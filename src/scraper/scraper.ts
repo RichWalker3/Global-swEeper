@@ -7,7 +7,7 @@ import { chromium, Page, Response } from 'playwright';
 import type { ScrapeResult, ScrapeOptions, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology } from './types.js';
 import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, extractProductLinks } from './detectors.js';
 import { tagPage } from '../prefilter/tagger.js';
-import { initWappalyzer, analyzeWithWappalyzer } from './wappalyzer.js';
+import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
 
 const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   maxPages: 30,
@@ -108,10 +108,19 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         
         // Run Wappalyzer analysis on homepage and collection pages (most representative)
         if (wappalyzerReady && pageData.rawHtml && (target.type === 'home' || target.type === 'collection')) {
-          const wapResults = await analyzeWithWappalyzer(pageData.url, pageData.rawHtml, pageData.headers);
+          const wapResultsRaw = await analyzeWithWappalyzer(pageData.url, pageData.rawHtml, pageData.headers);
+          // Filter to only e-commerce relevant technologies (exclude jQuery, Cloudflare, etc.)
+          const wapResults = filterEcommerceRelevant(wapResultsRaw);
+          
           for (const tech of wapResults) {
-            if (!allTechnologies.has(tech.name.toLowerCase())) {
-              allTechnologies.set(tech.name.toLowerCase(), {
+            const techNameLower = tech.name.toLowerCase();
+            // Skip if it's the same as detected platform (avoid duplication)
+            if (platformDetected && techNameLower === platformDetected.toLowerCase()) {
+              continue;
+            }
+            
+            if (!allTechnologies.has(techNameLower)) {
+              allTechnologies.set(techNameLower, {
                 name: tech.name,
                 confidence: String(tech.confidence),
                 version: tech.version || null,
@@ -119,12 +128,12 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
                 website: tech.website,
                 categories: tech.categories.map(c => ({ [String(c.id)]: c.name })),
               });
-              // Also add to thirdParties for backward compat
+              // Also add to thirdParties for UI display
               thirdParties.add(tech.name);
             }
           }
           if (opts.verbose && wapResults.length > 0) {
-            console.log(`    → Wappalyzer found ${wapResults.length} technologies`);
+            console.log(`    → Wappalyzer found ${wapResults.length} relevant technologies`);
           }
         }
         

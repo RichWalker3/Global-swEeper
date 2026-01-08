@@ -81,21 +81,51 @@ export function getCategoryNames(results: WappalyzerResult[]): string[] {
 }
 
 /**
+ * Technologies to exclude - too generic/common to be useful
+ */
+const EXCLUDED_TECHNOLOGIES = new Set([
+  // Infrastructure - everyone uses these
+  'cloudflare', 'fastly', 'akamai', 'amazon cloudfront', 'google cloud cdn',
+  'hsts', 'http/2', 'http/3', 
+  
+  // Generic JS libraries - not useful for WA
+  'jquery', 'lodash', 'underscore.js', 'moment.js', 'axios',
+  'webpack', 'vite', 'parcel', 'rollup',
+  
+  // Generic UI libraries
+  'bootstrap', 'tailwind css', 'font awesome', 'google fonts',
+  'slick', 'swiper', 'owl carousel',
+  
+  // Security basics
+  'ssl', 'tls', 'lets encrypt',
+  
+  // Tracking pixels everyone has
+  'facebook pixel', 'google tag manager', 'google analytics',
+  'meta pixel', 'pinterest tag', 'tiktok pixel',
+]);
+
+/**
  * Filter results to only include e-commerce relevant technologies
+ * Excludes generic/common technologies that aren't useful for WAs
  */
 export function filterEcommerceRelevant(results: WappalyzerResult[]): WappalyzerResult[] {
-  const relevantCategories = new Set([
-    'Ecommerce', 'Payment processors', 'Cart abandonment', 
-    'Loyalty & rewards', 'Live chat', 'Marketing automation',
-    'Email', 'Analytics', 'Tag managers', 'A/B Testing',
-    'Personalisation', 'Customer data platform', 'Reviews',
-    'Retargeting', 'Affiliate programs', 'Buy now pay later',
-    'Shipping carriers', 'Returns management', 'Subscriptions',
-    'CMS', 'JavaScript frameworks', 'UI frameworks'
-  ]);
-
-  return results.filter(r => 
-    r.categories.some(cat => relevantCategories.has(cat.name))
-  );
+  return results.filter(r => {
+    // Exclude by name (case-insensitive)
+    if (EXCLUDED_TECHNOLOGIES.has(r.name.toLowerCase())) {
+      return false;
+    }
+    
+    // Keep technologies in relevant categories
+    const relevantCategories = new Set([
+      'Ecommerce', 'Payment processors', 'Cart abandonment', 
+      'Loyalty & rewards', 'Live chat', 'Marketing automation',
+      'Email', 'Tag managers', 'A/B Testing',
+      'Personalisation', 'Customer data platform', 'Reviews',
+      'Retargeting', 'Affiliate programs', 'Buy now pay later',
+      'Shipping carriers', 'Returns management', 'Subscriptions',
+    ]);
+    
+    return r.categories.some(cat => relevantCategories.has(cat.name));
+  });
 }
 

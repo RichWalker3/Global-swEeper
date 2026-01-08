@@ -625,7 +625,7 @@
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                   </span>
-                  <span class="checkbox-label">Take screenshots</span>
+                  <span class="checkbox-label">Take screenshots <small style="color: var(--gray-400);">(coming soon)</small></span>
                 </label>
                 <label class="checkbox-item">
                   <input type="checkbox" name="verbose" checked>
@@ -681,6 +681,10 @@
             </div>
           </div>
 
+          <div style="font-size: 0.75rem; color: var(--gray-400); margin-top: 1rem;">
+            <span style="color: var(--green);">✓</span> = GE Supported &nbsp;
+            <span style="color: var(--red);">⚠️</span> = Red Flag
+          </div>
           <div class="third-parties" id="thirdParties"></div>
 
           <div class="red-flags hidden" id="redFlags">
@@ -893,18 +897,37 @@
       const thirdPartiesEl = document.getElementById('thirdParties');
       const redFlagApps = summary.redFlags || [];
       const technologies = summary.technologies || [];
+      const platform = (summary.platformDetected || '').toLowerCase();
       
       // Combine thirdPartiesDetected with Wappalyzer technologies  
       const allApps = new Set(summary.thirdPartiesDetected || []);
       technologies.forEach(tech => allApps.add(tech.name));
       
-      // Critical apps to highlight
-      const goodApps = ['ReturnGO', 'Shop Pay', 'Shopify Payments', 'Global-e', 'LoyaltyLion'];
-      const warningPatterns = ['smile.io', 'recharge', 'reach', 'flow', 'zonos'];
+      // Filter out platform (it's already shown in the Platform box)
+      const filteredApps = Array.from(allApps).filter(app => 
+        app.toLowerCase() !== platform
+      );
       
-      thirdPartiesEl.innerHTML = Array.from(allApps).map(app => {
+      // Apps that are GOOD for Global-e integration (✓ = GE Partner or Supported)
+      const goodApps = [
+        'ReturnGO',        // GE Partner
+        'Shop Pay',        // Shopify Payments indicator
+        'Shopify Payments',
+        'Global-e',        // Already using GE!
+        'LoyaltyLion',     // Supported
+        'Loop Returns',    // Supported
+        'Narvar',          // Supported
+        'Afterpay',        // Supported BNPL
+        'Klarna',          // Supported BNPL
+        'Affirm',          // Supported BNPL
+      ];
+      
+      // Apps that are RED FLAGS (⚠️ = Not supported or problematic)
+      const warningPatterns = ['smile.io', 'recharge', 'reach', 'flow commerce', 'zonos'];
+      
+      thirdPartiesEl.innerHTML = filteredApps.map(app => {
         const isWarning = redFlagApps.includes(app) || warningPatterns.some(p => app.toLowerCase().includes(p));
-        const isGood = goodApps.some(g => app.toLowerCase().includes(g.toLowerCase()));
+        const isGood = goodApps.some(g => app.toLowerCase() === g.toLowerCase());
         const className = isWarning ? 'warning' : isGood ? 'good' : '';
         const icon = isWarning ? '⚠️' : isGood ? '✓' : '';
         return `<span class="third-party-tag ${className}">${icon} ${app}</span>`;

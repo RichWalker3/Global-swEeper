@@ -1,12 +1,13 @@
 /**
  * Main scraper implementation using Playwright
- * Uses pattern-based detection for reliable third-party identification
+ * Uses Wappalyzer + pattern-based detection for comprehensive third-party identification
  */
 
 import { chromium, Page, Response } from 'playwright';
-import type { ScrapeResult, ScrapeOptions, PageData, CrawlSummary, NetworkRequest, DGFinding } from './types.js';
+import type { ScrapeResult, ScrapeOptions, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology } from './types.js';
 import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, extractProductLinks } from './detectors.js';
 import { tagPage } from '../prefilter/tagger.js';
+import { initWappalyzer, analyzeWithWappalyzer } from './wappalyzer.js';
 
 const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   maxPages: 30,
@@ -19,6 +20,12 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const startedAt = new Date().toISOString();
   
+  // Initialize Wappalyzer
+  const wappalyzerReady = await initWappalyzer();
+  if (opts.verbose && wappalyzerReady) {
+    console.log('  ✓ Wappalyzer initialized');
+  }
+  
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -28,6 +35,7 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
   const pages: PageData[] = [];
   const visited = new Set<string>();
   const thirdParties = new Set<string>();
+  const allTechnologies = new Map<string, DetectedTechnology>(); // Wappalyzer results
   const redFlags = new Set<string>();
   const b2bIndicators = new Set<string>();
   const dangerousGoods: DGFinding[] = [];
@@ -97,6 +105,28 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         // Extract page data
         const pageData = await extractPageData(page, response, networkRequests, opts);
         pages.push(pageData);
+        
+        // Run Wappalyzer analysis on homepage and collection pages (most representative)
+        if (wappalyzerReady && pageData.rawHtml && (target.type === 'home' || target.type === 'collection')) {
+          const wapResults = await analyzeWithWappalyzer(pageData.url, pageData.rawHtml, pageData.headers);
+          for (const tech of wapResults) {
+            if (!allTechnologies.has(tech.name.toLowerCase())) {
+              allTechnologies.set(tech.name.toLowerCase(), {
+                name: tech.name,
+                confidence: String(tech.confidence),
+                version: tech.version || null,
+                icon: tech.icon,
+                website: tech.website,
+                categories: tech.categories.map(c => ({ [String(c.id)]: c.name })),
+              });
+              // Also add to thirdParties for backward compat
+              thirdParties.add(tech.name);
+            }
+          }
+          if (opts.verbose && wapResults.length > 0) {
+            console.log(`    → Wappalyzer found ${wapResults.length} technologies`);
+          }
+        }
         
         // Scan for DG keywords
         const dgMatches = scanForDangerousGoods(pageData.cleanedText);
@@ -214,7 +244,7 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
       shopPayDetected,
       errors,
       thirdPartiesDetected: Array.from(thirdParties),
-      technologies: [], // Placeholder for future Wappalyzer-like integration
+      technologies: Array.from(allTechnologies.values()),
       redFlags: Array.from(redFlags),
       dangerousGoods,
       b2bIndicators: Array.from(b2bIndicators),

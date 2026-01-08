@@ -33,6 +33,7 @@
     "dotenv": "^16.4.5",
     "marked": "^14.1.0",
     "playwright": "^1.57.0",
+    "simple-wappalyzer": "^1.1.70",
     "zod": "^3.23.8"
   },
   "devDependencies": {

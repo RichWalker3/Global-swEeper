@@ -4,37 +4,103 @@
 
 import type { ScrapeResult, PageData } from '../scraper/types.js';
 
-const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce website. Your task is to produce a structured Website Assessment (WA) in JSON format.
+const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce website. Your task is to produce a formatted Website Assessment (WA) document in standard Markdown format (compatible with Jira, Confluence, and other tools).
 
-## Output Rules
+## Output Format
 
-1. **Every check must have a status:** \`verified\`, \`unconfirmed\`, or \`absent\`
+Generate a complete Website Assessment using this structure:
 
-2. **Status meanings:**
-   - \`verified\`: You found direct evidence. MUST include \`evidence\` array with url + quote.
-   - \`unconfirmed\`: You saw signals but can't fully prove it. Include \`notes\` explaining uncertainty.
-   - \`absent\`: You looked in the right places and didn't find it. Include \`searchedUrls\` or \`notes\`.
+# Website Assessment
 
-3. **Evidence rules:**
-   - Use exact quotes from the provided text when possible
-   - Keep quotes concise (1-2 sentences max)
-   - If you're making a deduction (e.g., "Shop Pay button means Shopify Payments"), add \`"inference": true\`
+## Merchant Overview
+- **Brand:** [brand name]
+- **Primary URL:** [url](https://example.com)
+- **Notes / Scope:** [scope notes]
+- **Assessed:** [date]
 
-4. **Be conservative:**
-   - If you're not sure, use \`unconfirmed\`
-   - Don't hallucinate features that aren't in the evidence
-   - It's better to mark something \`absent\` than to guess
+## Evidence Log (Working Links)
+- **Home:** [Home](https://example.com)
+- **PDP (example):** [Product](https://example.com/product)
+- **Shipping policy:** [Shipping](https://example.com/shipping)
+- **Returns policy:** [Returns](https://example.com/returns)
 
-5. **Red flags to always call out:**
-   - Smile.io (not supported by GE)
-   - Recharge (proprietary checkout, often OoS)
-   - Crypto/Bitcoin payments (not supported)
-   - Amazon fulfillment (OoS)
-   - Variable restocking fees (GE needs static)
+## Platform & Site Structure
+- **Platform & Version** — ✅ Verified: Shopify Plus
+  - Evidence: [shipping page](https://url) — "quote from page"
+[Continue for each check...]
 
-6. **Takeaways:**
-   - Write 1-2 sentence summaries for each section
-   - Focus on what matters for integration/presales`;
+## Catalog & Products
+[checks...]
+
+## Checkout & Payments
+[checks...]
+
+## Shipping & Logistics
+[checks...]
+
+## Loyalty, Subscriptions, and CRM
+[checks...]
+
+## Internationalization Testing
+[checks...]
+
+## Legal and Compliance
+[checks...]
+
+## Business Restrictions
+[checks...]
+
+## Apps, Integrations, and Data Layer
+[checks...]
+
+## Tech Risks and Integration Notes
+
+### 🚩 Red Flags
+- [list any red flags]
+
+- **Constraints:** [list]
+- **Effort Estimate:** [inference]
+
+## Open Questions
+- [questions needing merchant clarification]
+
+## Next Steps
+- [recommended actions]
+
+---
+
+### Legend
+- ✅ **Verified** — Direct UI evidence or authoritative policy page
+- ❔ **Unconfirmed** — Signal seen but not fully proven
+- ❌ **Absent** — Looked in reasonable places and did not find
+- **[Inference]** — Deduction with best available evidence
+
+## Status Indicators
+
+Use these status indicators for EVERY check:
+- ✅ **Verified** — Direct evidence found. Include: Evidence URL + quote.
+- ❔ **Unconfirmed** — Signals seen but not fully proven. Include explanatory notes.
+- ❌ **Absent** — Looked in reasonable places and did not find.
+- **[Inference]** — Deduction based on available evidence
+
+## Rules
+
+- **Be conservative:** If unsure, mark as ❔ Unconfirmed. Don't hallucinate features.
+- **Cite evidence:** For ✅ Verified items, always include the URL and a brief quote.
+- **Keep quotes concise:** 1-2 sentences max.
+- **Use Markdown link format:** [link text](https://full-url)
+- **Use bullet points (-) instead of numbered lists** for all lists (Open Questions, Next Steps, Red Flags, etc.)
+
+## Red Flags to Always Call Out (🚩)
+- Smile.io (NOT supported by Global-e)
+- Recharge (proprietary checkout, often OoS)
+- Crypto/Bitcoin payments (not supported)
+- Amazon fulfillment (OoS)
+- Variable restocking fees (GE needs static)
+
+## Takeaways
+- Write 1-2 sentence summaries for each section
+- Focus on what matters for integration/presales`;
 
 export function buildPrompt(scrapeResult: ScrapeResult): { system: string; user: string } {
   const { summary, pages } = scrapeResult;
@@ -63,16 +129,30 @@ ${formatMetadataOnly(tierThree)}
 
 ## Required Output
 
-Return a valid JSON object matching the WebsiteAssessment schema. Include:
-- meta (brand, primaryUrl, assessedAt, scopeNotes)
-- evidenceLog (links to key pages found)
-- platform, catalog, checkout, shipping, loyaltyCrm sections
-- internationalization, legal, businessRestrictions, integrations sections
-- techRisks (constraints, redFlags, integrationSurfaces, effortEstimate)
-- openQuestions and nextSteps arrays
-- crawlSummary (copy from above)
+Generate a complete Website Assessment in **standard Markdown format**. Include ALL sections:
 
-Respond with ONLY the JSON object. No markdown formatting, no explanation.`;
+- **Merchant Overview** - Brand, URL, scope, date
+- **Evidence Log** - Working links to key pages
+- **Platform & Site Structure** - Platform, headless, domain strategy, languages, etc.
+- **Catalog & Products** - Product types, bundles, customization, subscriptions, reviews
+- **Checkout & Payments** - Flow type, wallets, payment methods, gift cards, taxes/duties
+- **Shipping & Logistics** - Tiers, carriers, returns, tracking
+- **Loyalty, Subscriptions, CRM** - Loyalty program, email/SMS vendors
+- **Internationalization Testing** - Markets tested, currency behavior, duties
+- **Legal and Compliance** - Policies, cookie consent, restricted products
+- **Business Restrictions** - B2B, marketplace presence
+- **Apps, Integrations, Data Layer** - Notable apps, analytics
+- **Tech Risks and Integration Notes** - 🚩 Red flags, constraints, effort estimate
+- **Open Questions** - What needs merchant clarification
+- **Next Steps** - Recommended actions
+
+**IMPORTANT: Use bullet points (-) for ALL lists, not numbered lists (1. 2. 3.). Numbered lists don't render correctly in Jira.**
+
+Use emoji status indicators: ✅ Verified, ❔ Unconfirmed, ❌ Absent
+Use Markdown link format: [link text](https://url)
+Use # ## ### for headers, **bold** for emphasis.
+
+Respond with ONLY the Markdown. No preamble, no explanation after.`;
 
   return {
     system: SYSTEM_PROMPT,

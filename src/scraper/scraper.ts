@@ -1,15 +1,16 @@
 /**
  * Main scraper implementation using Playwright
+ * Uses pattern-based detection for reliable third-party identification
  */
 
-import { chromium, Browser, Page } from 'playwright';
-import type { ScrapeResult, ScrapeOptions, PageData, CrawlSummary, NetworkRequest } from './types.js';
-import { detectThirdParty } from './detectors.js';
+import { chromium, Page, Response } from 'playwright';
+import type { ScrapeResult, ScrapeOptions, PageData, CrawlSummary, NetworkRequest, DGFinding } from './types.js';
+import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, extractProductLinks } from './detectors.js';
 import { tagPage } from '../prefilter/tagger.js';
 
 const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   maxPages: 30,
-  timeout: 30000,
+  timeout: 15000,
   takeScreenshots: true,
   verbose: false,
 };
@@ -27,20 +28,26 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
   const pages: PageData[] = [];
   const visited = new Set<string>();
   const thirdParties = new Set<string>();
+  const redFlags = new Set<string>();
+  const b2bIndicators = new Set<string>();
+  const dangerousGoods: DGFinding[] = [];
   const errors: CrawlSummary['errors'] = [];
   
   let platformDetected: string | undefined;
   let globalEDetected = false;
   let returngoDetected = false;
+  let shopPayDetected = false;
   let checkoutReached = false;
   let checkoutStoppedAt: string | undefined;
-
+  let productPagesScraped = 0;
+  
+  const discoveredProductUrls: string[] = [];
   const domain = new URL(seedUrl).hostname;
 
   try {
-    // Define crawl targets based on e-commerce site structure
     const targets = buildCrawlTargets(seedUrl);
     
+    // Phase 1: Scrape main pages
     for (const target of targets) {
       if (visited.size >= opts.maxPages) break;
       if (visited.has(target.url)) continue;
@@ -57,13 +64,23 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
             thirdParties.add(detected);
             networkRequests.push({ url: reqUrl, type: request.resourceType(), thirdParty: detected });
             
+            // Check for red flags
+            if (isRedFlag(detected)) {
+              redFlags.add(detected);
+            }
+            
             // Special detections
             if (detected === 'Global-e') globalEDetected = true;
             if (detected === 'ReturnGO') returngoDetected = true;
+            if (detected === 'Shop Pay') shopPayDetected = true;
+          } else {
+            // Still track request even without match for debugging
+            networkRequests.push({ url: reqUrl, type: request.resourceType() });
           }
         });
 
-        await page.goto(target.url, { timeout: opts.timeout, waitUntil: 'networkidle' });
+        const response = await page.goto(target.url, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(2000);
         visited.add(target.url);
         
         // Detect platform from page
@@ -78,8 +95,30 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         }
 
         // Extract page data
-        const pageData = await extractPageData(page, networkRequests, opts);
+        const pageData = await extractPageData(page, response, networkRequests, opts);
         pages.push(pageData);
+        
+        // Scan for DG keywords
+        const dgMatches = scanForDangerousGoods(pageData.cleanedText);
+        for (const match of dgMatches) {
+          dangerousGoods.push({ ...match, foundOnUrl: pageData.url });
+        }
+        
+        // Detect B2B indicators
+        const b2b = detectB2B(pageData.cleanedText, pageData.url);
+        for (const indicator of b2b.evidence) {
+          b2bIndicators.add(indicator);
+        }
+        
+        // Extract product links from collection pages
+        if (target.type === 'collection' && pageData.rawHtml) {
+          const productUrls = extractProductLinks(pageData.rawHtml, seedUrl);
+          for (const url of productUrls) {
+            if (!discoveredProductUrls.includes(url)) {
+              discoveredProductUrls.push(url);
+            }
+          }
+        }
 
         if (opts.verbose) {
           console.log(`  ✓ ${target.type}: ${pageData.url}`);
@@ -97,6 +136,61 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         }
       }
     }
+    
+    // Phase 2: Scrape discovered product pages (up to 5)
+    const maxProducts = Math.min(5, opts.maxPages - visited.size);
+    for (let i = 0; i < Math.min(discoveredProductUrls.length, maxProducts); i++) {
+      const productUrl = discoveredProductUrls[i];
+      if (visited.has(productUrl)) continue;
+      
+      try {
+        const page = await context.newPage();
+        const networkRequests: NetworkRequest[] = [];
+        
+        page.on('request', (request) => {
+          const reqUrl = request.url();
+          const detected = detectThirdParty(reqUrl);
+          if (detected) {
+            thirdParties.add(detected);
+            networkRequests.push({ url: reqUrl, type: request.resourceType(), thirdParty: detected });
+            if (isRedFlag(detected)) redFlags.add(detected);
+            if (detected === 'Shop Pay') shopPayDetected = true;
+          } else {
+            networkRequests.push({ url: reqUrl, type: request.resourceType() });
+          }
+        });
+
+        const response = await page.goto(productUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(2000);
+        visited.add(productUrl);
+        productPagesScraped++;
+        
+        const pageData = await extractPageData(page, response, networkRequests, opts);
+        pageData.matchedCategories.push('pdp');
+        pages.push(pageData);
+        
+        // Scan PDP for DG keywords
+        const dgMatches = scanForDangerousGoods(pageData.cleanedText);
+        for (const match of dgMatches) {
+          if (!dangerousGoods.some(d => d.category === match.category)) {
+            dangerousGoods.push({ ...match, foundOnUrl: pageData.url });
+          }
+        }
+
+        if (opts.verbose) {
+          console.log(`  ✓ PDP: ${pageData.url}`);
+        }
+
+        await page.close();
+      } catch (error) {
+        errors.push({
+          url: productUrl,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          type: 'other',
+        });
+      }
+    }
+    
   } finally {
     await browser.close();
   }
@@ -114,11 +208,17 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
       checkoutReached,
       checkoutStoppedAt,
       platformDetected,
-      headlessDetected: await detectHeadless(pages),
+      headlessDetected: detectHeadless(pages),
       globalEDetected,
       returngoDetected,
+      shopPayDetected,
       errors,
       thirdPartiesDetected: Array.from(thirdParties),
+      technologies: [], // Placeholder for future Wappalyzer-like integration
+      redFlags: Array.from(redFlags),
+      dangerousGoods,
+      b2bIndicators: Array.from(b2bIndicators),
+      productPagesScraped,
     },
     pages,
   };
@@ -132,7 +232,6 @@ interface CrawlTarget {
 function buildCrawlTargets(seedUrl: string): CrawlTarget[] {
   const base = seedUrl.replace(/\/$/, '');
   
-  // Standard e-commerce page patterns
   return [
     { url: base, type: 'home' },
     { url: `${base}/collections/all`, type: 'collection' },
@@ -143,38 +242,46 @@ function buildCrawlTargets(seedUrl: string): CrawlTarget[] {
     { url: `${base}/pages/returns`, type: 'policy' },
     { url: `${base}/pages/faq`, type: 'other' },
     { url: `${base}/pages/rewards`, type: 'other' },
+    { url: `${base}/pages/wholesale`, type: 'other' },
     { url: `${base}/cart`, type: 'cart' },
-    // PDPs will be discovered dynamically from collection pages
   ];
 }
 
-async function extractPageData(page: Page, networkRequests: NetworkRequest[], opts: Required<ScrapeOptions>): Promise<PageData> {
+async function extractPageData(
+  page: Page, 
+  response: Response | null, 
+  networkRequests: NetworkRequest[], 
+  opts: Required<ScrapeOptions>
+): Promise<PageData> {
   const url = page.url();
   const title = await page.title();
+  const rawHtml = await page.content();
   
-  // Get cleaned text content
+  const statusCode = response?.status();
+  const responseHeaders = response?.headers() || {};
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(responseHeaders)) {
+    headers[key] = String(value);
+  }
+  
   const cleanedText = await page.evaluate(() => {
-    // Remove script, style, and hidden elements
     const clone = document.body.cloneNode(true) as HTMLElement;
     clone.querySelectorAll('script, style, noscript, [hidden], [aria-hidden="true"]').forEach(el => el.remove());
     return clone.innerText.replace(/\s+/g, ' ').trim();
   });
 
   const excerpt = cleanedText.slice(0, 500);
-  
-  // Tag page with categories
   const { categories, keyPhrases } = tagPage(cleanedText, url, title);
 
-  // Take screenshot if enabled
   let screenshot: string | undefined;
   if (opts.takeScreenshots) {
     // TODO: Implement screenshot saving
-    // screenshot = await page.screenshot({ path: `screenshots/${Date.now()}.png` });
   }
 
   return {
     url,
     title,
+    rawHtml,
     cleanedText,
     excerpt,
     screenshot,
@@ -182,24 +289,22 @@ async function extractPageData(page: Page, networkRequests: NetworkRequest[], op
     keyPhrases,
     networkRequests,
     timestamp: new Date().toISOString(),
+    statusCode,
+    headers,
   };
 }
 
 async function detectPlatform(page: Page): Promise<string | undefined> {
   return await page.evaluate(() => {
-    // Shopify detection
     if ((window as any).Shopify || document.querySelector('[data-shopify]') || document.body.innerHTML.includes('cdn.shopify.com')) {
       return 'Shopify';
     }
-    // SFCC detection
     if (document.body.innerHTML.includes('demandware')) {
       return 'SFCC';
     }
-    // Magento detection
     if ((window as any).Mage || document.body.innerHTML.includes('mage/')) {
       return 'Magento';
     }
-    // BigCommerce detection
     if (document.body.innerHTML.includes('bigcommerce.com')) {
       return 'BigCommerce';
     }
@@ -207,8 +312,7 @@ async function detectPlatform(page: Page): Promise<string | undefined> {
   });
 }
 
-async function detectHeadless(pages: PageData[]): Promise<boolean> {
-  // Check for headless framework signals in page content
+function detectHeadless(pages: PageData[]): boolean {
   const headlessSignals = ['__NEXT_DATA__', '_next/', 'gatsby', '_nuxt/', 'hydrogen'];
   
   for (const page of pages) {
@@ -220,4 +324,3 @@ async function detectHeadless(pages: PageData[]): Promise<boolean> {
   }
   return false;
 }
-

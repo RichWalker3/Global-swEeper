@@ -1,80 +1,110 @@
 /**
  * Third-party detection from network requests and page content
+ * Focused on WA-critical apps only: red flags, loyalty, subscriptions, returns, payments
  */
 
 interface ThirdPartyPattern {
   name: string;
   patterns: RegExp[];
   category: string;
+  priority: 'critical' | 'high' | 'medium';
+  notes?: string;
 }
 
+// Only keep patterns that matter for Website Assessments
 const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
-  // Returns
-  { name: 'ReturnGO', patterns: [/returngo\.ai/i, /returnsportal\.returngo/i], category: 'returns' },
-  { name: 'Loop Returns', patterns: [/loopreturns\.com/i], category: 'returns' },
-  { name: 'Narvar', patterns: [/narvar\.com/i], category: 'returns' },
-  { name: 'Happy Returns', patterns: [/happyreturns\.com/i], category: 'returns' },
+  // ============ RED FLAGS - CRITICAL ============
+  { 
+    name: 'Smile.io', 
+    patterns: [/smile\.io/i, /sweettoothrewards/i], 
+    category: 'loyalty',
+    priority: 'critical',
+    notes: '❌ NOT SUPPORTED by Global-e'
+  },
+  { 
+    name: 'Recharge', 
+    patterns: [/rechargepayments\.com/i, /rechargeapps\.com/i], 
+    category: 'subscriptions',
+    priority: 'critical',
+    notes: '⚠️ Uses proprietary checkout, often OoS'
+  },
 
-  // Subscriptions
-  { name: 'Recharge', patterns: [/rechargepayments\.com/i, /rechargeapps\.com/i], category: 'subscriptions' },
-  { name: 'Bold Subscriptions', patterns: [/boldapps\.net/i, /boldcommerce\.com/i], category: 'subscriptions' },
-  { name: 'Skio', patterns: [/skio\.com/i], category: 'subscriptions' },
+  // ============ POSITIVE SIGNALS ============
+  { 
+    name: 'ReturnGO', 
+    patterns: [/returngo\.ai/i, /returnsportal\.returngo/i], 
+    category: 'returns',
+    priority: 'high',
+    notes: '✅ GE Partner - flag as positive'
+  },
+  { 
+    name: 'Global-e', 
+    patterns: [/global-e\.com/i, /globale\.com/i, /ge-scripts/i], 
+    category: 'cross_border',
+    priority: 'critical',
+    notes: 'Already using Global-e!'
+  },
 
-  // Loyalty
-  { name: 'Smile.io', patterns: [/smile\.io/i, /sweettoothrewards/i], category: 'loyalty' },
-  { name: 'LoyaltyLion', patterns: [/loyaltylion\.com/i], category: 'loyalty' },
-  { name: 'Yotpo', patterns: [/yotpo\.com/i, /staticw2\.yotpo/i], category: 'loyalty' },
+  // ============ LOYALTY (need to know for scoping) ============
+  { name: 'LoyaltyLion', patterns: [/loyaltylion\.com/i], category: 'loyalty', priority: 'high', notes: '✅ Supported' },
+  { name: 'Yotpo Loyalty', patterns: [/yotpo\.com/i, /staticw2\.yotpo/i], category: 'loyalty', priority: 'high', notes: '⚠️ In progress (slow)' },
 
-  // Reviews
-  { name: 'Stamped', patterns: [/stamped\.io/i], category: 'reviews' },
-  { name: 'Judge.me', patterns: [/judge\.me/i], category: 'reviews' },
-  { name: 'Okendo', patterns: [/okendo\.io/i], category: 'reviews' },
+  // ============ SUBSCRIPTIONS ============
+  { name: 'Bold Subscriptions', patterns: [/boldapps\.net/i, /boldcommerce\.com/i], category: 'subscriptions', priority: 'high' },
+  { name: 'Skio', patterns: [/skio\.com/i], category: 'subscriptions', priority: 'high' },
+  { name: 'Ordergroove', patterns: [/ordergroove\.com/i], category: 'subscriptions', priority: 'high' },
 
-  // Email/SMS
-  { name: 'Klaviyo', patterns: [/klaviyo\.com/i, /a\.]klaviyo/i], category: 'email' },
-  { name: 'Attentive', patterns: [/attentivemobile\.com/i, /attn\.tv/i], category: 'sms' },
-  { name: 'Postscript', patterns: [/postscript\.io/i], category: 'sms' },
+  // ============ RETURNS ============
+  { name: 'Loop Returns', patterns: [/loopreturns\.com/i], category: 'returns', priority: 'medium' },
+  { name: 'Narvar', patterns: [/narvar\.com/i], category: 'returns', priority: 'medium' },
+  { name: 'Happy Returns', patterns: [/happyreturns\.com/i], category: 'returns', priority: 'medium' },
 
-  // Gift Cards
-  { name: 'Rise.ai', patterns: [/rise-ai\.com/i, /riseai\.co/i], category: 'gift_cards' },
-  { name: 'Govalo', patterns: [/govalo\.com/i], category: 'gift_cards' },
+  // ============ PAYMENTS / BNPL ============
+  { name: 'Shop Pay', patterns: [/shop\.app/i, /shopify.*accelerated/i], category: 'payments', priority: 'high', notes: 'Shopify Payments indicator' },
+  { name: 'Klarna', patterns: [/klarna\.com/i, /klarna-payments/i], category: 'bnpl', priority: 'medium' },
+  { name: 'Afterpay', patterns: [/afterpay\.com/i, /afterpay-js/i, /square.*afterpay/i], category: 'bnpl', priority: 'medium' },
+  { name: 'Affirm', patterns: [/affirm\.com/i], category: 'bnpl', priority: 'medium' },
+  { name: 'Sezzle', patterns: [/sezzle\.com/i], category: 'bnpl', priority: 'medium' },
 
-  // Personalization
-  { name: 'Nosto', patterns: [/nosto\.com/i], category: 'personalization' },
-  { name: 'Dynamic Yield', patterns: [/dynamicyield\.com/i], category: 'personalization' },
-  { name: 'Rebuy', patterns: [/rebuyengine\.com/i], category: 'personalization' },
+  // ============ GIFT CARDS ============
+  { name: 'Rise.ai', patterns: [/rise-ai\.com/i, /riseai\.co/i, /strn\.rise-ai/i], category: 'gift_cards', priority: 'medium' },
 
-  // Search
-  { name: 'Algolia', patterns: [/algolia\.net/i, /algolia\.com/i], category: 'search' },
-  { name: 'Searchspring', patterns: [/searchspring\.net/i], category: 'search' },
-  { name: 'Klevu', patterns: [/klevu\.com/i], category: 'search' },
+  // ============ CROSS-BORDER COMPETITORS ============
+  { name: 'Reach', patterns: [/withreach\.com/i], category: 'cross_border', priority: 'critical', notes: 'Competitor!' },
+  { name: 'Flow Commerce', patterns: [/flow\.io/i], category: 'cross_border', priority: 'critical', notes: 'Competitor!' },
+  { name: 'Zonos', patterns: [/zonos\.com/i], category: 'cross_border', priority: 'critical', notes: 'Competitor!' },
 
-  // Shipping Protection
-  { name: 'Route', patterns: [/route\.com/i, /routeapp\.io/i], category: 'shipping_protection' },
-  { name: 'Extend', patterns: [/extend\.com/i], category: 'warranty' },
+  // ============ MARKETING / EMAIL ============
+  { name: 'Klaviyo', patterns: [/klaviyo\.com/i, /a\.]klviyo\.com/i], category: 'email', priority: 'medium' },
+  { name: 'Attentive', patterns: [/attentive\.com/i, /attn\.tv/i], category: 'sms', priority: 'medium' },
+  { name: 'Postscript', patterns: [/postscript\.io/i], category: 'sms', priority: 'medium' },
+  { name: 'Mailchimp', patterns: [/mailchimp\.com/i, /list-manage\.com/i, /chimpstatic\.com/i], category: 'email', priority: 'medium' },
 
-  // Fraud
-  { name: 'Signifyd', patterns: [/signifyd\.com/i], category: 'fraud' },
-  { name: 'Riskified', patterns: [/riskified\.com/i], category: 'fraud' },
+  // ============ REVIEWS ============
+  { name: 'Judge.me', patterns: [/judge\.me/i], category: 'reviews', priority: 'medium' },
+  { name: 'Stamped.io', patterns: [/stamped\.io/i], category: 'reviews', priority: 'medium' },
+  { name: 'Loox', patterns: [/loox\.io/i], category: 'reviews', priority: 'medium' },
+  { name: 'Okendo', patterns: [/okendo\.io/i], category: 'reviews', priority: 'medium' },
 
-  // Analytics
-  { name: 'Google Analytics', patterns: [/google-analytics\.com/i, /googletagmanager\.com/i], category: 'analytics' },
-  { name: 'Segment', patterns: [/segment\.io/i, /segment\.com/i], category: 'analytics' },
+  // ============ ANALYTICS ============
+  { name: 'Google Analytics', patterns: [/google-analytics\.com/i, /googletagmanager\.com/i, /gtag/i], category: 'analytics', priority: 'medium' },
+  { name: 'Hotjar', patterns: [/hotjar\.com/i], category: 'analytics', priority: 'medium' },
+  { name: 'Segment', patterns: [/segment\.io/i, /segment\.com/i], category: 'analytics', priority: 'medium' },
 
-  // Cross-border (competitors/related)
-  { name: 'Global-e', patterns: [/global-e\.com/i, /globale\.com/i, /ge-scripts/i], category: 'cross_border' },
-  { name: 'Reach', patterns: [/withreach\.com/i], category: 'cross_border' },
-  { name: 'Flow Commerce', patterns: [/flow\.io/i], category: 'cross_border' },
+  // ============ CHAT / SUPPORT ============
+  { name: 'Gorgias', patterns: [/gorgias\.chat/i, /gorgias\.io/i], category: 'support', priority: 'medium' },
+  { name: 'Zendesk', patterns: [/zendesk\.com/i, /zdassets\.com/i], category: 'support', priority: 'medium' },
+  { name: 'Intercom', patterns: [/intercom\.io/i, /intercomcdn\.com/i], category: 'support', priority: 'medium' },
 
-  // Payments
-  { name: 'Klarna', patterns: [/klarna\.com/i, /klarna-payments/i], category: 'bnpl' },
-  { name: 'Afterpay', patterns: [/afterpay\.com/i, /afterpay-js/i], category: 'bnpl' },
-  { name: 'Affirm', patterns: [/affirm\.com/i], category: 'bnpl' },
-  { name: 'Sezzle', patterns: [/sezzle\.com/i], category: 'bnpl' },
+  // ============ PERSONALIZATION ============
+  { name: 'Nosto', patterns: [/nosto\.com/i], category: 'personalization', priority: 'medium' },
+  { name: 'Rebuy', patterns: [/rebuyengine\.com/i], category: 'personalization', priority: 'medium' },
+  { name: 'Bold', patterns: [/boldapps\.net/i, /boldcommerce\.com/i], category: 'apps', priority: 'medium' },
 
-  // Tracking
-  { name: 'AfterShip', patterns: [/aftership\.com/i], category: 'tracking' },
-  { name: 'Malomo', patterns: [/gomalomo\.com/i], category: 'tracking' },
+  // ============ SHIPPING ============  
+  { name: 'ShipBob', patterns: [/shipbob\.com/i], category: 'shipping', priority: 'medium' },
+  { name: 'ShipStation', patterns: [/shipstation\.com/i], category: 'shipping', priority: 'medium' },
+  { name: 'Easyship', patterns: [/easyship\.com/i], category: 'shipping', priority: 'medium' },
 ];
 
 /**
@@ -92,6 +122,13 @@ export function detectThirdParty(url: string): string | undefined {
 }
 
 /**
+ * Get detection info including notes
+ */
+export function getThirdPartyInfo(name: string): ThirdPartyPattern | undefined {
+  return THIRD_PARTY_PATTERNS.find(p => p.name === name);
+}
+
+/**
  * Get all patterns for a specific category
  */
 export function getPatternsForCategory(category: string): ThirdPartyPattern[] {
@@ -106,3 +143,164 @@ export function getCategoryForThirdParty(name: string): string | undefined {
   return found?.category;
 }
 
+/**
+ * Check if a detected third party is a red flag
+ */
+export function isRedFlag(name: string): boolean {
+  const redFlags = ['Smile.io', 'Recharge', 'Reach', 'Flow Commerce', 'Zonos'];
+  return redFlags.includes(name);
+}
+
+// ============ DANGEROUS GOODS DETECTION ============
+
+const DG_KEYWORDS: { keyword: string; category: string; risk: 'high' | 'medium' }[] = [
+  // Fragrances (high risk - flammable)
+  { keyword: 'perfume', category: 'fragrance', risk: 'high' },
+  { keyword: 'parfum', category: 'fragrance', risk: 'high' },
+  { keyword: 'eau de toilette', category: 'fragrance', risk: 'high' },
+  { keyword: 'eau de parfum', category: 'fragrance', risk: 'high' },
+  { keyword: 'cologne', category: 'fragrance', risk: 'high' },
+  { keyword: 'fragrance', category: 'fragrance', risk: 'high' },
+  
+  // Nail products (flammable)
+  { keyword: 'nail polish', category: 'nail', risk: 'high' },
+  { keyword: 'nail lacquer', category: 'nail', risk: 'high' },
+  { keyword: 'nail enamel', category: 'nail', risk: 'high' },
+  { keyword: 'nail remover', category: 'nail', risk: 'high' },
+  
+  // Aerosols
+  { keyword: 'aerosol', category: 'aerosol', risk: 'high' },
+  { keyword: 'spray', category: 'aerosol', risk: 'medium' },
+  { keyword: 'hairspray', category: 'aerosol', risk: 'high' },
+  { keyword: 'dry shampoo', category: 'aerosol', risk: 'high' },
+  { keyword: 'setting spray', category: 'aerosol', risk: 'medium' },
+  
+  // Batteries
+  { keyword: 'lithium battery', category: 'battery', risk: 'high' },
+  { keyword: 'lithium-ion', category: 'battery', risk: 'high' },
+  { keyword: 'li-ion', category: 'battery', risk: 'high' },
+  { keyword: 'rechargeable battery', category: 'battery', risk: 'medium' },
+  
+  // Cosmetics (may contain DG ingredients)
+  { keyword: 'self-tanner', category: 'cosmetics', risk: 'medium' },
+  { keyword: 'sunscreen', category: 'cosmetics', risk: 'medium' },
+  { keyword: 'hair dye', category: 'cosmetics', risk: 'medium' },
+  { keyword: 'hair color', category: 'cosmetics', risk: 'medium' },
+  
+  // Flammables
+  { keyword: 'alcohol-based', category: 'flammable', risk: 'high' },
+  { keyword: 'flammable', category: 'flammable', risk: 'high' },
+  { keyword: 'lighter', category: 'flammable', risk: 'high' },
+  { keyword: 'matches', category: 'flammable', risk: 'high' },
+  { keyword: 'candle', category: 'flammable', risk: 'medium' },
+];
+
+export interface DGMatch {
+  keyword: string;
+  category: string;
+  risk: 'high' | 'medium';
+  context: string; // surrounding text
+}
+
+/**
+ * Scan text content for Dangerous Goods keywords
+ */
+export function scanForDangerousGoods(text: string): DGMatch[] {
+  const matches: DGMatch[] = [];
+  const lowerText = text.toLowerCase();
+  
+  for (const { keyword, category, risk } of DG_KEYWORDS) {
+    const index = lowerText.indexOf(keyword.toLowerCase());
+    if (index !== -1) {
+      // Extract context (50 chars before and after)
+      const start = Math.max(0, index - 50);
+      const end = Math.min(text.length, index + keyword.length + 50);
+      const context = text.slice(start, end).replace(/\s+/g, ' ').trim();
+      
+      matches.push({ keyword, category, risk, context });
+    }
+  }
+  
+  // Dedupe by category (keep first match per category)
+  const seen = new Set<string>();
+  return matches.filter(m => {
+    if (seen.has(m.category)) return false;
+    seen.add(m.category);
+    return true;
+  });
+}
+
+// ============ B2B / WHOLESALE DETECTION ============
+
+const B2B_KEYWORDS = [
+  'wholesale',
+  'trade program',
+  'trade account',
+  'business account',
+  'bulk order',
+  'bulk pricing',
+  'reseller',
+  'b2b',
+  'dealer',
+  'distributor',
+  'faire.com', // Wholesale marketplace
+  'faire',
+];
+
+/**
+ * Scan text/URL for B2B/Wholesale indicators
+ */
+export function detectB2B(text: string, url: string): { detected: boolean; evidence: string[] } {
+  const evidence: string[] = [];
+  const lowerText = text.toLowerCase();
+  const lowerUrl = url.toLowerCase();
+  
+  for (const keyword of B2B_KEYWORDS) {
+    if (lowerText.includes(keyword) || lowerUrl.includes(keyword)) {
+      evidence.push(keyword);
+    }
+  }
+  
+  return {
+    detected: evidence.length > 0,
+    evidence: [...new Set(evidence)], // dedupe
+  };
+}
+
+// ============ PRODUCT LINK EXTRACTION ============
+
+/**
+ * Extract product URLs from page content (for PDP discovery)
+ */
+export function extractProductLinks(html: string, baseUrl: string): string[] {
+  const productLinks: string[] = [];
+  const domain = new URL(baseUrl).origin;
+  
+  // Common Shopify product URL patterns
+  const patterns = [
+    /href=["']([^"']*\/products\/[^"'#?]+)/gi,
+    /href=["']([^"']*\/p\/[^"'#?]+)/gi,
+  ];
+  
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      let url = match[1];
+      
+      // Make absolute if relative
+      if (url.startsWith('/')) {
+        url = domain + url;
+      } else if (!url.startsWith('http')) {
+        url = domain + '/' + url;
+      }
+      
+      // Skip duplicates and variant URLs
+      if (!productLinks.includes(url) && !url.includes('?variant=')) {
+        productLinks.push(url);
+      }
+    }
+  }
+  
+  // Return first 5 unique products (don't want to scrape too many)
+  return productLinks.slice(0, 5);
+}

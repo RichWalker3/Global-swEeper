@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global-swEep | Website Assessment Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Global-e brand colors - orange, white, black */
+      --black: #1a1a1a;
+      --black-light: #2d2d2d;
+      --black-lighter: #3d3d3d;
+      --orange: #e85a2c;
+      --orange-dark: #d14a1f;
+      --orange-glow: rgba(232, 90, 44, 0.2);
+      --white: #ffffff;
+      --gray-100: #f7f7f7;
+      --gray-200: #e8e8e8;
+      --gray-300: #a0a0a0;
+      --gray-400: #707070;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --green: #22c55e;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--gray-100);
+      color: var(--black);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    header {
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-200);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      font-size: 1.75rem;
+    }
+
+    .logo-text {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--black);
+    }
+
+    .logo-text span {
+      color: var(--orange);
+    }
+
+    .logo-sub {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      font-weight: 500;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      color: var(--gray-400);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--gray-300);
+    }
+
+    .status-dot.connected {
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+    }
+
+    /* Main Layout */
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 2rem;
+      min-height: calc(100vh - 80px);
+    }
+
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--gray-100);
+    }
+
+    .card-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--black);
+    }
+
+    .card-body {
+      padding: 1.5rem;
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--gray-400);
+      margin-bottom: 0.5rem;
+    }
+
+    input[type="url"],
+    input[type="text"] {
+      width: 100%;
+      padding: 0.875rem 1rem;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      color: var(--black);
+      font-size: 0.9375rem;
+      font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px var(--orange-glow);
+    }
+
+    input::placeholder {
+      color: var(--gray-300);
+    }
+
+    /* Checkboxes */
+    .checkbox-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+    }
+
+    .checkbox-item input {
+      display: none;
+    }
+
+    .checkbox-box {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--gray-300);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      background: var(--white);
+    }
+
+    .checkbox-item input:checked + .checkbox-box {
+      background: var(--orange);
+      border-color: var(--orange);
+    }
+
+    .checkbox-box svg {
+      width: 12px;
+      height: 12px;
+      stroke: var(--white);
+      stroke-width: 3;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .checkbox-item input:checked + .checkbox-box svg {
+      opacity: 1;
+    }
+
+    .checkbox-label {
+      font-size: 0.9375rem;
+      color: var(--black);
+    }
+
+    /* Button */
+    .btn {
+      width: 100%;
+      padding: 1rem;
+      background: var(--orange);
+      border: none;
+      border-radius: 8px;
+      color: var(--white);
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--orange-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px var(--orange-glow);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      color: var(--black);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--gray-100);
+      box-shadow: none;
+    }
+
+    /* Progress */
+    .progress-section {
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--gray-200);
+    }
+
+    .progress-bar-container {
+      height: 8px;
+      background: var(--gray-200);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--orange);
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.3s ease-out;
+    }
+
+    .progress-status {
+      font-size: 0.875rem;
+      color: var(--gray-400);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .progress-status .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--gray-200);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Pages Log */
+    .pages-log {
+      margin-top: 1rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .page-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      font-size: 0.8125rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .page-item:last-child {
+      border-bottom: none;
+    }
+
+    .page-check {
+      color: var(--green);
+    }
+
+    .page-url {
+      color: var(--gray-400);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .page-categories {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .category-tag {
+      font-size: 0.6875rem;
+      padding: 0.125rem 0.375rem;
+      background: var(--orange-glow);
+      color: var(--orange);
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    /* Output Panel */
+    .output-panel {
+      height: calc(100vh - 140px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .output-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-left: auto;
+    }
+
+    .tab-btn {
+      padding: 0.375rem 0.75rem;
+      background: transparent;
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      color: var(--gray-400);
+      font-size: 0.8125rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--orange);
+      border-color: var(--orange);
+      color: var(--white);
+    }
+
+    .output-content {
+      flex: 1;
+      min-height: 0; /* Allow content to shrink */
+      overflow: auto;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 1.5rem;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.8125rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: var(--black);
+      min-height: 200px;
+    }
+
+    .output-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--gray-400);
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .output-placeholder-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      flex-shrink: 0; /* Don't shrink - always visible */
+    }
+
+    .action-buttons .btn {
+      flex: 1;
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--yellow);
+    }
+
+    .alert-info {
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: var(--blue);
+    }
+
+    .alert-success {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: var(--green);
+    }
+
+    .alert-icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .alert-content {
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .alert-content strong {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    /* Hidden */
+    .hidden {
+      display: none !important;
+    }
+
+    /* Third parties list */
+    .third-parties {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .third-party-tag {
+      padding: 0.375rem 0.75rem;
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: var(--black);
+    }
+
+    .third-party-tag.warning {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+    }
+
+    .third-party-tag.good {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--green);
+    }
+
+    /* Red flags box */
+    .red-flags {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
+    .red-flags h4 {
+      color: var(--red);
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .red-flags ul {
+      margin-left: 1.5rem;
+      font-size: 0.8125rem;
+      color: var(--black);
+    }
+
+    /* Summary stats */
+    .summary-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .stat-box {
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--orange);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      margin-top: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <span class="logo-icon">🧹</span>
+      <div>
+        <div class="logo-text">Global-sw<span>E</span>ep</div>
+        <div class="logo-sub">Website Assessment Tool</div>
+      </div>
+    </div>
+    <div class="status-badge">
+      <span class="status-dot" id="connectionDot"></span>
+      <span id="connectionStatus">Connecting...</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Panel: Input -->
+    <div class="input-panel">
+      <div class="card">
+        <div class="card-header">
+          <span>🎯</span>
+          <h2>New Assessment</h2>
+        </div>
+        <div class="card-body">
+          <form id="sweepForm">
+            <div class="form-group">
+              <label for="merchantUrl">Merchant URL</label>
+              <input 
+                type="url" 
+                id="merchantUrl" 
+                name="url" 
+                placeholder="https://cool-brand.com"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label>Options</label>
+              <div class="checkbox-group">
+                <label class="checkbox-item">
+                  <input type="checkbox" name="screenshots" checked>
+                  <span class="checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                  <span class="checkbox-label">Take screenshots</span>
+                </label>
+                <label class="checkbox-item">
+                  <input type="checkbox" name="verbose" checked>
+                  <span class="checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                  <span class="checkbox-label">Verbose logging</span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn" id="startBtn">
+              <span>🚀</span>
+              Run Assessment
+            </button>
+          </form>
+
+          <!-- Progress Section (hidden initially) -->
+          <div class="progress-section hidden" id="progressSection">
+            <div class="progress-bar-container">
+              <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="progress-status">
+              <div class="spinner" id="progressSpinner"></div>
+              <span id="progressText">Starting...</span>
+            </div>
+            <div class="pages-log" id="pagesLog"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary Card (hidden initially) -->
+      <div class="card hidden" id="summaryCard" style="margin-top: 1rem;">
+        <div class="card-header">
+          <span>📊</span>
+          <h2>Summary</h2>
+        </div>
+        <div class="card-body">
+          <div class="summary-stats">
+            <div class="stat-box">
+              <div class="stat-value" id="statPages">0</div>
+              <div class="stat-label">Pages</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value" id="statApps">0</div>
+              <div class="stat-label">Apps Found</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value" id="statPlatform">-</div>
+              <div class="stat-label">Platform</div>
+            </div>
+          </div>
+
+          <div class="third-parties" id="thirdParties"></div>
+
+          <div class="red-flags hidden" id="redFlags">
+            <h4>🚩 Red Flags</h4>
+            <ul id="redFlagsList"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Extraction Options (hidden initially) -->
+      <div class="card hidden" id="extractionCard" style="margin-top: 1rem;">
+        <div class="card-header">
+          <span>🤖</span>
+          <h2>Extract Assessment</h2>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info" id="noApiKeyAlert">
+            <span class="alert-icon">💡</span>
+            <div class="alert-content">
+              <strong>No API key? No problem!</strong>
+              Copy the evidence packet and paste it into Cursor to extract using your unlimited credits.
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn btn-secondary" id="copyEvidenceBtn">
+              📋 Copy for Cursor
+            </button>
+            <button class="btn hidden" id="autoExtractBtn">
+              ⚡ Auto-Extract
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- JSON to Markdown Converter (hidden initially) -->
+      <div class="card hidden" id="jsonConverterCard" style="margin-top: 1rem;">
+        <div class="card-header">
+          <span>🔄</span>
+          <h2>Convert JSON → Markdown</h2>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info" style="margin-bottom: 1rem;">
+            <span class="alert-icon">📥</span>
+            <div class="alert-content">
+              <strong>Got JSON from Cursor?</strong>
+              Paste it below to convert to formatted Markdown — no AI credits needed!
+            </div>
+          </div>
+          <textarea id="jsonInput" placeholder="Paste the JSON assessment here..." style="width: 100%; height: 150px; font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; padding: 0.75rem; border: 1px solid var(--gray-200); border-radius: 8px; resize: vertical;"></textarea>
+          <div class="action-buttons" style="margin-top: 0.75rem;">
+            <button class="btn" id="convertJsonBtn">
+              🔄 Convert to Markdown
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Output -->
+    <div class="output-panel card">
+      <div class="card-header">
+        <span>📄</span>
+        <h2>Output</h2>
+        <div class="output-tabs">
+          <button class="tab-btn" data-tab="markdown">Markdown</button>
+          <button class="tab-btn" data-tab="json">JSON</button>
+          <button class="tab-btn active" data-tab="prompt">Prompt</button>
+        </div>
+      </div>
+      <div class="card-body" style="flex: 1; display: flex; flex-direction: column; padding: 1rem; min-height: 0; overflow: hidden;">
+        <div class="output-content" id="outputContent">
+          <div class="output-placeholder">
+            <div class="output-placeholder-icon">🧹</div>
+            <p>Enter a merchant URL and click "Run Assessment" to get started.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.7;">
+              The tool will crawl the site, detect third-party apps,<br>
+              and prepare evidence for your Website Assessment.
+            </p>
+          </div>
+        </div>
+        <div class="action-buttons" id="outputActions">
+          <button class="btn" id="copyOutputBtn">
+            📋 Copy <span id="copyTabName">Prompt</span>
+          </button>
+          <button class="btn btn-secondary" id="downloadBtn">
+            💾 Download
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // State
+    let clientId = null;
+    let eventSource = null;
+    let currentScrapeResult = null;
+    let currentPrompt = null;
+    let currentTab = 'prompt';  // Default to Prompt tab
+    let outputs = {
+      markdown: '',
+      json: '',
+      prompt: '',
+    };
+
+    // DOM elements
+    const form = document.getElementById('sweepForm');
+    const startBtn = document.getElementById('startBtn');
+    const progressSection = document.getElementById('progressSection');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const pagesLog = document.getElementById('pagesLog');
+    const summaryCard = document.getElementById('summaryCard');
+    const extractionCard = document.getElementById('extractionCard');
+    const outputContent = document.getElementById('outputContent');
+    const outputActions = document.getElementById('outputActions');
+    const connectionDot = document.getElementById('connectionDot');
+    const connectionStatus = document.getElementById('connectionStatus');
+
+    // Connect to SSE
+    function connect() {
+      clientId = crypto.randomUUID();
+      eventSource = new EventSource(`/events?clientId=${clientId}`);
+
+      eventSource.addEventListener('connected', (e) => {
+        const data = JSON.parse(e.data);
+        clientId = data.clientId;
+        connectionDot.classList.add('connected');
+        connectionStatus.textContent = 'Connected';
+      });
+
+      eventSource.addEventListener('status', (e) => {
+        const data = JSON.parse(e.data);
+        progressText.textContent = data.message;
+        if (data.progress !== undefined) {
+          progressBar.style.width = `${data.progress}%`;
+        }
+      });
+
+      eventSource.addEventListener('page', (e) => {
+        const data = JSON.parse(e.data);
+        addPageToLog(data);
+        progressBar.style.width = `${data.progress}%`;
+        progressText.textContent = `Scraping ${data.current}/${data.total}: ${data.title}`;
+      });
+
+      eventSource.addEventListener('scraped', (e) => {
+        const data = JSON.parse(e.data);
+        currentScrapeResult = data.scrapeResult;
+        currentPrompt = data.prompt;
+        onScrapingComplete(data);
+      });
+
+      eventSource.addEventListener('complete', (e) => {
+        const data = JSON.parse(e.data);
+        onExtractionComplete(data);
+      });
+
+      eventSource.addEventListener('error', (e) => {
+        if (e.data) {
+          const data = JSON.parse(e.data);
+          progressText.textContent = `Error: ${data.message}`;
+          progressBar.style.background = 'var(--red)';
+        }
+        startBtn.disabled = false;
+      });
+
+      eventSource.onerror = () => {
+        connectionDot.classList.remove('connected');
+        connectionStatus.textContent = 'Disconnected';
+        setTimeout(connect, 3000);
+      };
+    }
+
+    // Add page to log
+    function addPageToLog(page) {
+      const item = document.createElement('div');
+      item.className = 'page-item';
+      item.innerHTML = `
+        <span class="page-check">✓</span>
+        <span class="page-url">${page.url}</span>
+        <div class="page-categories">
+          ${page.categories.slice(0, 2).map(c => `<span class="category-tag">${c}</span>`).join('')}
+        </div>
+      `;
+      pagesLog.appendChild(item);
+      pagesLog.scrollTop = pagesLog.scrollHeight;
+    }
+
+    // On scraping complete
+    function onScrapingComplete(data) {
+      const { scrapeResult, prompt } = data;
+      const summary = scrapeResult.summary;
+
+      // Update progress - hide spinner and show completion
+      document.getElementById('progressSpinner').classList.add('hidden');
+      progressText.innerHTML = '✅ Scraping complete!';
+      progressBar.style.width = '100%';
+
+      // Show summary
+      summaryCard.classList.remove('hidden');
+      document.getElementById('statPages').textContent = summary.pagesVisited;
+      // Count all detected technologies (from Wappalyzer + pattern matching)
+      const techCount = new Set([...(summary.thirdPartiesDetected || []), ...(summary.technologies || []).map(t => t.name)]).size;
+      document.getElementById('statApps').textContent = techCount;
+      document.getElementById('statPlatform').textContent = summary.platformDetected || '?';
+
+      // Show third parties with color coding (from Wappalyzer + pattern matching)
+      const thirdPartiesEl = document.getElementById('thirdParties');
+      const redFlagApps = summary.redFlags || [];
+      const technologies = summary.technologies || [];
+      
+      // Combine thirdPartiesDetected with Wappalyzer technologies  
+      const allApps = new Set(summary.thirdPartiesDetected || []);
+      technologies.forEach(tech => allApps.add(tech.name));
+      
+      // Critical apps to highlight
+      const goodApps = ['ReturnGO', 'Shop Pay', 'Shopify Payments', 'Global-e', 'LoyaltyLion'];
+      const warningPatterns = ['smile.io', 'recharge', 'reach', 'flow', 'zonos'];
+      
+      thirdPartiesEl.innerHTML = Array.from(allApps).map(app => {
+        const isWarning = redFlagApps.includes(app) || warningPatterns.some(p => app.toLowerCase().includes(p));
+        const isGood = goodApps.some(g => app.toLowerCase().includes(g.toLowerCase()));
+        const className = isWarning ? 'warning' : isGood ? 'good' : '';
+        const icon = isWarning ? '⚠️' : isGood ? '✓' : '';
+        return `<span class="third-party-tag ${className}">${icon} ${app}</span>`;
+      }).join('');
+
+      // Build red flags list from all sources
+      const redFlagsEl = document.getElementById('redFlags');
+      const redFlagsList = document.getElementById('redFlagsList');
+      const flags = [];
+      
+      // Red flag apps
+      if (redFlagApps.includes('Smile.io')) {
+        flags.push('🚫 Smile.io detected - NOT supported by Global-e');
+      }
+      if (redFlagApps.includes('Recharge')) {
+        flags.push('⚠️ Recharge detected - Uses proprietary checkout, often OoS');
+      }
+      if (redFlagApps.includes('Reach') || redFlagApps.includes('Flow Commerce') || redFlagApps.includes('Zonos')) {
+        flags.push('🏁 Competitor cross-border solution detected!');
+      }
+      
+      // Dangerous Goods
+      const dgFindings = summary.dangerousGoods || [];
+      if (dgFindings.length > 0) {
+        const dgCategories = [...new Set(dgFindings.map(d => d.category))];
+        flags.push(`⚠️ Dangerous Goods detected: ${dgCategories.join(', ')} - Requires DHL Express, special handling`);
+      }
+      
+      // B2B indicators
+      const b2bIndicators = summary.b2bIndicators || [];
+      if (b2bIndicators.length > 0) {
+        flags.push(`📦 B2B/Wholesale detected: ${b2bIndicators.join(', ')} - Usually OoS due to GMV`);
+      }
+      
+      if (flags.length > 0) {
+        redFlagsEl.classList.remove('hidden');
+        redFlagsList.innerHTML = flags.map(f => `<li>${f}</li>`).join('');
+      } else {
+        redFlagsEl.classList.add('hidden');
+      }
+
+      // Show extraction options
+      extractionCard.classList.remove('hidden');
+
+      // Build summary text for Markdown tab
+      let summaryText = `📋 NEXT STEP: Copy the Prompt and paste into Cursor!
+
+1. Click "📋 Copy Prompt" button below
+2. Paste into a new Cursor chat
+3. Cursor will return your formatted Markdown WA directly!
+
+---
+## Scrape Summary
+
+- **Pages visited:** ${summary.pagesVisited} (${summary.productPagesScraped || 0} PDPs)
+- **Platform:** ${summary.platformDetected || 'Unknown'}
+- **Shop Pay:** ${summary.shopPayDetected ? '✅ Detected' : '❌ Not detected'}
+- **Third-parties:** ${summary.thirdPartiesDetected.join(', ') || 'None detected'}
+`;
+
+      if (flags.length > 0) {
+        summaryText += `\n## ⚠️ Flags\n\n${flags.map(f => `- ${f}`).join('\n')}`;
+      }
+
+      if (dgFindings.length > 0) {
+        summaryText += `\n\n## Dangerous Goods Details\n\n`;
+        dgFindings.forEach(dg => {
+          summaryText += `- **${dg.category}** (${dg.risk} risk): "${dg.keyword}" found on ${dg.foundOnUrl}\n`;
+        });
+      }
+
+      // Store outputs
+      outputs.prompt = `=== SYSTEM PROMPT ===\n\n${prompt.system}\n\n=== USER PROMPT ===\n\n${prompt.user}`;
+      outputs.json = JSON.stringify(scrapeResult, null, 2);
+      outputs.markdown = summaryText;
+
+      // Update output
+      updateOutput();
+      outputActions.classList.remove('hidden');
+
+      // Re-enable button
+      startBtn.disabled = false;
+      startBtn.innerHTML = '<span>🚀</span> Run Again';
+    }
+
+    // On extraction complete (if using API key)
+    function onExtractionComplete(data) {
+      outputs.markdown = data.markdown;
+      outputs.json = JSON.stringify(data.assessment, null, 2);
+      updateOutput();
+    }
+
+    // Update output display
+    function updateOutput() {
+      outputContent.textContent = outputs[currentTab] || 'No output yet';
+    }
+
+    // Form submit
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const url = document.getElementById('merchantUrl').value;
+      const options = {
+        screenshots: form.screenshots.checked,
+        verbose: form.verbose.checked,
+      };
+
+      // Reset UI
+      startBtn.disabled = true;
+      startBtn.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Running...';
+      progressSection.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      progressBar.style.background = '';
+      pagesLog.innerHTML = '';
+      document.getElementById('progressSpinner').classList.remove('hidden');
+      summaryCard.classList.add('hidden');
+      extractionCard.classList.add('hidden');
+      document.getElementById('jsonConverterCard').classList.add('hidden');
+      outputContent.innerHTML = '<div class="output-placeholder"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div><p style="margin-top:1rem;">Scraping in progress...</p></div>';
+
+      try {
+        await fetch('/api/sweep', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, clientId, options }),
+        });
+      } catch (error) {
+        progressText.textContent = `Error: ${error.message}`;
+        startBtn.disabled = false;
+      }
+    });
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTab = btn.dataset.tab;
+        updateOutput();
+        // Update copy button label
+        const tabNames = { markdown: 'Markdown', json: 'JSON', prompt: 'Prompt' };
+        document.getElementById('copyTabName').textContent = tabNames[currentTab];
+      });
+    });
+
+    // Copy evidence button
+    document.getElementById('copyEvidenceBtn').addEventListener('click', () => {
+      const text = outputs.prompt;
+      navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copyEvidenceBtn');
+      btn.innerHTML = '✅ Copied!';
+      setTimeout(() => btn.innerHTML = '📋 Copy for Cursor', 2000);
+    });
+
+    // Copy output button
+    document.getElementById('copyOutputBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(outputs[currentTab]);
+      const btn = document.getElementById('copyOutputBtn');
+      const tabNames = { markdown: 'Markdown', json: 'JSON', prompt: 'Prompt' };
+      btn.innerHTML = '✅ Copied!';
+      setTimeout(() => btn.innerHTML = `📋 Copy <span id="copyTabName">${tabNames[currentTab]}</span>`, 2000);
+    });
+
+    // Download button
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const ext = currentTab === 'json' ? 'json' : 'md';
+      const blob = new Blob([outputs[currentTab]], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `website-assessment.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Convert JSON to Markdown button
+    document.getElementById('convertJsonBtn').addEventListener('click', async () => {
+      const jsonInput = document.getElementById('jsonInput');
+      const btn = document.getElementById('convertJsonBtn');
+      const jsonText = jsonInput.value.trim();
+      
+      if (!jsonText) {
+        alert('Please paste JSON first!');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Converting...';
+
+      try {
+        const res = await fetch('/api/json-to-markdown', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: jsonText,
+        });
+        
+        const data = await res.json();
+        
+        if (data.error) {
+          alert('Error: ' + data.error + (data.details ? '\n\n' + data.details : ''));
+          btn.disabled = false;
+          btn.innerHTML = '🔄 Convert to Markdown';
+          return;
+        }
+
+        // Update the Markdown output and switch to Markdown tab
+        outputs.markdown = data.markdown;
+        currentTab = 'markdown';
+        updateOutput();
+        
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.tab === 'markdown');
+        });
+        document.getElementById('copyTabName').textContent = 'Markdown';
+
+        btn.innerHTML = '✅ Converted!';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '🔄 Convert to Markdown';
+        }, 2000);
+
+      } catch (e) {
+        alert('Failed to convert: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Convert to Markdown';
+      }
+    });
+
+    // Check API status on load
+    async function checkApiStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (data.hasApiKey) {
+          document.getElementById('noApiKeyAlert').classList.add('hidden');
+          document.getElementById('autoExtractBtn').classList.remove('hidden');
+        }
+      } catch (e) {
+        console.error('Failed to check API status');
+      }
+    }
+
+    // Initialize
+    connect();
+    checkApiStatus();
+  </script>
+</body>
+</html>
+

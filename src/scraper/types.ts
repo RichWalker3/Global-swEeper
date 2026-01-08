@@ -47,6 +47,84 @@ export interface DetectedTechnology {
   categories: Array<Record<string, string>>;
 }
 
+// Extracted policy information
+export interface ExtractedPolicyInfo {
+  returnWindow?: string;
+  returnFees?: string[];
+  freeReturns?: boolean;
+  freeExchanges?: boolean;
+  finalSaleItems?: string[];
+  restockingFee?: string;
+  returnPortal?: string;
+  returnProvider?: string;
+  shippingRestrictions?: string[];
+  giftWithPurchase?: boolean;
+  priceAdjustmentWindow?: string;
+}
+
+// Checkout flow information
+export interface CheckoutFlowInfo {
+  expressWallets: string[];
+  paymentMethods: string[];
+  bnplOptions: string[];
+  giftCardOption: boolean;
+  shippingOptions: string[];
+  taxDisplay?: string;
+  checkoutType?: string;
+}
+
+// Catalog features detection
+export interface CatalogFeaturesInfo {
+  // Bundles
+  bundlesDetected: boolean;
+  bundleEvidence: string[];
+  
+  // Customizable products
+  customizableProducts: boolean;
+  customizationTypes: string[];
+  
+  // Virtual/Digital products (NOT gift cards)
+  virtualProducts: boolean;
+  virtualProductTypes: string[];
+  
+  // Gift Cards (separate category)
+  giftCardsDetected: boolean;
+  giftCardTypes: string[];
+  
+  // Subscriptions
+  subscriptionsDetected: boolean;
+  subscriptionProvider?: string;
+  
+  // Pre-orders
+  preOrdersDetected: boolean;
+  
+  // GWP
+  gwpDetected: boolean;
+}
+
+// Loyalty program info
+export interface LoyaltyProgramInfo {
+  detected: boolean;
+  programName?: string;
+  provider?: string;
+  evidence: string[];
+}
+
+// Localization/Internationalization info
+export interface LocalizationDetected {
+  countrySelector: boolean;
+  multiLanguage: boolean;
+  languagesDetected: string[];
+  multiCurrency: boolean;
+  currenciesDetected: string[];
+}
+
+// Marketplace presence
+export interface MarketplacePresence {
+  detected: boolean;
+  marketplaces: string[];
+}
+
 export interface CrawlSummary {
   seedUrl: string;
   domain: string;
@@ -68,6 +146,17 @@ export interface CrawlSummary {
   dangerousGoods: DGFinding[];
   b2bIndicators: string[];
   productPagesScraped: number;
+  // Extracted policy and checkout info
+  policyInfo?: ExtractedPolicyInfo;
+  checkoutInfo?: CheckoutFlowInfo;
+  // Catalog features
+  catalogFeatures?: CatalogFeaturesInfo;
+  // Loyalty program
+  loyaltyProgram?: LoyaltyProgramInfo;
+  // Localization
+  localization?: LocalizationDetected;
+  // Marketplace presence
+  marketplacePresence?: MarketplacePresence;
 }
 
 export interface ScrapeResult {

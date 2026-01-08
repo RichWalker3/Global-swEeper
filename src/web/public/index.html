@@ -691,6 +691,41 @@
             <h4>🚩 Red Flags</h4>
             <ul id="redFlagsList"></ul>
           </div>
+
+          <!-- Policy & Checkout Info -->
+          <div class="policy-info hidden" id="policyInfo" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">📋 Extracted Policy Info</h4>
+            <div id="policyDetails" style="font-size: 0.8125rem; color: var(--gray-400); display: grid; gap: 0.5rem;"></div>
+          </div>
+
+          <div class="checkout-info hidden" id="checkoutInfoSection" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">💳 Checkout Flow</h4>
+            <div id="checkoutDetails" style="font-size: 0.8125rem; color: var(--gray-400); display: grid; gap: 0.5rem;"></div>
+          </div>
+
+          <!-- Catalog Features -->
+          <div class="catalog-features hidden" id="catalogFeaturesSection" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">📦 Catalog Features</h4>
+            <div id="catalogDetails" style="font-size: 0.8125rem; color: var(--gray-400); display: grid; gap: 0.5rem;"></div>
+          </div>
+
+          <!-- Loyalty Program -->
+          <div class="loyalty-info hidden" id="loyaltySection" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">🎁 Loyalty Program</h4>
+            <div id="loyaltyDetails" style="font-size: 0.8125rem; color: var(--gray-400); display: grid; gap: 0.5rem;"></div>
+          </div>
+
+          <!-- Localization -->
+          <div class="localization-info hidden" id="localizationSection" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">🌍 Localization</h4>
+            <div id="localizationDetails" style="font-size: 0.8125rem; color: var(--gray-400); display: grid; gap: 0.5rem;"></div>
+          </div>
+
+          <!-- Marketplace Presence -->
+          <div class="marketplace-info hidden" id="marketplaceSection" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--gray-200);">
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">🏪 Marketplace Presence</h4>
+            <div id="marketplaceDetails" style="font-size: 0.8125rem; color: var(--gray-400); display: grid; gap: 0.5rem;"></div>
+          </div>
         </div>
       </div>
 
@@ -969,6 +1004,169 @@
         redFlagsEl.classList.add('hidden');
       }
 
+      // Display extracted policy info
+      const policyInfo = summary.policyInfo || {};
+      const policyInfoEl = document.getElementById('policyInfo');
+      const policyDetails = document.getElementById('policyDetails');
+      const policyItems = [];
+      
+      if (policyInfo.returnWindow) {
+        policyItems.push(`<div><strong>Return Window:</strong> ${policyInfo.returnWindow}</div>`);
+      }
+      if (policyInfo.returnFees && policyInfo.returnFees.length > 0) {
+        policyItems.push(`<div><strong>Return Fees:</strong> ${policyInfo.returnFees.join(', ')}</div>`);
+      }
+      if (policyInfo.returnProvider) {
+        policyItems.push(`<div><strong>Return Provider:</strong> ${policyInfo.returnProvider}</div>`);
+      }
+      if (policyInfo.returnPortal) {
+        policyItems.push(`<div><strong>Return Portal:</strong> ${policyInfo.returnPortal}</div>`);
+      }
+      if (policyInfo.finalSaleItems && policyInfo.finalSaleItems.length > 0) {
+        policyItems.push(`<div><strong>Final Sale:</strong> ${policyInfo.finalSaleItems.join(', ')}</div>`);
+      }
+      if (policyInfo.giftWithPurchase) {
+        policyItems.push(`<div><strong>GWP:</strong> Gift With Purchase detected</div>`);
+      }
+      if (policyInfo.shippingRestrictions && policyInfo.shippingRestrictions.length > 0) {
+        policyItems.push(`<div style="color: var(--yellow);"><strong>⚠️ Shipping:</strong> ${policyInfo.shippingRestrictions.join(', ')}</div>`);
+      }
+      
+      if (policyItems.length > 0) {
+        policyInfoEl.classList.remove('hidden');
+        policyDetails.innerHTML = policyItems.join('');
+      } else {
+        policyInfoEl.classList.add('hidden');
+      }
+
+      // Display checkout info
+      const checkoutInfo = summary.checkoutInfo || {};
+      const checkoutInfoEl = document.getElementById('checkoutInfoSection');
+      const checkoutDetails = document.getElementById('checkoutDetails');
+      const checkoutItems = [];
+      
+      if (checkoutInfo.expressWallets && checkoutInfo.expressWallets.length > 0) {
+        checkoutItems.push(`<div><strong>Express Wallets:</strong> ${checkoutInfo.expressWallets.join(', ')}</div>`);
+      }
+      if (checkoutInfo.paymentMethods && checkoutInfo.paymentMethods.length > 0) {
+        checkoutItems.push(`<div><strong>Payment Methods:</strong> ${checkoutInfo.paymentMethods.join(', ')}</div>`);
+      }
+      if (checkoutInfo.bnplOptions && checkoutInfo.bnplOptions.length > 0) {
+        checkoutItems.push(`<div><strong>BNPL:</strong> ${checkoutInfo.bnplOptions.join(', ')}</div>`);
+      }
+      if (checkoutInfo.shippingOptions && checkoutInfo.shippingOptions.length > 0) {
+        checkoutItems.push(`<div><strong>Shipping Options:</strong> ${checkoutInfo.shippingOptions.join(', ')}</div>`);
+      }
+      if (checkoutInfo.giftCardOption) {
+        checkoutItems.push(`<div><strong>Gift Cards:</strong> Available at checkout</div>`);
+      }
+      if (checkoutInfo.taxDisplay) {
+        checkoutItems.push(`<div><strong>Taxes:</strong> ${checkoutInfo.taxDisplay}</div>`);
+      }
+      
+      if (checkoutItems.length > 0) {
+        checkoutInfoEl.classList.remove('hidden');
+        checkoutDetails.innerHTML = checkoutItems.join('');
+      } else {
+        checkoutInfoEl.classList.add('hidden');
+      }
+
+      // Display catalog features
+      const catalogFeatures = summary.catalogFeatures || {};
+      const catalogFeaturesEl = document.getElementById('catalogFeaturesSection');
+      const catalogDetails = document.getElementById('catalogDetails');
+      const catalogItems = [];
+      
+      if (catalogFeatures.bundlesDetected) {
+        catalogItems.push(`<div><strong>📦 Bundles/Kits:</strong> ✅ Detected</div>`);
+      }
+      if (catalogFeatures.customizableProducts) {
+        catalogItems.push(`<div><strong>✏️ Customizable:</strong> ${catalogFeatures.customizationTypes?.join(', ') || 'Yes'}</div>`);
+      }
+      if (catalogFeatures.virtualProducts) {
+        catalogItems.push(`<div><strong>💾 Virtual Products:</strong> ${catalogFeatures.virtualProductTypes?.join(', ') || 'Yes'}</div>`);
+      }
+      if (catalogFeatures.giftCardsDetected) {
+        catalogItems.push(`<div><strong>🎁 Gift Cards:</strong> ${catalogFeatures.giftCardTypes?.join(', ') || 'Yes'}</div>`);
+      }
+      if (catalogFeatures.subscriptionsDetected) {
+        const subText = catalogFeatures.subscriptionProvider ? `via ${catalogFeatures.subscriptionProvider}` : 'Detected';
+        catalogItems.push(`<div><strong>🔄 Subscriptions:</strong> ${subText}</div>`);
+      }
+      if (catalogFeatures.preOrdersDetected) {
+        catalogItems.push(`<div><strong>📅 Pre-orders:</strong> ✅ Detected</div>`);
+      }
+      if (catalogFeatures.gwpDetected) {
+        catalogItems.push(`<div><strong>🎀 Gift With Purchase:</strong> ✅ Detected</div>`);
+      }
+      
+      if (catalogItems.length > 0) {
+        catalogFeaturesEl.classList.remove('hidden');
+        catalogDetails.innerHTML = catalogItems.join('');
+      } else {
+        catalogFeaturesEl.classList.add('hidden');
+      }
+
+      // Display loyalty program
+      const loyaltyProgram = summary.loyaltyProgram || {};
+      const loyaltyEl = document.getElementById('loyaltySection');
+      const loyaltyDetails = document.getElementById('loyaltyDetails');
+      const loyaltyItems = [];
+      
+      if (loyaltyProgram.detected) {
+        if (loyaltyProgram.programName) {
+          loyaltyItems.push(`<div><strong>Program:</strong> ${loyaltyProgram.programName}</div>`);
+        }
+        if (loyaltyProgram.provider) {
+          loyaltyItems.push(`<div><strong>Provider:</strong> ${loyaltyProgram.provider}</div>`);
+        }
+        if (loyaltyProgram.evidence && loyaltyProgram.evidence.length > 0) {
+          loyaltyItems.push(`<div><strong>Evidence:</strong> ${loyaltyProgram.evidence.slice(0, 2).join(', ')}</div>`);
+        }
+      }
+      
+      if (loyaltyItems.length > 0) {
+        loyaltyEl.classList.remove('hidden');
+        loyaltyDetails.innerHTML = loyaltyItems.join('');
+      } else {
+        loyaltyEl.classList.add('hidden');
+      }
+
+      // Display localization
+      const localization = summary.localization || {};
+      const localizationEl = document.getElementById('localizationSection');
+      const localizationDetails = document.getElementById('localizationDetails');
+      const localizationItems = [];
+      
+      if (localization.countrySelector) {
+        localizationItems.push(`<div><strong>🌐 Country Selector:</strong> ✅ Detected</div>`);
+      }
+      if (localization.multiLanguage && localization.languagesDetected?.length > 0) {
+        localizationItems.push(`<div><strong>🗣️ Languages:</strong> ${localization.languagesDetected.join(', ')}</div>`);
+      }
+      if (localization.multiCurrency && localization.currenciesDetected?.length > 0) {
+        localizationItems.push(`<div><strong>💱 Currencies:</strong> ${localization.currenciesDetected.join(', ')}</div>`);
+      }
+      
+      if (localizationItems.length > 0) {
+        localizationEl.classList.remove('hidden');
+        localizationDetails.innerHTML = localizationItems.join('');
+      } else {
+        localizationEl.classList.add('hidden');
+      }
+
+      // Display marketplace presence
+      const marketplacePresence = summary.marketplacePresence || {};
+      const marketplaceEl = document.getElementById('marketplaceSection');
+      const marketplaceDetails = document.getElementById('marketplaceDetails');
+      
+      if (marketplacePresence.detected && marketplacePresence.marketplaces?.length > 0) {
+        marketplaceEl.classList.remove('hidden');
+        marketplaceDetails.innerHTML = `<div><strong>Found on:</strong> ${marketplacePresence.marketplaces.join(', ')}</div>`;
+      } else {
+        marketplaceEl.classList.add('hidden');
+      }
+
       // Show extraction options
       extractionCard.classList.remove('hidden');
 
@@ -990,6 +1188,66 @@
 
       if (flags.length > 0) {
         summaryText += `\n## ⚠️ Flags\n\n${flags.map(f => `- ${f}`).join('\n')}`;
+      }
+
+      // Add policy info to summary
+      if (policyItems.length > 0) {
+        summaryText += `\n\n## 📋 Policy Info\n\n`;
+        if (policyInfo.returnWindow) summaryText += `- **Return Window:** ${policyInfo.returnWindow}\n`;
+        if (policyInfo.returnFees && policyInfo.returnFees.length > 0) summaryText += `- **Return Fees:** ${policyInfo.returnFees.join(', ')}\n`;
+        if (policyInfo.returnProvider) summaryText += `- **Return Provider:** ${policyInfo.returnProvider}\n`;
+        if (policyInfo.returnPortal) summaryText += `- **Return Portal:** ${policyInfo.returnPortal}\n`;
+        if (policyInfo.finalSaleItems && policyInfo.finalSaleItems.length > 0) summaryText += `- **Final Sale Items:** ${policyInfo.finalSaleItems.join(', ')}\n`;
+        if (policyInfo.giftWithPurchase) summaryText += `- **GWP:** Gift With Purchase detected\n`;
+        if (policyInfo.shippingRestrictions && policyInfo.shippingRestrictions.length > 0) summaryText += `- **⚠️ Shipping Restrictions:** ${policyInfo.shippingRestrictions.join(', ')}\n`;
+      }
+
+      // Add checkout info to summary
+      if (checkoutItems.length > 0) {
+        summaryText += `\n\n## 💳 Checkout Flow\n\n`;
+        if (checkoutInfo.expressWallets && checkoutInfo.expressWallets.length > 0) summaryText += `- **Express Wallets:** ${checkoutInfo.expressWallets.join(', ')}\n`;
+        if (checkoutInfo.paymentMethods && checkoutInfo.paymentMethods.length > 0) summaryText += `- **Payment Methods:** ${checkoutInfo.paymentMethods.join(', ')}\n`;
+        if (checkoutInfo.bnplOptions && checkoutInfo.bnplOptions.length > 0) summaryText += `- **BNPL:** ${checkoutInfo.bnplOptions.join(', ')}\n`;
+        if (checkoutInfo.shippingOptions && checkoutInfo.shippingOptions.length > 0) summaryText += `- **Shipping Options:** ${checkoutInfo.shippingOptions.join(', ')}\n`;
+        if (checkoutInfo.giftCardOption) summaryText += `- **Gift Cards:** Available at checkout\n`;
+        if (checkoutInfo.taxDisplay) summaryText += `- **Taxes:** ${checkoutInfo.taxDisplay}\n`;
+      }
+
+      // Add catalog features to summary (uses catalogFeatures declared above)
+      if (catalogFeatures.bundlesDetected || catalogFeatures.customizableProducts || catalogFeatures.virtualProducts || 
+          catalogFeatures.giftCardsDetected || catalogFeatures.subscriptionsDetected || catalogFeatures.preOrdersDetected || catalogFeatures.gwpDetected) {
+        summaryText += `\n\n## 📦 Catalog Features\n\n`;
+        if (catalogFeatures.bundlesDetected) summaryText += `- **Bundles/Kits:** ✅ Detected\n`;
+        if (catalogFeatures.customizableProducts) summaryText += `- **Customizable Products:** ${catalogFeatures.customizationTypes?.join(', ') || 'Yes'}\n`;
+        if (catalogFeatures.virtualProducts) summaryText += `- **Virtual Products:** ${catalogFeatures.virtualProductTypes?.join(', ') || 'Yes'}\n`;
+        if (catalogFeatures.giftCardsDetected) summaryText += `- **Gift Cards:** ${catalogFeatures.giftCardTypes?.join(', ') || 'Yes'}\n`;
+        if (catalogFeatures.subscriptionsDetected) {
+          const subText = catalogFeatures.subscriptionProvider ? `via ${catalogFeatures.subscriptionProvider}` : 'Detected';
+          summaryText += `- **Subscriptions:** ${subText}\n`;
+        }
+        if (catalogFeatures.preOrdersDetected) summaryText += `- **Pre-orders:** ✅ Detected\n`;
+        if (catalogFeatures.gwpDetected) summaryText += `- **Gift With Purchase:** ✅ Detected\n`;
+      }
+
+      // Add loyalty program to summary (uses loyaltyProgram declared above)
+      if (loyaltyProgram.detected) {
+        summaryText += `\n\n## 🎁 Loyalty Program\n\n`;
+        if (loyaltyProgram.programName) summaryText += `- **Program Name:** ${loyaltyProgram.programName}\n`;
+        if (loyaltyProgram.provider) summaryText += `- **Provider:** ${loyaltyProgram.provider}\n`;
+      }
+
+      // Add localization to summary (uses localization declared above)
+      if (localization.countrySelector || localization.multiLanguage || localization.multiCurrency) {
+        summaryText += `\n\n## 🌍 Localization\n\n`;
+        if (localization.countrySelector) summaryText += `- **Country Selector:** ✅ Detected\n`;
+        if (localization.multiLanguage && localization.languagesDetected?.length > 0) summaryText += `- **Languages:** ${localization.languagesDetected.join(', ')}\n`;
+        if (localization.multiCurrency && localization.currenciesDetected?.length > 0) summaryText += `- **Currencies:** ${localization.currenciesDetected.join(', ')}\n`;
+      }
+
+      // Add marketplace presence to summary (uses marketplacePresence declared above)
+      if (marketplacePresence.detected && marketplacePresence.marketplaces?.length > 0) {
+        summaryText += `\n\n## 🏪 Marketplace Presence\n\n`;
+        summaryText += `- **Found on:** ${marketplacePresence.marketplaces.join(', ')}\n`;
       }
 
       if (dgFindings.length > 0) {

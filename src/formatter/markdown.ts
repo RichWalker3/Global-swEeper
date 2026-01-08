@@ -3,7 +3,7 @@
  */
 
 import type { WebsiteAssessment } from '../schema/assessment.js';
-import type { Check, Evidence } from '../schema/common.js';
+import type { Check } from '../schema/common.js';
 
 const STATUS_EMOJI = {
   verified: '✅',

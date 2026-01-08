@@ -3,5 +3,7 @@
  * Automated Website Assessment tool for Global-e merchant onboarding
  */
 
-export { sweep } from './cli/sweep.js';
+// Main exports
+export { scrape } from './scraper/scraper.js';
+export type { ScrapeResult, ScrapeOptions, CrawlSummary, PageData } from './scraper/types.js';
 

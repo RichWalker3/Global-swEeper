@@ -709,6 +709,30 @@
   <main>
     <!-- Left Panel: Input -->
     <div class="input-panel">
+      <!-- How It Works -->
+      <div class="card" id="howItWorksCard" style="margin-bottom: 1rem;">
+        <div class="card-header" style="cursor: pointer;" onclick="toggleHowItWorks()">
+          <span>📖</span>
+          <h2>How It Works</h2>
+          <span id="howItWorksToggle" style="margin-left: auto; font-size: 1rem; transition: transform 0.2s;">▼</span>
+        </div>
+        <div class="card-body" id="howItWorksBody" style="padding: 1rem 1.5rem;">
+          <ol style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--black); line-height: 1.8;">
+            <li><strong>Enter URL</strong> — Paste the merchant's website URL below</li>
+            <li><strong>Run Assessment</strong> — Click the button to scrape the site (20-40 sec)</li>
+            <li><strong>Review Summary</strong> — Check platform, third-parties, red flags</li>
+            <li><strong>Copy Prompt</strong> — Click "📋 Copy for Cursor" in the Output panel</li>
+            <li><strong>Paste in Cursor</strong> — Start a new Cursor chat and paste</li>
+            <li><strong>Get JSON back</strong> — Cursor generates the WA as JSON</li>
+            <li><strong>Convert to Markdown</strong> — Paste JSON in converter below</li>
+            <li><strong>Copy to Jira</strong> — Final Markdown ready for the ticket!</li>
+          </ol>
+          <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--gray-200); font-size: 0.75rem; color: var(--gray-400);">
+            <strong>What gets detected:</strong> Platform, checkout flow, express wallets, BNPL, 30+ third-party apps, return policies, loyalty programs, subscriptions, dangerous goods, B2B indicators, and red flags (Smile.io, Recharge, competitors).
+          </div>
+        </div>
+      </div>
+
       <!-- API Key Card (Coming Soon) -->
       <div class="card" id="apiKeyCard" style="margin-bottom: 1rem; opacity: 0.6;">
         <div class="card-header">
@@ -1004,6 +1028,15 @@
         if (autoExtractBtn) autoExtractBtn.classList.add('hidden');
         if (noApiKeyAlert) noApiKeyAlert.classList.remove('hidden');
       }
+    }
+
+    // Toggle How It Works section
+    function toggleHowItWorks() {
+      const body = document.getElementById('howItWorksBody');
+      const toggle = document.getElementById('howItWorksToggle');
+      const isHidden = body.style.display === 'none';
+      body.style.display = isHidden ? 'block' : 'none';
+      toggle.textContent = isHidden ? '▼' : '▶';
     }
 
     function initApiKeyInput() {

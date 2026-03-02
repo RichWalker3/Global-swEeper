@@ -769,21 +769,22 @@ interface CrawlTarget {
 
 // Patterns to classify discovered links
 const LINK_CLASSIFIERS: { pattern: RegExp; type: CrawlTarget['type']; priority: number }[] = [
-  // Policy pages (high priority)
-  { pattern: /\/(policies?|terms|privacy|refund|return|shipping|exchange|warranty|guarantee)/i, type: 'policy', priority: 10 },
-  { pattern: /\/(faq|help|support|contact)/i, type: 'other', priority: 5 },
-  
-  // Rewards/Loyalty pages (high priority)
-  { pattern: /\/(rewards?|loyalty|points|vip|member)/i, type: 'rewards', priority: 10 },
-  
+  // Policy pages (high priority) - match with or without /pages/ prefix
+  { pattern: /\/(pages?\/)?(policies?|terms|privacy|refund|returns?|shipping|exchange|warranty|guarantee)/i, type: 'policy', priority: 10 },
+  { pattern: /\/(pages?\/)?(faq|help|support|contact)/i, type: 'other', priority: 5 },
+
+  // Rewards/Loyalty pages (high priority) - match with or without /pages/ prefix
+  { pattern: /\/(pages?\/)?(rewards?|loyalty|points|vip|member|referr?als?)/i, type: 'rewards', priority: 10 },
+
   // Collection pages
   { pattern: /\/(collections?|shop|category|categories|products?)$/i, type: 'collection', priority: 8 },
   { pattern: /\/collections\/[^\/]+$/i, type: 'collection', priority: 7 },
-  
+  { pattern: /\/(mens?|womens?|kids?|sale|new|best-sellers?)/i, type: 'collection', priority: 6 },
+
   // Cart/Checkout
   { pattern: /\/(cart|bag|basket)$/i, type: 'cart', priority: 6 },
   { pattern: /\/checkout/i, type: 'checkout', priority: 6 },
-  
+
   // Product pages (lower priority - we'll discover these from collections)
   { pattern: /\/products\/[^\/]+$/i, type: 'pdp', priority: 3 },
 ];
@@ -948,6 +949,34 @@ async function discoverCrawlTargets(page: Page, seedUrl: string, verbose: boolea
     }
     return true;
   });
+  
+  // If we found very few targets, add common fallback URLs
+  if (targets.length < 5) {
+    const fallbackPaths = [
+      { path: '/pages/returns', type: 'policy' as const },
+      { path: '/pages/shipping', type: 'policy' as const },
+      { path: '/pages/faq', type: 'other' as const },
+      { path: '/pages/about', type: 'other' as const },
+      { path: '/collections/all', type: 'collection' as const },
+      { path: '/collections/mens', type: 'collection' as const },
+      { path: '/collections/womens', type: 'collection' as const },
+      { path: '/policies/refund-policy', type: 'policy' as const },
+      { path: '/policies/shipping-policy', type: 'policy' as const },
+      { path: '/policies/privacy-policy', type: 'policy' as const },
+      { path: '/cart', type: 'cart' as const },
+    ];
+    
+    for (const fb of fallbackPaths) {
+      const url = base + fb.path;
+      if (!discovered.has(url)) {
+        targets.push({ url, type: fb.type, source: 'fallback' });
+      }
+    }
+    
+    if (verbose) {
+      console.log(`  → Added ${fallbackPaths.length} fallback URLs (discovery found too few)`);
+    }
+  }
   
   if (verbose) {
     const byType = targets.reduce((acc, t) => {

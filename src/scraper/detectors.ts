@@ -89,24 +89,12 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
   { name: 'Flow Commerce', patterns: [/flow\.io/i], category: 'cross_border', priority: 'critical', notes: 'Competitor!' },
   { name: 'Zonos', patterns: [/zonos\.com/i], category: 'cross_border', priority: 'critical', notes: 'Competitor!' },
 
-  // ============ MARKETING / EMAIL ============
-  { name: 'Klaviyo', patterns: [/klaviyo\.com/i, /a\.]klviyo\.com/i], category: 'email', priority: 'medium' },
-  { name: 'Attentive', patterns: [/attentive\.com/i, /attn\.tv/i], category: 'sms', priority: 'medium' },
-  { name: 'Postscript', patterns: [/postscript\.io/i], category: 'sms', priority: 'medium' },
-  { name: 'Mailchimp', patterns: [/mailchimp\.com/i, /list-manage\.com/i, /chimpstatic\.com/i], category: 'email', priority: 'medium' },
-  { name: 'Listrak', patterns: [/listrak\.com/i, /listrakbi\.com/i], category: 'email', priority: 'medium' },
-
-  // ============ REVIEWS ============
+  // ============ REVIEWS (relevant for customer experience) ============
   { name: 'Judge.me', patterns: [/judge\.me/i], category: 'reviews', priority: 'medium' },
   { name: 'Stamped.io', patterns: [/stamped\.io/i], category: 'reviews', priority: 'medium' },
   { name: 'Loox', patterns: [/loox\.io/i], category: 'reviews', priority: 'medium' },
   { name: 'Okendo', patterns: [/okendo\.io/i], category: 'reviews', priority: 'medium' },
-
-  // ============ ANALYTICS ============
-  { name: 'Google Analytics', patterns: [/google-analytics\.com/i, /googletagmanager\.com/i, /gtag/i], category: 'analytics', priority: 'medium' },
-  { name: 'Hotjar', patterns: [/hotjar\.com/i], category: 'analytics', priority: 'medium' },
-  { name: 'Segment', patterns: [/segment\.io/i, /segment\.com/i], category: 'analytics', priority: 'medium' },
-  { name: 'Impact', patterns: [/impact\.com/i, /impactradius\.com/i, /d\.impactradius/i], category: 'affiliate', priority: 'medium' },
+  { name: 'Bazaarvoice Reviews', patterns: [/bazaarvoice\.com/i], category: 'reviews', priority: 'medium' },
 
   // ============ CHAT / SUPPORT ============
   { name: 'Gorgias', patterns: [/gorgias\.chat/i, /gorgias\.io/i], category: 'support', priority: 'medium' },

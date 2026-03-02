@@ -2,7 +2,7 @@
 
 > **Global-swEep** — A tool that gathers and organizes website evidence for human review.
 
-> **Status:** Design phase - ready for implementation  
+> **Status:** Beta - Web UI available, tested against 10+ merchants  
 > **Owner:** Richie Walker, Presales Solutions Engineer @ Global-e North America
 
 ---
@@ -55,12 +55,15 @@ Build an app that:
 
 | Component | Purpose | Status |
 |-----------|---------|--------|
-| **Scraper** | Playwright-based crawler that navigates sites, captures text, detects third-party scripts | To build |
-| **Pre-filter** | Tags pages by category (shipping, returns, checkout, etc.) before LLM call | To build |
-| **LLM Extractor** | Claude prompt that transforms evidence into structured JSON | Designed |
-| **Schema Validator** | Zod validation to ensure output matches expected structure | Designed |
-| **Output Formatter** | Converts JSON to Markdown WA document | To build |
-| **Jira/Confluence API** | Uploads WA to ticket, updates DNA document | Patterns exist |
+| **Scraper** | Playwright-based crawler that navigates sites, captures text, detects third-party scripts | ✅ Built |
+| **Pre-filter** | Tags pages by category (shipping, returns, checkout, etc.) before LLM call | ✅ Built |
+| **Wappalyzer** | Technology detection using Wappalyzer patterns | ✅ Built |
+| **LLM Extractor** | Claude prompt that transforms evidence into structured JSON | ✅ Built |
+| **Schema Validator** | Zod validation to ensure output matches expected structure | ✅ Built |
+| **Output Formatter** | Converts JSON to Markdown WA document | ✅ Built |
+| **Web UI** | Real-time progress, summary display, copy-paste workflow | ✅ Built |
+| **Jira/Confluence API** | Fetch existing WAs for comparison testing | ✅ Built (read) |
+| **Direct API Integration** | Call Claude API from web UI | 🚧 Coming Soon |
 
 ---
 
@@ -203,31 +206,65 @@ Every claim in the WA must be one of:
 
 ---
 
-## Getting Started (When Ready to Build)
+## Getting Started
 
-### Pre-requisites to Set Up First
-- [ ] **GitHub account + SSH keys** — Set up on your machine
-- [ ] **Git initialized** — `git init` in the sweep folder
-- [ ] **GitHub repo created** — Push initial commit
-- [ ] **Node.js installed** — v18+ recommended
-- [ ] **Anthropic API key** — For Claude extraction
+### Prerequisites
+- **Node.js v18+** — Required for the scraper
+- **Playwright browsers** — Auto-installed on first run
 
-### Once Set Up
+### Installation
 
 ```bash
-# Clone this repo
-git clone <repo-url>
+# Clone the repo
+git clone https://github.com/RichWalker3/Global-swEeper.git
 cd global-sweep
 
 # Install dependencies
 npm install
 
-# Set up credentials
-cp .env.example .env
-# Add your Anthropic API key and Jira credentials
+# Install Playwright browsers (required once)
+npx playwright install chromium
+```
 
-# Run on a test site
-npm run sweep -- --url https://example-merchant.com
+### Running the Web UI
+
+```bash
+# Start the web server
+npm run web
+
+# Open in browser
+# http://localhost:3847
+```
+
+### How to Use
+
+1. **Enter the merchant URL** in the web interface
+2. **Click "Run Assessment"** — the scraper will crawl the site (20-40 seconds)
+3. **Review the Summary** — platform, third-parties, red flags, policy info
+4. **Copy the Prompt** — click "📋 Copy for Cursor"
+5. **Paste into Cursor** — start a new chat and paste the prompt
+6. **Cursor generates the WA** — returns JSON following the template
+7. **Paste JSON back** — use "Convert JSON → Markdown" section
+8. **Copy final Markdown** — paste into Jira ticket
+
+### What Gets Detected
+
+| Category | Examples |
+|----------|----------|
+| **Platform** | Shopify, Shopify Plus, headless indicators |
+| **Checkout** | Express wallets (Shop Pay, Apple Pay, Google Pay), BNPL (Afterpay, Klarna, Affirm) |
+| **Third-parties** | Klaviyo, Gorgias, ReturnGO, Yotpo, Recharge, Smile.io, 30+ more |
+| **Policies** | Return window, free returns, final sale items |
+| **Catalog** | Bundles, subscriptions, gift cards, pre-orders, customizable products |
+| **Loyalty** | Program name, provider (LoyaltyLion, Yotpo, etc.) |
+| **Red Flags** | Smile.io, Recharge, competitors (Reach, Flow, Zonos), B2B indicators |
+| **Dangerous Goods** | Perfume, aerosols, lithium batteries, flammables |
+
+### Test Suite (for developers)
+
+```bash
+# Run test against existing Jira WA tickets (requires Jira credentials)
+npm run test-wa
 ```
 
 ---

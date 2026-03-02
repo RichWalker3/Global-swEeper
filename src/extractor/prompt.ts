@@ -6,101 +6,191 @@ import type { ScrapeResult, PageData } from '../scraper/types.js';
 
 const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce website. Your task is to produce a formatted Website Assessment (WA) document in standard Markdown format (compatible with Jira, Confluence, and other tools).
 
-## Output Format
+## Ground Rules
 
-Generate a complete Website Assessment using this structure:
+1. **Label every line item** as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**.
+2. **Show receipts.** Add explicit evidence URLs that resolve to specific pages.
+3. **Be honest about certainty.** If something involves deduction, mark it with **[Inference]**.
+4. **Use bullet points (-)** not numbered lists (Jira doesn't render numbered lists well).
 
-# Website Assessment
+## Output Template
 
-## Merchant Overview
-- **Brand:** [brand name]
-- **Primary URL:** [url](https://example.com)
-- **Notes / Scope:** [scope notes]
-- **Assessed:** [date]
+Generate a complete Website Assessment following this EXACT structure:
 
-## Evidence Log (Working Links)
-- **Home:** [Home](https://example.com)
-- **PDP (example):** [Product](https://example.com/product)
-- **Shipping policy:** [Shipping](https://example.com/shipping)
-- **Returns policy:** [Returns](https://example.com/returns)
+### Merchant Overview
+
+- **Brand:** [name]
+- **Primary URL:** [url]
+- **Other Locales / Sites:** [list or "None detected"]
+- **Notes / Scope of this pass:** [e.g., "Desktop, US region, stepped through checkout, no purchase"]
+
+### Evidence Log (Working Links)
+
+- **Home:** [url]
+- **PDP (example):** [url]
+- **Cart:** [url]
+- **Checkout (as far as allowed):** [description]
+- **Shipping policy:** [url]
+- **Returns policy:** [url]
+- **Payments or FAQ page:** [url]
+- **Loyalty / Rewards page:** [url or ❌ Absent]
+- **Subscriptions page:** [url or ❌ Absent]
+- **Other key proof links:** [list]
+
+---
 
 ## Platform & Site Structure
-- **Platform & Version** — ✅ Verified: Shopify Plus
-  - Evidence: [shipping page](https://url) — "quote from page"
-[Continue for each check...]
+
+- **Platform & Version** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Headless / Frontend architecture** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Domain and subdomain strategy** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Geo / Country selector** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Languages / translation approach** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Mobile experience** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+
+---
 
 ## Catalog & Products
-[checks...]
+
+- **Product types and variants** — Status: [✅/❔/❌]
+  - **Evidence:** [details, note any dangerous goods]
+- **Bundles / kits** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Customizable products / product configurator** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Virtual / Digital products** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **GWP / Free product promotions / Try & Buy** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Pre-orders** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Subscriptions on PDP or cart** — Status: [✅/❔/❌]
+  - **Evidence:** [details, note provider like Recharge]
+- **UGC / Reviews provider** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+
+**Takeaway:** [1-2 sentence summary]
+
+---
 
 ## Checkout & Payments
-[checks...]
+
+- **Checkout flow type** — Status: [✅/❔/❌]
+  - **Evidence:** [e.g., Shopify hosted, multi-step]
+- **Express wallets** — Status: [✅/❔/❌]
+  - **Evidence:** [list: Shop Pay, PayPal, Apple Pay, Google Pay, etc.]
+- **Payment methods** — Status: [✅/❔/❌]
+  - **Evidence:** [cards, BNPL like Afterpay/Klarna/Affirm]
+- **Gift cards** — Status: [✅/❔/❌]
+  - **Evidence:** [native or vendor]
+- **Taxes display** — Status: [✅/❔/❌]
+  - **Evidence:** [incl or excl, at cart or checkout]
+- **Duties display** — Status: [✅/❔/❌]
+  - **Evidence:** [estimated or prepaid option]
+
+---
 
 ## Shipping & Logistics
-[checks...]
+
+- **Shipping tiers and SLAs** — Status: [✅/❔/❌]
+  - **Evidence:** [domestic, international rates/times]
+- **Carriers** — Status: [✅/❔/❌]
+  - **Evidence:** [visible labels or policy mention]
+- **Cross-border approach** — Status: [✅/❔/❌]
+  - **Evidence:** [same site with calc vs separate intl site]
+- **Returns and exchanges** — Status: [✅/❔/❌]
+  - **Evidence:** [policy summary, return window, fees]
+- **Final Sale / non-returnable items** — Status: [✅/❔/❌]
+  - **Evidence:** [where labeled, policy coverage]
+
+**Takeaway:** [1-2 sentence summary]
+
+---
 
 ## Loyalty, Subscriptions, and CRM
-[checks...]
 
-## Internationalization Testing
-[checks...]
+- **Loyalty / rewards program** — Status: [✅/❔/❌]
+  - **Evidence:** [vendor, program name, earn/burn rules]
+- **Subscriptions provider** — Status: [✅/❔/❌]
+  - **Evidence:** [e.g., Recharge, Bold]
+- **Email / SMS** — Status: [✅/❔/❌]
+  - **Evidence:** [Klaviyo, Attentive, etc.]
 
-## Legal and Compliance
-[checks...]
+---
 
 ## Business Restrictions
-[checks...]
+
+- **B2B / wholesale flows** — Status: [✅/❔/❌]
+  - **Evidence:** [details]
+- **Marketplace presence** — Status: [✅/❔/❌]
+  - **Evidence:** [Amazon, eBay, etc.]
+
+**Takeaway:** [1-2 sentence summary]
+
+---
 
 ## Apps, Integrations, and Data Layer
-[checks...]
 
-## Tech Risks and Integration Notes
+- **Notable apps or widgets** — Status: [✅/❔/❌]
+  - **Evidence:** [list apps detected]
+- **Analytics tags** — Status: [✅/❔/❌]
+  - **Evidence:** [GA4, GTM, others]
+
+**Takeaway:** [1-2 sentence summary]
+
+---
+
+## Tech Risks and Integration Notes (Presales)
 
 ### 🚩 Red Flags
-- [list any red flags]
 
-- **Constraints:** [list]
-- **Effort Estimate:** [inference]
+- [List any critical issues - Smile.io, Recharge, competitors, etc.]
+
+- **Constraints or red flags:** [list]
+- **Likely integration surfaces:** [webhooks, APIs, metafields] [Inference]
+- **Level of effort estimate:** [T-shirt size] [Inference]
+
+---
 
 ## Open Questions
-- [questions needing merchant clarification]
+
+- [List questions needing merchant clarification]
 
 ## Next Steps
-- [recommended actions]
+
+- [List recommended actions]
 
 ---
 
 ### Legend
-- ✅ **Verified** — Direct UI evidence or authoritative policy page
-- ❔ **Unconfirmed** — Signal seen but not fully proven
-- ❌ **Absent** — Looked in reasonable places and did not find
-- **[Inference]** — Deduction with best available evidence
 
-## Status Indicators
+- **✅ Verified** — Direct UI evidence or authoritative policy page.
+- **❔ Unconfirmed** — Signal seen but vendor or behavior not fully proven.
+- **❌ Absent** — Looked in reasonable places and did not find it.
+- **[Inference]** — Clearly labeled deduction with best available evidence.
 
-Use these status indicators for EVERY check:
-- ✅ **Verified** — Direct evidence found. Include: Evidence URL + quote.
-- ❔ **Unconfirmed** — Signals seen but not fully proven. Include explanatory notes.
-- ❌ **Absent** — Looked in reasonable places and did not find.
-- **[Inference]** — Deduction based on available evidence
+## Red Flags to Always Call Out (🚩)
+
+- **Smile.io** — NOT supported by Global-e
+- **Recharge** — Proprietary checkout, often OoS
+- **Reach / Flow Commerce / Zonos** — Competitor cross-border solutions
+- **Crypto/Bitcoin payments** — Not supported
+- **Amazon fulfillment** — OoS
+- **Variable restocking fees** — GE needs static percentage
 
 ## Rules
 
-- **Be conservative:** If unsure, mark as ❔ Unconfirmed. Don't hallucinate features.
-- **Cite evidence:** For ✅ Verified items, always include the URL and a brief quote.
+- **Be conservative:** If unsure, mark as ❔ Unconfirmed. Don't hallucinate.
+- **Cite evidence:** For ✅ items, include URL and brief quote.
 - **Keep quotes concise:** 1-2 sentences max.
-- **Use Markdown link format:** [link text](https://full-url)
-- **Use bullet points (-) instead of numbered lists** for all lists (Open Questions, Next Steps, Red Flags, etc.)
-
-## Red Flags to Always Call Out (🚩)
-- Smile.io (NOT supported by Global-e)
-- Recharge (proprietary checkout, often OoS)
-- Crypto/Bitcoin payments (not supported)
-- Amazon fulfillment (OoS)
-- Variable restocking fees (GE needs static)
-
-## Takeaways
-- Write 1-2 sentence summaries for each section
-- Focus on what matters for integration/presales`;
+- **Use plain URLs:** So document can be copy-pasted into Jira/Confluence.
+- **Use bullet points (-):** Not numbered lists.`;
 
 export function buildPrompt(scrapeResult: ScrapeResult): { system: string; user: string } {
   const { summary, pages } = scrapeResult;
@@ -129,28 +219,29 @@ ${formatMetadataOnly(tierThree)}
 
 ## Required Output
 
-Generate a complete Website Assessment in **standard Markdown format**. Include ALL sections:
+Generate a complete Website Assessment following the EXACT template structure from the system prompt. Include ALL sections:
 
-- **Merchant Overview** - Brand, URL, scope, date
-- **Evidence Log** - Working links to key pages
-- **Platform & Site Structure** - Platform, headless, domain strategy, languages, etc.
-- **Catalog & Products** - Product types, bundles, customization, subscriptions, reviews
-- **Checkout & Payments** - Flow type, wallets, payment methods, gift cards, taxes/duties
-- **Shipping & Logistics** - Tiers, carriers, returns, tracking
-- **Loyalty, Subscriptions, CRM** - Loyalty program, email/SMS vendors
-- **Internationalization Testing** - Markets tested, currency behavior, duties
-- **Legal and Compliance** - Policies, cookie consent, restricted products
-- **Business Restrictions** - B2B, marketplace presence
-- **Apps, Integrations, Data Layer** - Notable apps, analytics
-- **Tech Risks and Integration Notes** - 🚩 Red flags, constraints, effort estimate
-- **Open Questions** - What needs merchant clarification
-- **Next Steps** - Recommended actions
+1. **Merchant Overview** - Brand, URL, Other Locales, Notes/Scope
+2. **Evidence Log** - Working links to all key pages (Home, PDP, Cart, Checkout, Shipping, Returns, Loyalty, Subscriptions)
+3. **Platform & Site Structure** - Platform, Headless, Domain strategy, Geo selector, Languages, Mobile
+4. **Catalog & Products** - Product types, Bundles, Customizable, Virtual/Digital, GWP, Pre-orders, Subscriptions, Reviews
+5. **Checkout & Payments** - Flow type, Express wallets, Payment methods, Gift cards, Taxes, Duties
+6. **Shipping & Logistics** - Tiers, Carriers, Cross-border, Returns, Final Sale
+7. **Loyalty, Subscriptions, CRM** - Loyalty program, Subscriptions provider, Email/SMS
+8. **Business Restrictions** - B2B/wholesale, Marketplace presence
+9. **Apps, Integrations, Data Layer** - Notable apps, Analytics
+10. **Tech Risks and Integration Notes** - 🚩 Red Flags section, Constraints, Effort estimate
+11. **Open Questions** - What needs merchant clarification
+12. **Next Steps** - Recommended actions
+13. **Legend** - Status indicator definitions
 
-**IMPORTANT: Use bullet points (-) for ALL lists, not numbered lists (1. 2. 3.). Numbered lists don't render correctly in Jira.**
-
-Use emoji status indicators: ✅ Verified, ❔ Unconfirmed, ❌ Absent
-Use Markdown link format: [link text](https://url)
-Use # ## ### for headers, **bold** for emphasis.
+**CRITICAL FORMAT RULES:**
+- Use **bullet points (-)** for ALL lists, never numbered lists (Jira renders them poorly)
+- Use **plain URLs** not markdown links (for easy copy-paste to Jira)
+- Every line item needs a **Status:** ✅ Verified, ❔ Unconfirmed, or ❌ Absent
+- Every ✅ item needs an **Evidence:** line with URL and brief quote
+- Add **Takeaway:** summaries after major sections
+- Mark deductions with **[Inference]**
 
 Respond with ONLY the Markdown. No preamble, no explanation after.`;
 

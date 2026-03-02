@@ -335,11 +335,17 @@ const LOYALTY_PATTERNS = [
   /rewards?\s*(program|points?|member)/i,
   /loyalty\s*(program|points?|member)/i,
   /earn\s*(points?|rewards?)/i,
+  /receive\s*\d+\s*points/i,                    // "receive 150 points"
   /points?\s*(balance|earned|program)/i,
-  /vip\s*(program|member|status)/i,
+  /how\s*to\s*(earn|redeem)\s*points/i,         // "HOW TO EARN POINTS"
+  /redeem\s*(your\s*)?points/i,                 // "redeem your points"
+  /\d+\s*points\s*(for|=|:)/i,                  // "200 points for $5"
+  /vip\s*(program|member|status|tiers?)/i,      // "VIP TIERS"
   /member\s*(perks?|benefits?|rewards?)/i,
   /refer\s*a\s*friend/i,
   /referral\s*(program|bonus|reward)/i,
+  /exclusive\s*perks/i,                         // "exclusive perks"
+  /points\s*for\s*(each|every)\s*order/i,       // "points for each order"
 ];
 
 const LOYALTY_PROVIDERS: { pattern: RegExp; name: string }[] = [
@@ -380,10 +386,19 @@ export function detectLoyaltyProgram(text: string, html: string, networkRequests
     }
   }
   
-  // Try to extract program name
-  const nameMatch = text.match(/(?:join|welcome\s*to|introducing)\s*(?:the\s*)?([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*(?:rewards?|loyalty|program)/i);
-  if (nameMatch) {
-    programName = nameMatch[1];
+  // Try to extract program name from various patterns
+  const namePatterns = [
+    /(?:join|welcome\s*to|introducing)\s*(?:the\s*)?([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s*(?:rewards?|loyalty|program)/i,
+    /([A-Z]{2,}(?:\s+[A-Z]{2,})?)\s+LOYALTY\s+PROGRAM/i,  // "ICC LOYALTY PROGRAM"
+    /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s+(?:rewards?|loyalty)\s+program/i,
+  ];
+  
+  for (const pattern of namePatterns) {
+    const nameMatch = text.match(pattern);
+    if (nameMatch && nameMatch[1]) {
+      programName = nameMatch[1].trim();
+      break;
+    }
   }
   
   return {
@@ -532,6 +547,76 @@ export function detectMarketplaces(text: string, html: string): MarketplaceInfo 
   return {
     detected: marketplaces.size > 0,
     marketplaces: Array.from(marketplaces),
+    evidence: evidence.slice(0, 5),
+  };
+}
+
+// ============ BNPL WIDGET DETECTION (Product Page) ============
+
+export interface BNPLWidgetInfo {
+  detected: boolean;
+  providers: string[];
+  evidence: string[];
+}
+
+const BNPL_WIDGET_PATTERNS: { pattern: RegExp; provider: string }[] = [
+  // Afterpay patterns
+  { pattern: /pay\s*in\s*4.*afterpay/i, provider: 'Afterpay' },
+  { pattern: /afterpay.*pay\s*in\s*4/i, provider: 'Afterpay' },
+  { pattern: /4\s*interest-?free\s*(payments?|installments?).*afterpay/i, provider: 'Afterpay' },
+  { pattern: /afterpay\s*available/i, provider: 'Afterpay' },
+  { pattern: /or\s*4\s*payments\s*of\s*\$[\d.]+\s*with\s*afterpay/i, provider: 'Afterpay' },
+  
+  // Klarna patterns
+  { pattern: /pay\s*in\s*(3|4).*klarna/i, provider: 'Klarna' },
+  { pattern: /klarna.*pay\s*in\s*(3|4)/i, provider: 'Klarna' },
+  { pattern: /4\s*interest-?free\s*(payments?|installments?).*klarna/i, provider: 'Klarna' },
+  { pattern: /klarna\s*available/i, provider: 'Klarna' },
+  { pattern: /pay\s*later\s*with\s*klarna/i, provider: 'Klarna' },
+  { pattern: /slice\s*it.*klarna/i, provider: 'Klarna' },
+  
+  // Affirm patterns
+  { pattern: /pay\s*over\s*time.*affirm/i, provider: 'Affirm' },
+  { pattern: /affirm.*pay\s*over\s*time/i, provider: 'Affirm' },
+  { pattern: /as\s*low\s*as\s*\$[\d.]+\/mo.*affirm/i, provider: 'Affirm' },
+  { pattern: /affirm.*as\s*low\s*as/i, provider: 'Affirm' },
+  { pattern: /affirm\s*available/i, provider: 'Affirm' },
+  { pattern: /starting\s*at\s*\$[\d.]+\/mo.*affirm/i, provider: 'Affirm' },
+  { pattern: /monthly\s*payments.*affirm/i, provider: 'Affirm' },
+  
+  // Sezzle patterns
+  { pattern: /pay\s*in\s*4.*sezzle/i, provider: 'Sezzle' },
+  { pattern: /sezzle.*pay\s*in\s*4/i, provider: 'Sezzle' },
+  { pattern: /sezzle\s*available/i, provider: 'Sezzle' },
+  
+  // Shop Pay Installments
+  { pattern: /shop\s*pay\s*installments/i, provider: 'Shop Pay Installments' },
+  { pattern: /4\s*interest-?free\s*payments.*shop\s*pay/i, provider: 'Shop Pay Installments' },
+  
+  // Generic "pay in 4" with context clues
+  { pattern: /pay\s*in\s*4\s*interest-?free/i, provider: 'BNPL (unspecified)' },
+  { pattern: /buy\s*now,?\s*pay\s*later/i, provider: 'BNPL (unspecified)' },
+  { pattern: /split\s*(?:your\s*)?payment/i, provider: 'BNPL (unspecified)' },
+];
+
+export function detectBNPLWidgets(text: string, html: string): BNPLWidgetInfo {
+  const providers = new Set<string>();
+  const evidence: string[] = [];
+  const searchText = text + ' ' + html;
+  
+  for (const { pattern, provider } of BNPL_WIDGET_PATTERNS) {
+    if (pattern.test(searchText)) {
+      providers.add(provider);
+      const match = searchText.match(pattern);
+      if (match && !evidence.some(e => e.includes(provider))) {
+        evidence.push(`${provider}: "${match[0].slice(0, 50)}"`);
+      }
+    }
+  }
+  
+  return {
+    detected: providers.size > 0,
+    providers: Array.from(providers),
     evidence: evidence.slice(0, 5),
   };
 }

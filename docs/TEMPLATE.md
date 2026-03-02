@@ -1,6 +1,16 @@
-# Website Assessment
+# Website Assessment (WA)
 
 **Purpose:** A single template for quick first‑pass reviews that pairs the site assessment with Discovery Notes & Analysis (DNA). This doc includes 1) a short playbook and 2) a fill‑in template you can paste into any merchant thread.
+
+> **Terminology:** "WA" = Website Assessment. When the user says "WA", they mean Website Assessment.
+
+---
+
+## 0) Output Requirements
+
+**Always output the completed WA in chat** so the user can review and copy it directly. Additionally, save the assessment to `logs/assessments/` with the naming convention `YYYY-MM-DD_domain_WA.md`.
+
+The chat output should be the complete, formatted assessment ready to copy-paste into Jira, Confluence, or Slack.
 
 ---
 
@@ -10,15 +20,17 @@
 
 1. **Label every line item** as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**.
 
-2. **Show receipts.** Add **explicit evidence links** that resolve to specific pages or screens. Avoid homepages unless truly needed. Use **plain URLs** (not markdown link syntax) so the document can be easily copy-pasted with styling intact into Jira, Confluence, or Slack.
+2. **Navigate, don't guess.** Always use the site's own navigation (header menus, footer links, buttons) to discover pages. **Never hardcode or guess URLs** — follow the actual links on the page. If a link doesn't exist in the navigation, mark it as ❌ Absent.
 
-3. **Be honest about certainty.** If a statement involves deduction, mark it with **[Inference]** and still include the best supporting link you have. If something cannot be verified, leave it **❔ Unconfirmed** and explain why.
+3. **Show receipts.** Add **explicit evidence links** that resolve to specific pages or screens. Avoid homepages unless truly needed. Use **plain URLs** (not markdown link syntax) so the document can be easily copy-pasted with styling intact into Jira, Confluence, or Slack.
 
-4. **Don't purchase.** Step through checkout as far as allowed to collect evidence on currency, duties, taxes, shipping options, and payments.
+4. **Be honest about certainty.** If a statement involves deduction, mark it with **[Inference]** and still include the best supporting link you have. If something cannot be verified, leave it **❔ Unconfirmed** and explain why.
 
-5. **Business Restrictions are split**: B2B, Marketplace, Dropshippers each has its own line.
+5. **Don't purchase.** Step through checkout as far as allowed to collect evidence on currency, duties, taxes, shipping options, and payments.
 
-6. Keep it tight. Prefer concise bullets. Add a one‑line takeaway for any long section.
+6. **Business Restrictions are split**: B2B, Marketplace, Dropshippers each has its own line.
+
+7. Keep it tight. Prefer concise bullets. Add a one‑line takeaway for any long section.
 
 ### Workflow (10–25 minutes)
 
@@ -133,14 +145,6 @@
   * **Evidence:**
 
 * **Mobile experience** (nav, PDP, PLP notes) — Status: ___
-
-  * **Evidence:**
-
-* **Performance quick read** (perceived load, CLS jank, image weight) — Status: ___
-
-  * **Evidence:**
-
-* **Accessibility quick read** (alt text presence, keyboard traps, contrast hints) — Status: ___
 
   * **Evidence:**
 

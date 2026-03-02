@@ -16,14 +16,29 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
   // ============ RED FLAGS - CRITICAL ============
   { 
     name: 'Smile.io', 
-    patterns: [/smile\.io/i, /sweettoothrewards/i], 
+    patterns: [
+      /smile\.io/i, 
+      /sweettoothrewards/i,
+      /cdn\.smile\.io/i,
+      /js\.smile\.io/i,
+      /sweettooth-.*\.js/i,
+      /smile-ui/i,
+    ], 
     category: 'loyalty',
     priority: 'critical',
     notes: '❌ NOT SUPPORTED by Global-e'
   },
   { 
     name: 'Recharge', 
-    patterns: [/rechargepayments\.com/i, /rechargeapps\.com/i], 
+    patterns: [
+      /rechargepayments\.com/i, 
+      /rechargeapps\.com/i,
+      /rechargecdn\.com/i,
+      /rc\.rechargeapps/i,
+      /getrecharge\.com/i,
+      /subscriptions.*recharge/i,
+      /recharge-subscriptions/i,
+    ], 
     category: 'subscriptions',
     priority: 'critical',
     notes: '⚠️ Uses proprietary checkout, often OoS'
@@ -61,10 +76,10 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
 
   // ============ PAYMENTS / BNPL ============
   { name: 'Shop Pay', patterns: [/shop\.app/i, /shopify.*accelerated/i], category: 'payments', priority: 'high', notes: 'Shopify Payments indicator' },
-  { name: 'Klarna', patterns: [/klarna\.com/i, /klarna-payments/i], category: 'bnpl', priority: 'medium' },
-  { name: 'Afterpay', patterns: [/afterpay\.com/i, /afterpay-js/i, /square.*afterpay/i], category: 'bnpl', priority: 'medium' },
-  { name: 'Affirm', patterns: [/affirm\.com/i], category: 'bnpl', priority: 'medium' },
-  { name: 'Sezzle', patterns: [/sezzle\.com/i], category: 'bnpl', priority: 'medium' },
+  { name: 'Klarna', patterns: [/klarna\.com/i, /klarna-payments/i, /cdn\.klarna/i, /klarna-messaging/i], category: 'bnpl', priority: 'medium' },
+  { name: 'Afterpay', patterns: [/afterpay\.com/i, /afterpay-js/i, /square.*afterpay/i, /static\.afterpay/i, /js\.afterpay/i], category: 'bnpl', priority: 'medium' },
+  { name: 'Affirm', patterns: [/affirm\.com/i, /cdn1\.affirm/i, /cdn2\.affirm/i, /js\.affirm/i, /affirm-js/i, /www\.affirm/i], category: 'bnpl', priority: 'medium' },
+  { name: 'Sezzle', patterns: [/sezzle\.com/i, /widget\.sezzle/i, /cdn\.sezzle/i], category: 'bnpl', priority: 'medium' },
 
   // ============ GIFT CARDS ============
   { name: 'Rise.ai', patterns: [/rise-ai\.com/i, /riseai\.co/i, /strn\.rise-ai/i], category: 'gift_cards', priority: 'medium' },
@@ -79,6 +94,7 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
   { name: 'Attentive', patterns: [/attentive\.com/i, /attn\.tv/i], category: 'sms', priority: 'medium' },
   { name: 'Postscript', patterns: [/postscript\.io/i], category: 'sms', priority: 'medium' },
   { name: 'Mailchimp', patterns: [/mailchimp\.com/i, /list-manage\.com/i, /chimpstatic\.com/i], category: 'email', priority: 'medium' },
+  { name: 'Listrak', patterns: [/listrak\.com/i, /listrakbi\.com/i], category: 'email', priority: 'medium' },
 
   // ============ REVIEWS ============
   { name: 'Judge.me', patterns: [/judge\.me/i], category: 'reviews', priority: 'medium' },
@@ -90,16 +106,27 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
   { name: 'Google Analytics', patterns: [/google-analytics\.com/i, /googletagmanager\.com/i, /gtag/i], category: 'analytics', priority: 'medium' },
   { name: 'Hotjar', patterns: [/hotjar\.com/i], category: 'analytics', priority: 'medium' },
   { name: 'Segment', patterns: [/segment\.io/i, /segment\.com/i], category: 'analytics', priority: 'medium' },
+  { name: 'Impact', patterns: [/impact\.com/i, /impactradius\.com/i, /d\.impactradius/i], category: 'affiliate', priority: 'medium' },
 
   // ============ CHAT / SUPPORT ============
   { name: 'Gorgias', patterns: [/gorgias\.chat/i, /gorgias\.io/i], category: 'support', priority: 'medium' },
-  { name: 'Zendesk', patterns: [/zendesk\.com/i, /zdassets\.com/i], category: 'support', priority: 'medium' },
+  { name: 'Zendesk', patterns: [/zendesk\.com/i, /zdassets\.com/i, /static\.zdassets/i, /ekr\.zdassets/i, /zopim/i], category: 'support', priority: 'medium' },
   { name: 'Intercom', patterns: [/intercom\.io/i, /intercomcdn\.com/i], category: 'support', priority: 'medium' },
+  { name: 'Gladly', patterns: [/gladly\.com/i, /cdn\.gladly\.qa/i, /gladly\.qa/i], category: 'support', priority: 'medium' },
 
   // ============ PERSONALIZATION ============
   { name: 'Nosto', patterns: [/nosto\.com/i], category: 'personalization', priority: 'medium' },
   { name: 'Rebuy', patterns: [/rebuyengine\.com/i], category: 'personalization', priority: 'medium' },
   { name: 'Bold', patterns: [/boldapps\.net/i, /boldcommerce\.com/i], category: 'apps', priority: 'medium' },
+
+  // ============ SEARCH / FILTER ============
+  { name: 'Boost Commerce', patterns: [/boostcommerce\.io/i, /boost-pfs\.com/i, /bc-sf-search/i], category: 'search', priority: 'medium' },
+  { name: 'Searchanise', patterns: [/searchanise\.io/i], category: 'search', priority: 'medium' },
+  { name: 'Algolia', patterns: [/algolia\.com/i, /algolianet\.com/i], category: 'search', priority: 'medium' },
+
+  // ============ CART / CHECKOUT UPSELL ============
+  { name: 'Checkout+', patterns: [/checkout-?plus/i, /shipping-?insurance/i, /route\.com/i], category: 'upsell', priority: 'medium', notes: 'Returns protection upsell' },
+  { name: 'Route', patterns: [/route\.com/i], category: 'shipping_protection', priority: 'medium' },
 
   // ============ SHIPPING ============  
   { name: 'ShipBob', patterns: [/shipbob\.com/i], category: 'shipping', priority: 'medium' },
@@ -202,6 +229,15 @@ export interface DGMatch {
   context: string; // surrounding text
 }
 
+// Words that indicate "lighter" is an adjective (weight) not a noun (fire device)
+const LIGHTER_FALSE_POSITIVE_CONTEXT = [
+  'lighter weight', 'lighter frame', 'lighter feel', 'lighter than',
+  'lighter footprint', 'lighter fabric', 'lighter material', 'lighter design',
+  'lighter construction', 'lighter and', 'lighter yet', 'lighter but',
+  'lighter version', 'lighter option', 'much lighter', 'significantly lighter',
+  'environmental footprint', 'carbon footprint',
+];
+
 /**
  * Scan text content for Dangerous Goods keywords
  */
@@ -216,6 +252,17 @@ export function scanForDangerousGoods(text: string): DGMatch[] {
       const start = Math.max(0, index - 50);
       const end = Math.min(text.length, index + keyword.length + 50);
       const context = text.slice(start, end).replace(/\s+/g, ' ').trim();
+      const lowerContext = context.toLowerCase();
+      
+      // Special handling for "lighter" - skip if used as adjective for weight
+      if (keyword === 'lighter') {
+        const isFalsePositive = LIGHTER_FALSE_POSITIVE_CONTEXT.some(phrase => 
+          lowerContext.includes(phrase)
+        );
+        if (isFalsePositive) {
+          continue; // Skip this match - it's "lighter weight" not "cigarette lighter"
+        }
+      }
       
       matches.push({ keyword, category, risk, context });
     }
@@ -232,32 +279,77 @@ export function scanForDangerousGoods(text: string): DGMatch[] {
 
 // ============ B2B / WHOLESALE DETECTION ============
 
-const B2B_KEYWORDS = [
-  'wholesale',
+// Strong B2B indicators (high confidence)
+const B2B_STRONG_KEYWORDS = [
+  'wholesale program',
+  'wholesale account',
+  'wholesale portal',
   'trade program',
   'trade account',
   'business account',
   'bulk order',
   'bulk pricing',
+  'b2b portal',
+  'b2b login',
+  'faire.com',
+];
+
+// Weak B2B indicators (need context)
+const B2B_WEAK_KEYWORDS = [
+  'wholesale',
   'reseller',
-  'b2b',
   'dealer',
   'distributor',
-  'faire.com', // Wholesale marketplace
+  'b2b',
   'faire',
+];
+
+// Words that indicate the B2B keyword is NOT a real B2B offering
+// e.g., "unauthorized reseller", "dealer locator", "distributor of products"
+const B2B_FALSE_POSITIVE_CONTEXT = [
+  'unauthorized', 'not authorized', 'beware of',
+  'locate a dealer', 'find a dealer', 'dealer locator',
+  'authorized distributor', 'official distributor',
+  'reseller restrictions', 'resale prohibited',
 ];
 
 /**
  * Scan text/URL for B2B/Wholesale indicators
+ * Filters out false positives from footer/legal text
  */
 export function detectB2B(text: string, url: string): { detected: boolean; evidence: string[] } {
   const evidence: string[] = [];
   const lowerText = text.toLowerCase();
   const lowerUrl = url.toLowerCase();
   
-  for (const keyword of B2B_KEYWORDS) {
-    if (lowerText.includes(keyword) || lowerUrl.includes(keyword)) {
+  // Check URL first (most reliable)
+  for (const keyword of [...B2B_STRONG_KEYWORDS, ...B2B_WEAK_KEYWORDS]) {
+    if (lowerUrl.includes(keyword.replace(/\s+/g, '-')) || lowerUrl.includes(keyword.replace(/\s+/g, ''))) {
       evidence.push(keyword);
+    }
+  }
+  
+  // Check strong keywords in text (always add)
+  for (const keyword of B2B_STRONG_KEYWORDS) {
+    if (lowerText.includes(keyword)) {
+      evidence.push(keyword);
+    }
+  }
+  
+  // Check weak keywords with context filtering
+  for (const keyword of B2B_WEAK_KEYWORDS) {
+    if (lowerText.includes(keyword)) {
+      // Find the context around the keyword
+      const index = lowerText.indexOf(keyword);
+      const contextStart = Math.max(0, index - 100);
+      const contextEnd = Math.min(lowerText.length, index + keyword.length + 100);
+      const context = lowerText.slice(contextStart, contextEnd);
+      
+      // Skip if false positive context detected
+      const isFalsePositive = B2B_FALSE_POSITIVE_CONTEXT.some(fp => context.includes(fp));
+      if (!isFalsePositive) {
+        evidence.push(keyword);
+      }
     }
   }
   

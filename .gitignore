@@ -38,3 +38,5 @@ temp/
 # Output files (we'll organize these later)
 output/
 
+# Assessment logs (local debugging)
+logs/

@@ -9,17 +9,42 @@ import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, extractP
 import { tagPage } from '../prefilter/tagger.js';
 import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
 import { extractPolicyInfo, extractCheckoutInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
-import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP } from './catalogDetector.js';
+import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
+import { logAssessment, type DebugInfo } from '../logger/index.js';
 
 const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
-  maxPages: 30,
+  maxPages: 50,
   timeout: 15000,
+  scrapeTimeout: 120000, // 2 minutes overall timeout
   takeScreenshots: true,
   verbose: false,
 };
 
+// Track scrape progress for timeout reporting
+let scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: '' };
+
 export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Promise<ScrapeResult> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
+  
+  // Reset progress tracking
+  scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: seedUrl };
+  
+  // Wrap entire scrape in an overall timeout to prevent hung scrapes
+  const scrapePromise = scrapeInternal(seedUrl, opts);
+  const timeoutPromise = new Promise<ScrapeResult>((_, reject) => {
+    setTimeout(() => {
+      const timeoutSecs = (opts.scrapeTimeout / 1000).toFixed(0);
+      const reason = `Timed out after ${timeoutSecs}s during "${scrapeProgress.phase}" phase. ` +
+        `Progress: ${scrapeProgress.pagesScraped} pages scraped. ` +
+        (scrapeProgress.currentUrl ? `Last URL: ${scrapeProgress.currentUrl}` : '');
+      reject(new Error(`Scrape timeout: ${reason}`));
+    }, opts.scrapeTimeout);
+  });
+  
+  return Promise.race([scrapePromise, timeoutPromise]);
+}
+
+async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): Promise<ScrapeResult> {
   const startedAt = new Date().toISOString();
   
   // Initialize Wappalyzer
@@ -28,13 +53,76 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
     console.log('  ✓ Wappalyzer initialized');
   }
   
+  // Use "new" headless mode which is harder to detect than the old "headless: true"
+  // Also add anti-detection arguments to avoid bot detection
   const browser = await chromium.launch({ 
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled', // Hide automation
+      '--disable-features=IsolateOrigins,site-per-process', // Sometimes helps with complex sites
+      '--disable-web-security', // Disable CORS for scraping
+    ],
   });
+  
   const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
     viewport: { width: 1440, height: 900 },
+    // Add standard browser headers to look more like a real browser
+    extraHTTPHeaders: {
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Cache-Control': 'max-age=0',
+      'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"macOS"',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1',
+    },
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    geolocation: { latitude: 40.7128, longitude: -74.0060 }, // New York
+    permissions: ['geolocation'],
+  });
+  
+  // Add script to hide automation indicators
+  await context.addInitScript(() => {
+    // Override the webdriver property
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => undefined,
+    });
+    
+    // Mock plugins
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [
+        { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+        { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+        { name: 'Native Client', filename: 'internal-nacl-plugin' },
+      ],
+    });
+    
+    // Mock languages
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['en-US', 'en'],
+    });
+    
+    // Hide automation-related Chrome properties
+    const win = window as unknown as { chrome?: { runtime?: unknown } };
+    if (win.chrome) {
+      win.chrome.runtime = {
+        PlatformOs: { MAC: 'mac', WIN: 'win', ANDROID: 'android', CROS: 'cros', LINUX: 'linux', OPENBSD: 'openbsd' },
+        PlatformArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
+        PlatformNaclArch: { ARM: 'arm', X86_32: 'x86-32', X86_64: 'x86-64' },
+        RequestUpdateCheckStatus: { THROTTLED: 'throttled', NO_UPDATE: 'no_update', UPDATE_AVAILABLE: 'update_available' },
+        OnInstalledReason: { INSTALL: 'install', UPDATE: 'update', CHROME_UPDATE: 'chrome_update', SHARED_MODULE_UPDATE: 'shared_module_update' },
+        OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
+      };
+    }
   });
 
   const pages: PageData[] = [];
@@ -77,14 +165,66 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
   
   const discoveredProductUrls: string[] = [];
   const domain = new URL(seedUrl).hostname;
+  
+  // Debug tracking for logging
+  const debugInfo: Partial<DebugInfo> = {
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    viewportSize: { width: 1440, height: 900 },
+    totalRequestsIntercepted: 0,
+    redirectsDetected: [],
+    blockedRequests: [],
+    consoleErrors: [],
+  };
 
   try {
-    const targets = buildCrawlTargets(seedUrl);
+    // Phase 0: Load homepage first to discover links
+    const discoveryPage = await context.newPage();
     
-    // Phase 1: Scrape main pages
+    scrapeProgress.phase = 'discovery';
+    if (opts.verbose) {
+      console.log('  Discovering site structure...');
+    }
+    
+    await discoveryPage.goto(seedUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
+    await discoveryPage.waitForTimeout(1500); // Discovery page needs time for nav/footer to load
+
+    // Discover crawl targets from homepage links (footer, nav, sitemap)
+    // Use a timeout to avoid hanging on complex pages
+    let targets: CrawlTarget[];
+    try {
+      const discoveryPromise = discoverCrawlTargets(discoveryPage, seedUrl, opts.verbose);
+      const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) => 
+        setTimeout(() => reject(new Error('Discovery timeout')), 10000)
+      );
+      targets = await Promise.race([discoveryPromise, timeoutPromise]);
+    } catch (discoveryError) {
+      if (opts.verbose) {
+        console.log(`  ⚠ Discovery failed (${discoveryError}), using fallback targets`);
+      }
+      // Fallback to minimal static targets
+      targets = getFallbackTargets(seedUrl);
+    }
+    await discoveryPage.close();
+    
+    if (opts.verbose) {
+      console.log(`  Found ${targets.length} pages to crawl`);
+    }
+    
+    // Phase 1: Scrape discovered pages
+    const totalTargets = Math.min(targets.length, opts.maxPages);
+    let pageIndex = 0;
+    
     for (const target of targets) {
       if (visited.size >= opts.maxPages) break;
       if (visited.has(target.url)) continue;
+      
+      pageIndex++;
+      scrapeProgress.phase = 'page-scraping';
+      scrapeProgress.currentUrl = target.url;
+      if (opts.verbose) {
+        const elapsed = ((Date.now() - new Date(startedAt).getTime()) / 1000).toFixed(1);
+        console.log(`  [${pageIndex}/${totalTargets}] ${target.type}: ${new URL(target.url).pathname} (${elapsed}s)`);
+      }
       
       try {
         const page = await context.newPage();
@@ -93,6 +233,8 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         // Capture network requests for third-party detection
         page.on('request', (request) => {
           const reqUrl = request.url();
+          debugInfo.totalRequestsIntercepted = (debugInfo.totalRequestsIntercepted || 0) + 1;
+          
           const detected = detectThirdParty(reqUrl);
           if (detected) {
             thirdParties.add(detected);
@@ -112,9 +254,39 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
             networkRequests.push({ url: reqUrl, type: request.resourceType() });
           }
         });
+        
+        // Track console errors
+        page.on('console', (msg) => {
+          if (msg.type() === 'error') {
+            debugInfo.consoleErrors?.push(`${target.url}: ${msg.text()}`);
+          }
+        });
 
         const response = await page.goto(target.url, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000); // Reduced from 2s to 1s for faster scraping
+        
+        // Check for redirects - CRITICAL for debugging scraping issues
+        const finalUrl = page.url();
+        const targetDomain = new URL(target.url).hostname;
+        const finalDomain = new URL(finalUrl).hostname;
+        
+        if (finalUrl !== target.url) {
+          const redirectInfo = `${target.url} → ${finalUrl}`;
+          debugInfo.redirectsDetected?.push(redirectInfo);
+          
+          // Log warning if redirected to different domain (like Google)
+          if (finalDomain !== targetDomain && !finalDomain.includes(targetDomain.replace('www.', ''))) {
+            console.warn(`  ⚠️ REDIRECT TO DIFFERENT DOMAIN: ${redirectInfo}`);
+            errors.push({
+              url: target.url,
+              error: `Redirected to different domain: ${finalUrl}`,
+              type: 'other',
+            });
+            await page.close();
+            continue; // Skip this page - it's not from our target site
+          }
+        }
+        
         visited.add(target.url);
         
         // Detect platform from page
@@ -131,7 +303,8 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         // Extract page data
         const pageData = await extractPageData(page, response, networkRequests, opts);
         pages.push(pageData);
-        
+        scrapeProgress.pagesScraped = pages.length;
+
         // Extract policy info from policy and FAQ pages
         if ((target.type === 'policy' || target.type === 'other') && pageData.cleanedText.length > 100) {
           const policyInfo = extractPolicyInfo(pageData.cleanedText, pageData.url);
@@ -179,7 +352,7 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
             if (subs.provider) subscriptionProvider = subs.provider;
           }
           
-          // Loyalty program
+          // Loyalty program (also run on home/collection to catch nav links)
           const loyalty = detectLoyaltyProgram(pageData.cleanedText, pageData.rawHtml || '', networkUrls);
           if (loyalty.detected) {
             loyaltyInfo.detected = true;
@@ -196,6 +369,18 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
           if (target.type === 'home') {
             const loc = detectLocalization(pageData.cleanedText, pageData.rawHtml || '');
             localizationInfo = loc;
+          }
+        }
+        
+        // Run loyalty detection on dedicated rewards/loyalty pages (most authoritative source)
+        if (target.type === 'rewards') {
+          const networkUrls = pageData.networkRequests.map(r => r.url);
+          const loyalty = detectLoyaltyProgram(pageData.cleanedText, pageData.rawHtml || '', networkUrls);
+          if (loyalty.detected) {
+            loyaltyInfo.detected = true;
+            if (loyalty.provider) loyaltyInfo.provider = loyalty.provider;
+            if (loyalty.programName) loyaltyInfo.programName = loyalty.programName;
+            loyalty.evidence.forEach(e => { if (!loyaltyInfo.evidence.includes(e)) loyaltyInfo.evidence.push(e); });
           }
         }
         
@@ -250,6 +435,16 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
               discoveredProductUrls.push(url);
             }
           }
+          
+          // Check for BNPL widgets on collection pages too
+          const bnplWidgets = detectBNPLWidgets(pageData.cleanedText, pageData.rawHtml);
+          if (bnplWidgets.detected) {
+            for (const provider of bnplWidgets.providers) {
+              if (provider !== 'BNPL (unspecified)') {
+                thirdParties.add(provider);
+              }
+            }
+          }
         }
 
         if (opts.verbose) {
@@ -258,19 +453,33 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
 
         await page.close();
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         errors.push({
           url: target.url,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMsg,
           type: 'other',
         });
         if (opts.verbose) {
           console.log(`  ✗ ${target.type}: ${target.url} - ${error}`);
         }
+        
+        // If browser context is closed, stop trying to open new pages
+        if (errorMsg.includes('Target page, context or browser has been closed') ||
+            errorMsg.includes('Browser has been closed') ||
+            errorMsg.includes('context has been closed')) {
+          console.warn(`  ⚠️ Browser context closed - stopping page scraping`);
+          break;
+        }
       }
     }
     
     // Phase 2: Scrape discovered product pages (up to 5)
+    scrapeProgress.phase = 'product-pages';
     const maxProducts = Math.min(5, opts.maxPages - visited.size);
+    if (opts.verbose && discoveredProductUrls.length > 0) {
+      const elapsed = ((Date.now() - new Date(startedAt).getTime()) / 1000).toFixed(1);
+      console.log(`  [products] Scraping ${Math.min(discoveredProductUrls.length, maxProducts)} product pages... (${elapsed}s)`);
+    }
     for (let i = 0; i < Math.min(discoveredProductUrls.length, maxProducts); i++) {
       const productUrl = discoveredProductUrls[i];
       if (visited.has(productUrl)) continue;
@@ -293,7 +502,7 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         });
 
         const response = await page.goto(productUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000); // Reduced from 2s
         visited.add(productUrl);
         productPagesScraped++;
         
@@ -308,7 +517,20 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
             dangerousGoods.push({ ...match, foundOnUrl: pageData.url });
           }
         }
-        
+
+        // Detect BNPL widgets on product pages (Afterpay, Klarna, Affirm badges)
+        const bnplWidgets = detectBNPLWidgets(pageData.cleanedText, pageData.rawHtml || '');
+        if (bnplWidgets.detected) {
+          for (const provider of bnplWidgets.providers) {
+            if (provider !== 'BNPL (unspecified)') {
+              thirdParties.add(provider);
+              if (opts.verbose && !thirdParties.has(provider)) {
+                console.log(`    → BNPL widget: ${provider}`);
+              }
+            }
+          }
+        }
+
         // PDP-specific catalog detection
         const networkUrls = pageData.networkRequests.map(r => r.url);
         
@@ -357,18 +579,37 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
 
         await page.close();
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         errors.push({
           url: productUrl,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: errorMsg,
           type: 'other',
         });
+        
+        // If browser context is closed, stop trying
+        if (errorMsg.includes('Target page, context or browser has been closed') ||
+            errorMsg.includes('context has been closed')) {
+          console.warn(`  ⚠️ Browser context closed - stopping product scraping`);
+          break;
+        }
       }
     }
     
     // Phase 3: Checkout flow testing
     // Try to add an item and navigate to checkout
+    // Limit checkout test to 30 seconds to avoid timeouts
+    scrapeProgress.phase = 'checkout';
+    scrapeProgress.currentUrl = `${seedUrl}/checkout`;
+    if (opts.verbose) {
+      const elapsed = ((Date.now() - new Date(startedAt).getTime()) / 1000).toFixed(1);
+      console.log(`  [checkout] Testing checkout flow... (${elapsed}s)`);
+    }
     try {
-      const checkoutResult = await testCheckoutFlow(context, seedUrl, opts);
+      const checkoutPromise = testCheckoutFlow(context, seedUrl, opts);
+      const checkoutTimeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 30000); // 30 second max for checkout
+      });
+      const checkoutResult = await Promise.race([checkoutPromise, checkoutTimeoutPromise]);
       if (checkoutResult) {
         checkoutInfo = checkoutResult.checkoutInfo;
         checkoutReached = checkoutResult.reachedCheckout;
@@ -397,12 +638,32 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
         console.log(`  ⚠ Checkout test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
+
+    if (opts.verbose && !checkoutReached) {
+      console.log(`  ⚠ Checkout not reached (may have timed out or cart was empty)`);
+    }
     
   } finally {
     await browser.close();
   }
 
   const completedAt = new Date().toISOString();
+  
+  // Add subscription/loyalty providers to thirdParties for unified detection
+  if (subscriptionsDetected && subscriptionProvider) {
+    thirdParties.add(subscriptionProvider);
+    // Recharge is a red flag
+    if (subscriptionProvider === 'Recharge') {
+      redFlags.add('Recharge');
+    }
+  }
+  if (loyaltyInfo.detected && loyaltyInfo.provider) {
+    thirdParties.add(loyaltyInfo.provider);
+    // Smile.io is a red flag
+    if (loyaltyInfo.provider === 'Smile.io') {
+      redFlags.add('Smile.io');
+    }
+  }
   
   // Merge all extracted policies into one
   const mergedPolicy = mergePolicies(extractedPolicies);
@@ -436,7 +697,7 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
     gwpDetected: gwpDetected || mergedPolicy.giftWithPurchase || false,
   };
 
-  return {
+  const result: ScrapeResult = {
     summary: {
       seedUrl,
       domain,
@@ -468,28 +729,230 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
     },
     pages,
   };
+  
+  // Log the assessment for debugging and audit
+  try {
+    await logAssessment(result, debugInfo);
+  } catch (logError) {
+    console.warn(`  ⚠️ Failed to log assessment: ${logError}`);
+  }
+  
+  return result;
 }
 
 interface CrawlTarget {
   url: string;
-  type: 'home' | 'pdp' | 'collection' | 'cart' | 'checkout' | 'policy' | 'other';
+  type: 'home' | 'pdp' | 'collection' | 'cart' | 'checkout' | 'policy' | 'rewards' | 'other';
+  source?: string; // Where we found this link (footer, nav, sitemap)
 }
 
-function buildCrawlTargets(seedUrl: string): CrawlTarget[] {
-  const base = seedUrl.replace(/\/$/, '');
+// Patterns to classify discovered links
+const LINK_CLASSIFIERS: { pattern: RegExp; type: CrawlTarget['type']; priority: number }[] = [
+  // Policy pages (high priority)
+  { pattern: /\/(policies?|terms|privacy|refund|return|shipping|exchange|warranty|guarantee)/i, type: 'policy', priority: 10 },
+  { pattern: /\/(faq|help|support|contact)/i, type: 'other', priority: 5 },
   
+  // Rewards/Loyalty pages (high priority)
+  { pattern: /\/(rewards?|loyalty|points|vip|member)/i, type: 'rewards', priority: 10 },
+  
+  // Collection pages
+  { pattern: /\/(collections?|shop|category|categories|products?)$/i, type: 'collection', priority: 8 },
+  { pattern: /\/collections\/[^\/]+$/i, type: 'collection', priority: 7 },
+  
+  // Cart/Checkout
+  { pattern: /\/(cart|bag|basket)$/i, type: 'cart', priority: 6 },
+  { pattern: /\/checkout/i, type: 'checkout', priority: 6 },
+  
+  // Product pages (lower priority - we'll discover these from collections)
+  { pattern: /\/products\/[^\/]+$/i, type: 'pdp', priority: 3 },
+];
+
+// Link text patterns that help classify ambiguous URLs
+const TEXT_CLASSIFIERS: { pattern: RegExp; type: CrawlTarget['type'] }[] = [
+  { pattern: /^(shipping|delivery)\s*(policy|info|information)?$/i, type: 'policy' },
+  { pattern: /^return(s)?\s*((&|and)\s*exchange(s)?)?(\s*policy)?$/i, type: 'policy' },
+  { pattern: /^refund\s*(policy)?$/i, type: 'policy' },
+  { pattern: /^(terms|privacy|legal)/i, type: 'policy' },
+  { pattern: /^(rewards?|loyalty|points|vip|perks)/i, type: 'rewards' },
+  { pattern: /^(faq|help|support|contact)/i, type: 'other' },
+  { pattern: /^(wholesale|trade|b2b)/i, type: 'other' },
+  { pattern: /^(about|our\s*story)/i, type: 'other' },
+  { pattern: /^(shop\s*all|all\s*products|collections?)/i, type: 'collection' },
+];
+
+/**
+ * Discover crawl targets by extracting links from the homepage
+ * Much more reliable than guessing URL patterns
+ */
+async function discoverCrawlTargets(page: Page, seedUrl: string, verbose: boolean): Promise<CrawlTarget[]> {
+  const base = new URL(seedUrl).origin;
+  const discovered = new Map<string, CrawlTarget>();
+  
+  // Always include homepage
+  discovered.set(base, { url: base, type: 'home', source: 'seed' });
+  discovered.set(base + '/', { url: base + '/', type: 'home', source: 'seed' });
+  
+  // Extract all links from the page, focusing on footer and nav
+  // Note: Using Function constructor to avoid bundler transformation issues with page.evaluate
+  const links = await page.evaluate(new Function(`
+    var results = [];
+    
+    var anchors = document.querySelectorAll('a[href]');
+    for (var i = 0; i < anchors.length; i++) {
+      var anchor = anchors[i];
+      var href = anchor.href;
+      var text = (anchor.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 100);
+      var ariaLabel = anchor.getAttribute('aria-label') || '';
+      
+      // Determine location
+      var location = 'body';
+      if (anchor.closest('footer, [class*="footer"], [id*="footer"], [role="contentinfo"]')) {
+        location = 'footer';
+      } else if (anchor.closest('nav, [class*="nav"], [id*="nav"], header, [role="navigation"]')) {
+        location = 'nav';
+      }
+      
+      if (href && (text || ariaLabel)) {
+        results.push({
+          href: href,
+          text: text || ariaLabel,
+          location: location
+        });
+      }
+    }
+    
+    return results;
+  `) as () => { href: string; text: string; location: string }[]);
+  
+  if (verbose) {
+    console.log(`  → Found ${links.length} links on homepage`);
+  }
+  
+  // Process discovered links
+  for (const link of links) {
+    try {
+      const url = new URL(link.href);
+      
+      // Skip external links, anchors, and non-http(s)
+      if (url.origin !== base) continue;
+      if (url.hash && url.pathname === new URL(seedUrl).pathname) continue;
+      if (!url.protocol.startsWith('http')) continue;
+      
+      // Skip common non-content paths
+      if (/\.(jpg|jpeg|png|gif|svg|css|js|woff|ico|pdf)$/i.test(url.pathname)) continue;
+      if (/\/(cdn|assets|static|media)\//i.test(url.pathname)) continue;
+      if (/\/(account|login|register|cart\/add|checkout)/i.test(url.pathname)) continue;
+      
+      // Normalize URL (remove trailing slash for comparison, keep query params that matter)
+      const normalizedUrl = url.origin + url.pathname.replace(/\/$/, '');
+      
+      // Skip if already discovered with same or higher priority
+      if (discovered.has(normalizedUrl)) continue;
+      
+      // Classify the link
+      let type: CrawlTarget['type'] = 'other';
+      let priority = 0;
+      
+      // First try URL pattern matching
+      for (const classifier of LINK_CLASSIFIERS) {
+        if (classifier.pattern.test(url.pathname)) {
+          type = classifier.type;
+          priority = classifier.priority;
+          break;
+        }
+      }
+      
+      // If still 'other', try text-based classification
+      if (type === 'other' || priority < 5) {
+        for (const classifier of TEXT_CLASSIFIERS) {
+          if (classifier.pattern.test(link.text)) {
+            type = classifier.type;
+            priority = 8; // Text matches are reliable
+            break;
+          }
+        }
+      }
+      
+      // Boost priority for footer links (these are typically important policy/info pages)
+      if (link.location === 'footer') {
+        priority += 2;
+      }
+      
+      discovered.set(normalizedUrl, {
+        url: normalizedUrl,
+        type,
+        source: link.location,
+      });
+      
+    } catch {
+      // Invalid URL, skip
+    }
+  }
+  
+  // Sitemap fetching removed - footer links provide sufficient coverage
+  
+  // Convert to array and sort by priority/type
+  let targets = Array.from(discovered.values());
+  
+  // Sort: home first, then by type priority
+  // Policy and rewards are MORE important than bulk collections
+  const typePriority: Record<CrawlTarget['type'], number> = {
+    'home': 100,
+    'policy': 95,      // Moved up - critical for assessment
+    'rewards': 94,     // Moved up - often missed
+    'cart': 90,
+    'collection': 80,  // Moved down - we only need a few
+    'checkout': 70,
+    'other': 50,
+    'pdp': 10, // PDPs will be discovered from collections
+  };
+  
+  targets.sort((a, b) => (typePriority[b.type] || 0) - (typePriority[a.type] || 0));
+  
+  // Limit bulk page types to avoid wasting crawl budget
+  const MAX_COLLECTIONS = 2;  // Just enough to detect bundles and find products
+  const MAX_PDPS = 0;         // PDPs discovered from collections separately
+  
+  let collectionCount = 0;
+  let pdpCount = 0;
+  
+  targets = targets.filter(t => {
+    if (t.type === 'collection') {
+      collectionCount++;
+      return collectionCount <= MAX_COLLECTIONS;
+    }
+    if (t.type === 'pdp') {
+      pdpCount++;
+      return pdpCount <= MAX_PDPS;
+    }
+    return true;
+  });
+  
+  if (verbose) {
+    const byType = targets.reduce((acc, t) => {
+      acc[t.type] = (acc[t.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    console.log(`  → Discovered targets: ${JSON.stringify(byType)}`);
+  }
+  
+  return targets;
+}
+
+/**
+ * Fallback targets when dynamic discovery fails
+ * Uses common e-commerce URL patterns
+ */
+function getFallbackTargets(seedUrl: string): CrawlTarget[] {
+  const base = seedUrl.replace(/\/$/, '');
   return [
-    { url: base, type: 'home' },
-    { url: `${base}/collections/all`, type: 'collection' },
-    { url: `${base}/products`, type: 'collection' },
-    { url: `${base}/policies/shipping-policy`, type: 'policy' },
-    { url: `${base}/policies/refund-policy`, type: 'policy' },
-    { url: `${base}/pages/shipping`, type: 'policy' },
-    { url: `${base}/pages/returns`, type: 'policy' },
-    { url: `${base}/pages/faq`, type: 'other' },
-    { url: `${base}/pages/rewards`, type: 'other' },
-    { url: `${base}/pages/wholesale`, type: 'other' },
-    { url: `${base}/cart`, type: 'cart' },
+    { url: base, type: 'home', source: 'fallback' },
+    { url: `${base}/collections/all`, type: 'collection', source: 'fallback' },
+    { url: `${base}/products`, type: 'collection', source: 'fallback' },
+    { url: `${base}/policies/shipping-policy`, type: 'policy', source: 'fallback' },
+    { url: `${base}/policies/refund-policy`, type: 'policy', source: 'fallback' },
+    { url: `${base}/pages/faq`, type: 'other', source: 'fallback' },
+    { url: `${base}/cart`, type: 'cart', source: 'fallback' },
   ];
 }
 
@@ -634,18 +1097,51 @@ async function testCheckoutFlow(
     await page.goto(productUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
     
-    // Step 3: Try to add to cart
+    // Step 3: Try to add to cart - expanded selectors for different themes
     const addToCartSelectors = [
+      // Standard Shopify patterns
       'button[name="add"]',
       'button[type="submit"][form*="product"]',
+      '.product-form__submit',
+      '[data-add-to-cart]',
+      '[data-action="add-to-cart"]',
+      
+      // Text-based selectors (case variations)
       'button:has-text("Add to cart")',
       'button:has-text("Add to Cart")',
       'button:has-text("ADD TO CART")',
       'button:has-text("Add to bag")',
-      '[data-add-to-cart]',
+      'button:has-text("Add to Bag")',
+      'button:has-text("ADD TO BAG")',
+      'button:has-text("Buy now")',
+      'button:has-text("Buy Now")',
+      'button:has-text("Add")',
+      
+      // Class-based selectors
       '.add-to-cart',
       '#add-to-cart',
-      '.product-form__submit',
+      '.btn-add-to-cart',
+      '.btn-addtocart',
+      '.addtocart',
+      '.add-to-cart-btn',
+      '.product__add-to-cart',
+      '.product-add-to-cart',
+      '[class*="add-to-cart"]',
+      '[class*="addToCart"]',
+      
+      // Dawn theme (Shopify 2.0)
+      '.product-form__buttons button[type="submit"]',
+      '.shopify-payment-button button',
+      
+      // Common theme patterns
+      '#AddToCart',
+      '#addToCart',
+      '[id*="AddToCart"]',
+      '[id*="add-to-cart"]',
+      
+      // Aria labels
+      'button[aria-label*="Add to cart"]',
+      'button[aria-label*="Add to bag"]',
     ];
     
     let addedToCart = false;

@@ -111,21 +111,30 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // API: Extract with API key
+  // API: Extract with API key (from request or env)
   if (url.pathname === '/api/extract' && req.method === 'POST') {
     try {
       const body = JSON.parse(await parseBody(req));
-      const { scrapeResult, clientId } = body;
+      const { scrapeResult, clientId, apiKey } = body;
 
-      if (!process.env.ANTHROPIC_API_KEY) {
+      // Use API key from request, fall back to env var
+      const effectiveApiKey = apiKey || process.env.ANTHROPIC_API_KEY;
+
+      if (!effectiveApiKey) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'No API key configured' }));
+        res.end(JSON.stringify({ error: 'No API key provided. Enter your Anthropic API key in the header.' }));
+        return;
+      }
+
+      if (!effectiveApiKey.startsWith('sk-ant-')) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid API key format. Anthropic keys start with sk-ant-' }));
         return;
       }
 
       sendToClient(clientId, 'status', { step: 'extracting', message: 'Sending to Claude...' });
 
-      const result = await extract(scrapeResult, { verbose: true });
+      const result = await extract(scrapeResult, { verbose: true, apiKey: effectiveApiKey });
       const markdown = formatMarkdown(result.assessment);
 
       sendToClient(clientId, 'complete', { 

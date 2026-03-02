@@ -15,6 +15,7 @@ export interface ExtractOptions {
   model?: string;
   maxTokens?: number;
   verbose?: boolean;
+  apiKey?: string;
 }
 
 export interface ExtractResult {
@@ -33,9 +34,9 @@ export async function extract(
   const model = options.model || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
   const maxTokens = options.maxTokens || Number(process.env.MAX_TOKENS) || DEFAULT_MAX_TOKENS;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = options.apiKey || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY not found in environment');
+    throw new Error('No API key provided. Set ANTHROPIC_API_KEY or pass apiKey option.');
   }
 
   const client = new Anthropic({ apiKey });

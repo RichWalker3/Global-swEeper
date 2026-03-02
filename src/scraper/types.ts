@@ -167,6 +167,7 @@ export interface ScrapeResult {
 export interface ScrapeOptions {
   maxPages?: number;
   timeout?: number;
+  scrapeTimeout?: number; // Overall timeout for entire scrape (default: 120000ms = 2 min)
   takeScreenshots?: boolean;
   verbose?: boolean;
 }

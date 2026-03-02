@@ -11,7 +11,8 @@
     "web": "tsx src/web/server.ts",
     "start": "tsx src/web/server.ts",
     "lint": "eslint src --ext .ts",
-    "test": "vitest"
+    "test": "vitest",
+    "dna": "tsx src/cli/get-dna.ts"
   },
   "keywords": [
     "e-commerce",

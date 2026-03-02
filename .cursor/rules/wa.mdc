@@ -1,0 +1,87 @@
+---
+description: Run a Website Assessment (WA) for a merchant site
+globs:
+alwaysApply: false
+---
+
+# Website Assessment (WA)
+
+When the user requests a WA (Website Assessment) using `/wa [URL]`, follow these steps:
+
+## Instructions
+
+1. **Read the template** at `docs/TEMPLATE.md` for the exact format and sections
+2. **Read domain knowledge** at `docs/DOMAIN_KNOWLEDGE.md` for Global-e specific rules and app support matrix
+3. **Navigate to the provided URL** and systematically assess the site following the playbook workflow
+4. **Complete all sections** of the template with proper status labels (✅ Verified, ❔ Unconfirmed, ❌ Absent)
+5. **Output the completed WA in chat** (see Output Format below)
+6. **Save to file** at `logs/assessments/YYYY-MM-DD_domain_WA.md`
+
+## Output Format (CRITICAL)
+
+**ALWAYS return the completed assessment directly in chat as PLAIN TEXT — not inside markdown code blocks, not as a file preview, not as markdown-formatted text.**
+
+Rules for output:
+- Do NOT wrap the assessment in triple backticks (```)
+- Do NOT use markdown link syntax like `[text](url)` — use plain URLs only
+- DO use emoji status indicators: ✅ ❔ ❌ ⚠️
+- DO use plain bullet points and line breaks
+- The user must be able to select all the text and copy it directly into Jira/Confluence with formatting intact
+
+Example of CORRECT output format:
+```
+# Website Assessment
+
+Merchant Overview
+
+• Brand: Example Brand
+• Primary URL: https://example.com
+• Other Locales / Sites: https://example.co.uk, https://example.eu
+
+Evidence Log (Working Links)
+
+• Home: https://example.com
+• PDP (example): https://example.com/products/widget
+• Cart: https://example.com/cart
+...
+```
+
+Example of WRONG output (do NOT do this):
+- Wrapping everything in a code block
+- Using `[Cart](https://example.com/cart)` instead of plain URL
+- Only saving to file without showing in chat
+
+## Key Requirements
+
+- **Navigate, don't guess:** Always use the site's own navigation (header menus, footer links, buttons) to discover pages. Never hardcode or guess URLs — follow the actual links on the page
+- Label every line as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**
+- Use **plain URLs** (not markdown links) for easy Jira copy-paste
+- Mark deductions with **[Inference]**
+- Flag Global-e red flags: Smile.io ❌, Recharge ❌, DG products, etc.
+- Don't purchase — step through checkout as far as allowed
+- Test 2-3 international markets if possible
+- Capture screenshots for key findings
+
+## Section Order
+
+1. Merchant Overview
+2. Evidence Log (Working Links)
+3. Platform & Site Structure
+4. Catalog & Products
+5. Checkout & Payments
+6. Shipping & Logistics
+7. Loyalty, Subscriptions, and CRM
+8. Internationalization Testing
+9. Legal and Compliance
+10. Business Restrictions
+11. Apps, Integrations, and Data Layer
+12. Tech Risks and Integration Notes
+13. Opportunities and Recommendations
+14. Open Questions
+15. Next Steps
+16. Appendix
+
+## Example Usage
+
+User: "/wa https://example.com"
+User: "Can you do a WA for https://example.com"

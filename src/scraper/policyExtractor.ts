@@ -73,12 +73,36 @@ export function extractPolicyInfo(text: string, _url?: string): ExtractedPolicy 
   const lowerText = text.toLowerCase();
   const result: ExtractedPolicy = { rawExcerpts: {} };
 
-  // Return window extraction
-  const returnWindowMatch = lowerText.match(/(\d+)\s*(day|calendar day|business day)s?\s*(return|exchange|to return|for returns)/i)
-    || lowerText.match(/(return|exchange)s?\s*within\s*(\d+)\s*(day|calendar day|business day)s?/i);
-  if (returnWindowMatch) {
-    const days = returnWindowMatch[1] || returnWindowMatch[2];
-    result.returnWindow = `${days} days`;
+  // Return window extraction - improved patterns
+  // Pattern 1: "30 day return", "30-day return policy", "30 days to return"
+  let returnWindowMatch = lowerText.match(/(\d+)[\s-]*(day|calendar day|business day)s?\s*(return|to return|for return|refund)/i);
+  // Pattern 2: "return within 30 days", "returns within 30 days"
+  if (!returnWindowMatch) {
+    returnWindowMatch = lowerText.match(/return[s]?\s*(?:must be made\s*)?within\s*(\d+)\s*(day|calendar day|business day)s?/i);
+    if (returnWindowMatch) {
+      result.returnWindow = `${returnWindowMatch[1]} days`;
+    }
+  }
+  // Pattern 3: "within 30 days of delivery/purchase/receipt"  
+  if (!returnWindowMatch) {
+    returnWindowMatch = lowerText.match(/within\s*(\d+)\s*(day|calendar day|business day)s?\s*(of|from)\s*(delivery|purchase|receipt|order)/i);
+    if (returnWindowMatch) {
+      result.returnWindow = `${returnWindowMatch[1]} days`;
+    }
+  }
+  // Pattern 4: "30 day exchange"
+  if (!returnWindowMatch) {
+    returnWindowMatch = lowerText.match(/(\d+)[\s-]*(day|calendar day|business day)s?\s*exchange/i);
+    if (returnWindowMatch) {
+      result.returnWindow = `${returnWindowMatch[1]} days`;
+    }
+  }
+  // If first pattern matched, extract days
+  if (returnWindowMatch && !result.returnWindow) {
+    const days = returnWindowMatch[1];
+    if (days && !isNaN(Number(days))) {
+      result.returnWindow = `${days} days`;
+    }
   }
 
   // Return fees extraction

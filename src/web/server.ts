@@ -228,30 +228,48 @@ async function runSweep(targetUrl: string, clientId: string, options: Record<str
 }
 
 async function scrapeWithProgress(targetUrl: string, clientId: string, options: Record<string, boolean>): Promise<ScrapeResult> {
-  // Use the existing scraper but with progress callbacks
-  // For now, we'll use the standard scraper and simulate progress
-  
   sendToClient(clientId, 'status', { 
     step: 'scraping', 
     message: 'Launching browser...',
-    progress: 10,
-  });
-
-  await new Promise(r => setTimeout(r, 500));
-
-  sendToClient(clientId, 'status', { 
-    step: 'scraping', 
-    message: `Navigating to ${targetUrl}...`,
-    progress: 20,
+    progress: 5,
   });
 
   const result = await scrape(targetUrl, {
     takeScreenshots: options.screenshots !== false,
     verbose: true,
     maxPages: 25,
+    onProgress: (progress) => {
+      // Map scraper phases to UI progress
+      let progressPercent = 10;
+      let message = progress.message;
+      
+      if (progress.phase === 'init') {
+        progressPercent = 10;
+      } else if (progress.phase === 'scraping') {
+        if (progress.current && progress.total) {
+          progressPercent = 15 + Math.round((progress.current / progress.total) * 60);
+          message = `[${progress.current}/${progress.total}] ${progress.message}`;
+          if (progress.url) {
+            message += ` (${progress.url})`;
+          }
+        } else {
+          progressPercent = 50;
+        }
+      } else if (progress.phase === 'checkout') {
+        progressPercent = 80;
+      } else if (progress.phase === 'analyzing') {
+        progressPercent = 90;
+      }
+      
+      sendToClient(clientId, 'status', { 
+        step: progress.phase, 
+        message,
+        progress: progressPercent,
+      });
+    },
   });
 
-  // Send page-by-page progress
+  // Send page results summary
   const totalPages = result.pages.length;
   for (let i = 0; i < totalPages; i++) {
     const page = result.pages[i];
@@ -261,14 +279,14 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
       categories: page.matchedCategories,
       current: i + 1,
       total: totalPages,
-      progress: 20 + Math.round((i / totalPages) * 70),
+      progress: 90 + Math.round((i / totalPages) * 10),
     });
   }
 
   sendToClient(clientId, 'status', {
     step: 'analyzing',
     message: 'Analyzing collected data...',
-    progress: 95,
+    progress: 98,
   });
 
   return result;

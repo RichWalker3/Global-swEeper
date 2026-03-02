@@ -18,6 +18,7 @@ const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   scrapeTimeout: 120000, // 2 minutes overall timeout
   takeScreenshots: true,
   verbose: false,
+  onProgress: () => {}, // No-op by default
 };
 
 // Track scrape progress for timeout reporting
@@ -181,6 +182,7 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     const discoveryPage = await context.newPage();
     
     scrapeProgress.phase = 'discovery';
+    opts.onProgress({ phase: 'init', message: 'Discovering site structure...' });
     if (opts.verbose) {
       console.log('  Discovering site structure...');
     }
@@ -221,6 +223,14 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
       pageIndex++;
       scrapeProgress.phase = 'page-scraping';
       scrapeProgress.currentUrl = target.url;
+      scrapeProgress.pagesScraped = pageIndex;
+      opts.onProgress({ 
+        phase: 'scraping', 
+        message: `Scraping ${target.type} page...`,
+        current: pageIndex,
+        total: totalTargets,
+        url: new URL(target.url).pathname,
+      });
       if (opts.verbose) {
         const elapsed = ((Date.now() - new Date(startedAt).getTime()) / 1000).toFixed(1);
         console.log(`  [${pageIndex}/${totalTargets}] ${target.type}: ${new URL(target.url).pathname} (${elapsed}s)`);
@@ -476,9 +486,16 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     // Phase 2: Scrape discovered product pages (up to 5)
     scrapeProgress.phase = 'product-pages';
     const maxProducts = Math.min(5, opts.maxPages - visited.size);
+    const productCount = Math.min(discoveredProductUrls.length, maxProducts);
+    opts.onProgress({ 
+      phase: 'scraping', 
+      message: `Scraping ${productCount} product pages...`,
+      current: visited.size,
+      total: visited.size + productCount + 1, // +1 for checkout
+    });
     if (opts.verbose && discoveredProductUrls.length > 0) {
       const elapsed = ((Date.now() - new Date(startedAt).getTime()) / 1000).toFixed(1);
-      console.log(`  [products] Scraping ${Math.min(discoveredProductUrls.length, maxProducts)} product pages... (${elapsed}s)`);
+      console.log(`  [products] Scraping ${productCount} product pages... (${elapsed}s)`);
     }
     for (let i = 0; i < Math.min(discoveredProductUrls.length, maxProducts); i++) {
       const productUrl = discoveredProductUrls[i];
@@ -600,6 +617,10 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     // Limit checkout test to 30 seconds to avoid timeouts
     scrapeProgress.phase = 'checkout';
     scrapeProgress.currentUrl = `${seedUrl}/checkout`;
+    opts.onProgress({ 
+      phase: 'checkout', 
+      message: 'Testing checkout flow...',
+    });
     if (opts.verbose) {
       const elapsed = ((Date.now() - new Date(startedAt).getTime()) / 1000).toFixed(1);
       console.log(`  [checkout] Testing checkout flow... (${elapsed}s)`);

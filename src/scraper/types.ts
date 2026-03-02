@@ -164,10 +164,19 @@ export interface ScrapeResult {
   pages: PageData[];
 }
 
+export interface ScrapeProgress {
+  phase: 'init' | 'navigating' | 'scraping' | 'checkout' | 'analyzing';
+  message: string;
+  current?: number;
+  total?: number;
+  url?: string;
+}
+
 export interface ScrapeOptions {
   maxPages?: number;
   timeout?: number;
   scrapeTimeout?: number; // Overall timeout for entire scrape (default: 120000ms = 2 min)
   takeScreenshots?: boolean;
   verbose?: boolean;
+  onProgress?: (progress: ScrapeProgress) => void;
 }

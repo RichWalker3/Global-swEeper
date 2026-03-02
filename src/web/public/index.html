@@ -1672,21 +1672,23 @@
       }
     });
 
-    // Auto-extract with Claude
-    document.getElementById('autoExtractBtn').addEventListener('click', async () => {
-      const apiKey = getStoredApiKey();
-      if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-        alert('Please enter a valid Anthropic API key first.');
-        return;
-      }
+    // Auto-extract with Claude (disabled for now - API key coming soon)
+    const autoExtractBtn = document.getElementById('autoExtractBtn');
+    if (autoExtractBtn) {
+      autoExtractBtn.addEventListener('click', async () => {
+        const apiKey = getStoredApiKey();
+        if (!apiKey || !apiKey.startsWith('sk-ant-')) {
+          alert('Please enter a valid Anthropic API key first.');
+          return;
+        }
 
-      if (!currentScrapeResult) {
-        alert('No scrape results available. Run an assessment first.');
-        return;
-      }
+        if (!currentScrapeResult) {
+          alert('No scrape results available. Run an assessment first.');
+          return;
+        }
 
-      const btn = document.getElementById('autoExtractBtn');
-      btn.disabled = true;
+        const btn = document.getElementById('autoExtractBtn');
+        btn.disabled = true;
       btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Extracting...';
 
       try {
@@ -1720,7 +1722,8 @@
         btn.disabled = false;
         btn.innerHTML = '⚡ Auto-Extract';
       }
-    });
+      });
+    }
 
     // Initialize
     connect();

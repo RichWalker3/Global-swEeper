@@ -1,0 +1,32 @@
+---
+description: Use Atlassian API credentials for Confluence/Jira access
+alwaysApply: true
+---
+
+# Atlassian API Access
+
+When accessing Confluence or Jira content, ALWAYS use the API credentials from `.env`:
+
+- `JIRA_EMAIL` - Email for authentication
+- `JIRA_API_TOKEN` - API token for authentication  
+- `JIRA_BASE_URL` - Base URL (https://global-e.atlassian.net)
+
+## Confluence API Examples
+
+Fetch a page by ID:
+```bash
+curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+  "$JIRA_BASE_URL/wiki/api/v2/pages/{pageId}?body-format=storage"
+```
+
+Search Confluence:
+```bash
+curl -s -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+  "$JIRA_BASE_URL/wiki/rest/api/content/search?cql=text~'search term'"
+```
+
+## DO NOT
+
+- Do not use browser navigation to access Confluence/Jira (requires login)
+- Do not ask user to authenticate MCP tools for Atlassian
+- Do not ask user for credentials - they are in .env

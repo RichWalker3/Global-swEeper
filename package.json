@@ -7,8 +7,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "sweep": "tsx src/cli/sweep.ts",
-    "web": "tsx src/web/server.ts",
+    "sweep": "tsx src/web/server.ts",
+    "cli": "tsx src/cli/sweep.ts",
     "start": "tsx src/web/server.ts",
     "lint": "eslint src --ext .ts",
     "test": "vitest",

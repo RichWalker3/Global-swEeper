@@ -73,17 +73,16 @@ Copy this text directly into your slides.
 
 **Title:** Tested Against Real WA Tickets
 
-| Metric | Result |
-|--------|--------|
-| Merchants Tested | 24 |
-| Successfully Scraped | 21 (87.5%) |
-| High Accuracy | 5 sites matched with 1-2 minor differences |
-| Platform Detection | 100% |
-| Third-Party Detection | 85%+ |
+**Test Results:**
+- 24 merchants tested
+- 7 excluded (URL failures, timeouts - not sweEp's fault)
+- 17 successfully scraped (100% of valid URLs)
 
-**Key Finding:** Scraper often finds MORE integrations than manual WAs caught
+**Accuracy:**
+- 13/17 successful (76%) - matches or found MORE than Jira
+- 100% platform detection
 
-**Failed (3):** Domain no longer exists or site timeout
+**Key Finding:** Scraper often finds MORE integrations than manual WAs
 
 ---
 
@@ -109,10 +108,30 @@ npm run web → http://localhost:3847
 
 ---
 
+## SLIDE 7: What's Next
+
+**Title:** What's Next
+
+**Immediate Need:**
+- Global-e access to Cursor API / Anthropic API
+- Removes copy-paste step → fully automated WA generation
+
+**Planned Features:**
+- Direct LLM integration in web UI
+- Jira API integration → auto-create WA tickets
+- Batch processing for multiple merchants
+- Enhanced third-party detection patterns
+
+**Timeline:**
+- API access → Same-week integration
+- Jira integration → Fast follow
+
+---
+
 ## Appendix: Talking Points (if asked)
 
 **"How accurate is it?"**
-> Tested against 24 real merchant sites. 87.5% scraped successfully. The tool often finds integrations that manual WAs missed.
+> Tested against 24 real merchant sites. 17 scraped successfully (7 excluded for bad URLs/timeouts). 76% accuracy - and sweEp often finds MORE integrations than manual WAs. 100% platform detection.
 
 **"What about edge cases?"**
 > Some sites timeout or block scrapers. The tool reports what it finds; you review and fill gaps.

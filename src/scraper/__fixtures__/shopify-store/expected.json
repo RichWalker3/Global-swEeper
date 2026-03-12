@@ -1,0 +1,33 @@
+{
+  "home": {
+    "thirdParties": ["Smile.io", "Afterpay"],
+    "subscriptions": {
+      "detected": true
+    },
+    "categories": ["shipping"]
+  },
+  "returnsPolicy": {
+    "policy": {
+      "returnWindow": "30 days",
+      "returnFees": ["$10 Happy Returns", "$15 mailback"],
+      "returnProvider": "Loop Returns"
+    }
+  },
+  "product": {
+    "thirdParties": ["Klarna", "Afterpay", "Recharge"],
+    "dangerousGoods": [
+      { "category": "fragrance", "risk": "high" },
+      { "category": "aerosol", "risk": "high" }
+    ],
+    "catalog": {
+      "bundlesDetected": true,
+      "customizableProducts": true,
+      "customizationTypes": ["engraving"],
+      "subscriptionsDetected": true,
+      "preOrdersDetected": true
+    },
+    "bnpl": {
+      "providers": ["Afterpay", "Klarna"]
+    }
+  }
+}

@@ -3,13 +3,13 @@
  */
 
 import type { WebsiteAssessment } from '../schema/assessment.js';
-import type { Check } from '../schema/common.js';
+import type { Check, PageRef } from '../schema/common.js';
 
-const STATUS_EMOJI = {
+const STATUS_EMOJI: Record<'verified' | 'unconfirmed' | 'absent', string> = {
   verified: '✅',
   unconfirmed: '❔',
   absent: '❌',
-} as const;
+};
 
 export function formatMarkdown(assessment: WebsiteAssessment): string {
   const lines: string[] = [];
@@ -46,7 +46,7 @@ export function formatMarkdown(assessment: WebsiteAssessment): string {
   if (log.loyaltyPage) lines.push(`* **Loyalty / Rewards:** ${log.loyaltyPage.url}`);
   if (log.subscriptionsPage) lines.push(`* **Subscriptions:** ${log.subscriptionsPage.url}`);
   if (log.other.length) {
-    lines.push(`* **Other:** ${log.other.map(p => p.url).join(', ')}`);
+    lines.push(`* **Other:** ${log.other.map((p: PageRef) => p.url).join(', ')}`);
   }
   lines.push('');
   lines.push('---');
@@ -321,8 +321,9 @@ export function formatMarkdown(assessment: WebsiteAssessment): string {
 }
 
 function formatCheck(label: string, check: Check, extra?: string): string {
-  const emoji = STATUS_EMOJI[check.status];
-  let line = `* **${label}** — ${emoji} ${check.status.charAt(0).toUpperCase() + check.status.slice(1)}`;
+  const status = check.status as 'verified' | 'unconfirmed' | 'absent';
+  const emoji = STATUS_EMOJI[status];
+  let line = `* **${label}** — ${emoji} ${status.charAt(0).toUpperCase() + status.slice(1)}`;
   
   if (extra) {
     line += `: ${extra}`;

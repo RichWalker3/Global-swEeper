@@ -4,7 +4,7 @@
  * Scrapes multiple sites and saves results for comparison
  */
 
-import { scrape } from '../scraper/index.js';
+import { scrape } from '../src/scraper/index.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 

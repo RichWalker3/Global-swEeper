@@ -182,6 +182,13 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Health check endpoint (for container orchestration)
+  if (url.pathname === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }));
+    return;
+  }
+
   // Serve static files
   let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
   const fullPath = join(__dirname, 'public', filePath);
@@ -280,6 +287,20 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
       current: i + 1,
       total: totalPages,
       progress: 90 + Math.round((i / totalPages) * 10),
+    });
+  }
+  
+  // Send error events for failed pages
+  const errors = result.summary.errors || [];
+  if (errors.length > 0) {
+    sendToClient(clientId, 'scrapeErrors', {
+      errors: errors.map(e => ({
+        url: e.url,
+        error: e.error,
+        type: e.type,
+      })),
+      totalErrors: errors.length,
+      totalPages: totalPages + errors.length,
     });
   }
 

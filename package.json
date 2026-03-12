@@ -32,8 +32,11 @@
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "dotenv": "^16.4.5",
+    "esbuild": "^0.27.4",
     "marked": "^14.1.0",
     "playwright": "^1.57.0",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "simple-wappalyzer": "^1.1.70",
     "zod": "^3.23.8"
   },

@@ -230,6 +230,43 @@
       }
     }
 
+    /* Wide screen layout: move assessment bar above results */
+    @media (min-width: 1600px) {
+      main {
+        max-width: 1800px;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+      }
+
+      main > .input-panel {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 1.5rem;
+        order: 1;
+      }
+
+      main > .input-panel > .card:first-of-type {
+        grid-column: 1 / 2;
+      }
+
+      main > .input-panel > #summaryCard {
+        margin-top: 0;
+      }
+
+      main > .output-panel {
+        order: 2;
+        height: auto;
+        min-height: 500px;
+      }
+    }
+
+    @media (min-width: 1920px) {
+      main {
+        max-width: 1920px;
+        padding: 2rem 3rem;
+      }
+    }
+
     /* Cards */
     .card {
       background: var(--white);
@@ -460,12 +497,21 @@
       color: var(--green);
     }
 
+    .page-error {
+      color: var(--red);
+    }
+
     .page-url {
       color: var(--gray-400);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       flex: 1;
+    }
+
+    .page-item.error .page-url {
+      color: var(--red);
+      opacity: 0.8;
     }
 
     .page-categories {
@@ -481,6 +527,62 @@
       border-radius: 4px;
       text-transform: uppercase;
       font-weight: 500;
+    }
+
+    .category-tag.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--red);
+    }
+
+    /* Scrape Errors Alert */
+    .scrape-errors {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin-top: 1rem;
+    }
+
+    .scrape-errors h4 {
+      color: var(--red);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .scrape-errors-list {
+      font-size: 0.75rem;
+      color: var(--black);
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .scrape-errors-list li {
+      padding: 0.25rem 0;
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+    }
+
+    .scrape-errors-list .error-type {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--red);
+      padding: 0.125rem 0.375rem;
+      border-radius: 3px;
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .scrape-errors-list .error-url {
+      color: var(--gray-400);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     /* Output Panel */
@@ -819,6 +921,12 @@
               <span id="progressText">Starting...</span>
             </div>
             <div class="pages-log" id="pagesLog"></div>
+            
+            <!-- Scrape Errors (shown if any pages failed) -->
+            <div class="scrape-errors hidden" id="scrapeErrors">
+              <h4>⚠️ Some pages failed to load</h4>
+              <ul class="scrape-errors-list" id="scrapeErrorsList"></ul>
+            </div>
           </div>
         </div>
       </div>
@@ -843,6 +951,12 @@
               <div class="stat-value" id="statPlatform">-</div>
               <div class="stat-label">Platform</div>
             </div>
+          </div>
+          
+          <!-- Scrape Health Indicator -->
+          <div class="scrape-health hidden" id="scrapeHealth" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+            <span id="scrapeHealthIcon"></span>
+            <span id="scrapeHealthText"></span>
           </div>
 
           <div style="font-size: 0.75rem; color: var(--gray-400); margin-top: 1rem;">
@@ -1119,6 +1233,11 @@
         onScrapingComplete(data);
       });
 
+      eventSource.addEventListener('scrapeErrors', (e) => {
+        const data = JSON.parse(e.data);
+        displayScrapeErrors(data.errors);
+      });
+
       eventSource.addEventListener('complete', (e) => {
         const data = JSON.parse(e.data);
         onExtractionComplete(data);
@@ -1155,6 +1274,51 @@
       pagesLog.scrollTop = pagesLog.scrollHeight;
     }
 
+    // Display scrape errors
+    function displayScrapeErrors(errors) {
+      if (!errors || errors.length === 0) return;
+      
+      const errorsContainer = document.getElementById('scrapeErrors');
+      const errorsList = document.getElementById('scrapeErrorsList');
+      
+      // Build error type labels
+      const typeLabels = {
+        'blocked': '🛡️ BLOCKED',
+        'timeout': '⏱️ TIMEOUT',
+        'not_found': '404',
+        'auth_required': '🔒 AUTH',
+        'other': '❌ ERROR'
+      };
+      
+      errorsList.innerHTML = errors.map(err => {
+        const typeLabel = typeLabels[err.type] || typeLabels['other'];
+        const shortUrl = err.url.replace(/^https?:\/\/[^/]+/, '');
+        return `
+          <li>
+            <span class="error-type">${typeLabel}</span>
+            <span class="error-url" title="${err.url}">${shortUrl}</span>
+          </li>
+        `;
+      }).join('');
+      
+      errorsContainer.classList.remove('hidden');
+      
+      // Also add failed pages to the log
+      errors.forEach(err => {
+        const item = document.createElement('div');
+        item.className = 'page-item error';
+        const shortUrl = err.url.replace(/^https?:\/\/[^/]+/, '');
+        item.innerHTML = `
+          <span class="page-error">✗</span>
+          <span class="page-url" title="${err.error}">${shortUrl}</span>
+          <div class="page-categories">
+            <span class="category-tag error">${err.type}</span>
+          </div>
+        `;
+        pagesLog.appendChild(item);
+      });
+    }
+
     // On scraping complete
     function onScrapingComplete(data) {
       const { scrapeResult, prompt } = data;
@@ -1172,6 +1336,41 @@
       const techCount = new Set([...(summary.thirdPartiesDetected || []), ...(summary.technologies || []).map(t => t.name)]).size;
       document.getElementById('statApps').textContent = techCount;
       document.getElementById('statPlatform').textContent = summary.platformDetected || '?';
+      
+      // Show scrape health indicator
+      const scrapeErrors = summary.errors || [];
+      const totalAttempted = summary.pagesVisited + scrapeErrors.length;
+      const errorRate = totalAttempted > 0 ? scrapeErrors.length / totalAttempted : 0;
+      const scrapeHealthEl = document.getElementById('scrapeHealth');
+      const scrapeHealthIcon = document.getElementById('scrapeHealthIcon');
+      const scrapeHealthText = document.getElementById('scrapeHealthText');
+      
+      if (scrapeErrors.length > 0) {
+        scrapeHealthEl.classList.remove('hidden');
+        if (errorRate > 0.3) {
+          // Red: >30% errors
+          scrapeHealthEl.style.background = 'rgba(239, 68, 68, 0.15)';
+          scrapeHealthEl.style.color = 'var(--red)';
+          scrapeHealthIcon.textContent = '⚠️';
+          scrapeHealthText.textContent = `${summary.pagesVisited}/${totalAttempted} pages loaded - ${scrapeErrors.length} failed. Consider re-running.`;
+        } else {
+          // Yellow: some errors but <30%
+          scrapeHealthEl.style.background = 'rgba(245, 158, 11, 0.15)';
+          scrapeHealthEl.style.color = 'var(--yellow)';
+          scrapeHealthIcon.textContent = '⚡';
+          scrapeHealthText.textContent = `${summary.pagesVisited}/${totalAttempted} pages loaded - ${scrapeErrors.length} failed`;
+        }
+        
+        // Display the errors
+        displayScrapeErrors(scrapeErrors);
+      } else {
+        // All green
+        scrapeHealthEl.classList.remove('hidden');
+        scrapeHealthEl.style.background = 'rgba(34, 197, 94, 0.15)';
+        scrapeHealthEl.style.color = 'var(--green)';
+        scrapeHealthIcon.textContent = '✅';
+        scrapeHealthText.textContent = `All ${summary.pagesVisited} pages loaded successfully`;
+      }
 
       // Show third parties with color coding (from Wappalyzer + pattern matching)
       const thirdPartiesEl = document.getElementById('thirdParties');
@@ -1558,6 +1757,8 @@
       progressBar.style.background = '';
       pagesLog.innerHTML = '';
       document.getElementById('progressSpinner').classList.remove('hidden');
+      document.getElementById('scrapeErrors').classList.add('hidden');
+      document.getElementById('scrapeErrorsList').innerHTML = '';
       summaryCard.classList.add('hidden');
       extractionCard.classList.add('hidden');
       document.getElementById('jsonConverterCard').classList.add('hidden');

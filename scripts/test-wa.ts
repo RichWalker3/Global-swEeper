@@ -5,7 +5,7 @@
  */
 
 import { config } from 'dotenv';
-import { scrape } from '../scraper/scraper.js';
+import { scrape } from '../src/scraper/scraper.js';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 

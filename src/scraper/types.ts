@@ -27,6 +27,8 @@ export interface CrawlError {
   url: string;
   error: string;
   type: 'timeout' | 'blocked' | 'auth_required' | 'not_found' | 'other';
+  /** If blocked, indicates the bot detection system (cloudflare, perimeterx, datadome, etc) */
+  blockType?: string;
 }
 
 export interface DGFinding {

@@ -236,6 +236,8 @@ npm run web
 # http://localhost:3847
 ```
 
+**Team / non-coders:** For a **single prompt** that clones, installs, and launches Sweep: see **[ONE_SHOT_SETUP_PROMPT.md](./docs/ONE_SHOT_SETUP_PROMPT.md)**. For a full walkthrough and slash commands: **[TEAM_SETUP.md](./docs/TEAM_SETUP.md)**.
+
 ### How to Use
 
 1. **Enter the merchant URL** in the web interface

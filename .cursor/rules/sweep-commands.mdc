@@ -1,0 +1,33 @@
+---
+description: Launch, update, or get help with Global-sweep (no coding required)
+globs:
+alwaysApply: true
+---
+
+# Global-sweep Slash Commands
+
+When the user says any of the following in chat, perform the corresponding action. Be concise and friendly; they may not be developers.
+
+## /launch sweep (or "launch sweep")
+
+- Run in the project root: `npm run web` (or `npm start`).
+- Tell them: "Sweep is starting. Open your browser to **http://localhost:3847** (or the port shown in the terminal)."
+- If they're not in the project root, tell them to open the global-sweep folder in Cursor and try again, or run the command from the folder where they cloned the repo.
+
+## /update sweep (or "update sweep")
+
+- Run in the project root, in order:
+  1. `git pull` (to get latest code; if they don't use git, tell them to re-download the repo from GitHub and then run the next step).
+  2. `npm install`
+  3. Optionally: `npx playwright install chromium` (only if release notes or errors mention Playwright/browser changes).
+- Then say: "Sweep is updated. Use **launch sweep** when you're ready to run the app."
+
+## /wa &lt;url&gt;
+
+- Handled by the **Website Assessment (WA)** rule. Run a full WA for the given merchant URL using the template and domain knowledge. Do not duplicate WA logic here; defer to that rule.
+
+## General help
+
+- If they ask "how do I run sweep?" or "how do I start the app?", treat like **launch sweep**.
+- If they ask "how do I get the latest version?" or "how do I update?", treat like **update sweep**.
+- If they're stuck, point them to `docs/TEAM_SETUP.md` for the full setup and troubleshooting.

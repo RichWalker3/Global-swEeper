@@ -1,5 +1,7 @@
 # Global-sweep: Team Setup Guide
 
+**Repo:** [github.com/RichWalker3/Global-swEeper](https://github.com/RichWalker3/Global-swEeper) — clone URL: `https://github.com/RichWalker3/Global-swEeper.git`
+
 This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You’ll use **GitHub** to get the tool and **Cursor** to run it (with simple “slash” commands).
 
 **Want one prompt that does everything?** See **[ONE_SHOT_SETUP_PROMPT.md](./ONE_SHOT_SETUP_PROMPT.md)** — paste it into Cursor and it will clone the repo, install, and launch Sweep with no extra steps.
@@ -72,9 +74,9 @@ npm install
 npx playwright install chromium
 ```
 
-4. **Environment file:**  
-   - In the project folder, duplicate `env.example` and rename the copy to `.env`.  
-   - If your team lead gave you API keys or settings, add them to `.env` (you can open it in Cursor or Notepad).
+4. **Environment file (optional):**  
+   You do **not** need a `.env` file for the default web app and scraper — it runs with built-in defaults (including port **3847**).  
+   Create `.env` only if you need optional settings (custom port, proxy, Anthropic key, Atlassian/Jira). Copy `env.example` to `.env` and add values your team lead provides (open in Cursor or Notepad).
 
 ---
 
@@ -98,7 +100,7 @@ I'm setting up Global-sweep on my machine. Please:
 1. Confirm Node is v18+ (I can run `node -v` if needed).
 2. Run `npm install` in this project if dependencies aren't installed.
 3. Remind me to run `npx playwright install chromium` if I haven't already.
-4. Remind me to copy env.example to .env and add any keys my team lead provided.
+4. If I need optional settings (proxy, API keys, custom port), remind me I can copy env.example to .env — otherwise .env is not required.
 5. Tell me the exact command to launch the app and the URL to open in my browser (e.g. http://localhost:3847).
 
 After that, tell me how to use "/launch sweep" and "/update sweep" in future chats.
@@ -139,19 +141,25 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
   In the project folder run: `npm install` and `npx playwright install chromium`.
 
 - **Port 3847 already in use**  
-  Another app is using that port. Close the other app or set `PORT=3848` in your `.env` and use http://localhost:3848.
+  Another app is using that port. Close the other app or create a `.env` with `PORT=3848` and use http://localhost:3848.
 
 - **Cursor doesn’t run commands**  
   Make sure you’ve opened the **global-sweep folder** in Cursor (File → Open Folder), not a single file. The slash-style commands rely on the project’s rules.
+
+### Windows-specific
+
+- **`winget` doesn’t work** (policy, no admin, not installed): Install **Git** from [git-scm.com](https://git-scm.com/download/win) and **Node.js LTS** from [nodejs.org](https://nodejs.org), then **close and reopen** Command Prompt or PowerShell and verify `git --version` and `node -v`.
+- **Open the app in the browser:** `start http://localhost:3847`
+- **Paths:** Use `cd` into your project folder, e.g. `cd %USERPROFILE%\Desktop\global-sweep` (adjust if your folder is elsewhere).
 
 ---
 
 ## Summary
 
 1. Install Node.js and (optional) GitHub Desktop.
-2. Get the repo (ZIP or clone).
+2. Get the repo (ZIP or clone) from `https://github.com/RichWalker3/Global-swEeper.git`.
 3. In the project folder: `npm install` and `npx playwright install chromium`.
-4. Copy `env.example` to `.env` and add any keys from your team lead.
+4. **Optional:** copy `env.example` to `.env` only if you need proxy, API keys, or a custom port.
 5. Open the project in Cursor and paste the setup prompt once.
 6. Use **“launch sweep”** and **“update sweep”** (and **/wa &lt;url&gt;** for assessments) in Cursor chat.
 

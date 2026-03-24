@@ -1,5 +1,7 @@
 # One-shot setup: install, clone, and launch Sweep
 
+**Canonical repo (use everywhere):** `https://github.com/RichWalker3/Global-swEeper.git` — web: [github.com/RichWalker3/Global-swEeper](https://github.com/RichWalker3/Global-swEeper)
+
 Send your coworkers this **single prompt**. They create an empty folder, open it in Cursor, paste the prompt, and the AI installs Git and Node (if needed), clones the repo, installs dependencies, starts the app, and opens it in their browser. No Confluence/Jira setup — you can help them with that separately.
 
 ---
@@ -22,6 +24,19 @@ Because they already opened the folder in Cursor, when the AI clones the repo in
 
 **Confluence/Jira** — Not part of this setup. You can help them add API tokens and config later.
 
+**`.env` file** — **Not required** for the default web UI and scraper. The app runs with built-in defaults (e.g. port 3847). Add a `.env` only if someone needs optional settings: custom port, proxy, Anthropic API key, or Atlassian credentials (see `env.example`).
+
+### Windows (when someone is on Windows)
+
+Use the same prompt; the AI should prefer **PowerShell** or **Command Prompt** for commands. If **`winget`** fails (not installed, no admin rights, or policy blocks it), install manually:
+
+- **Git:** [git-scm.com](https://git-scm.com/download/win) — then reopen the terminal.
+- **Node.js LTS:** [nodejs.org](https://nodejs.org) — then reopen the terminal.
+
+Verify with `git --version` and `node -v` (v18+). Clone and `npm` steps are the same as on Mac. Open the app in the browser with:
+
+`start http://localhost:3847`
+
 ---
 
 ## The prompt (copy this whole block)
@@ -39,7 +54,7 @@ Repo: https://github.com/RichWalker3/Global-swEeper.git
 
 4. Then run: npx playwright install chromium
 
-5. If there is no .env file, create it by copying env.example to .env. Do not add or request Confluence/Jira/Atlassian credentials.
+5. Optional: only if I need custom port, proxy, Anthropic, or Atlassian settings later, copy env.example to .env and fill values. Otherwise skip — .env is not required for the default app. Do not add or request Confluence/Jira/Atlassian credentials unless I already have them.
 
 6. Start the web app in the background with: npm run web
 
@@ -55,4 +70,4 @@ When done, tell me briefly that Sweep is running and the browser should have ope
 - The app runs at **http://localhost:3847** and the AI opens it in their browser.
 - They’re already in the project folder in Cursor, so **launch sweep**, **update sweep**, and **/wa** work in future chats (see [TEAM_SETUP.md](./TEAM_SETUP.md)).
 
-**Confluence/Jira:** Not included in this setup. When you’re ready, help them add their API token and base URL to `.env` (see your internal docs or the Atlassian rule in the repo).
+**Confluence/Jira:** Not included in this setup. When you’re ready, they can add API token and base URL to `.env` (optional file — see `env.example` and the Atlassian rule in the repo).

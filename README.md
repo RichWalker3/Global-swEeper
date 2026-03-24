@@ -214,6 +214,8 @@ Every claim in the WA must be one of:
 
 ### Installation
 
+**Repo:** [github.com/RichWalker3/Global-swEeper](https://github.com/RichWalker3/Global-swEeper) (`git clone` URL below).
+
 ```bash
 # Clone the repo
 git clone https://github.com/RichWalker3/Global-swEeper.git
@@ -225,6 +227,8 @@ npm install
 # Install Playwright browsers (required once)
 npx playwright install chromium
 ```
+
+No `.env` file is required for the default app (port **3847**). Add `.env` only for optional settings — see `env.example` (proxy, API keys, custom port). **Windows:** if automated installers fail, use installers from [nodejs.org](https://nodejs.org) and [git-scm.com](https://git-scm.com/download/win); see [docs/ONE_SHOT_SETUP_PROMPT.md](./docs/ONE_SHOT_SETUP_PROMPT.md) and [docs/TEAM_SETUP.md](./docs/TEAM_SETUP.md).
 
 ### Running the Web UI
 

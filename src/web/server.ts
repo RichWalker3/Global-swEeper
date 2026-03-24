@@ -321,7 +321,7 @@ async function runSweep(targetUrl: string, clientId: string, options: Record<str
     });
 
   } catch (error) {
-    sendToClient(clientId, 'error', { 
+    sendToClient(clientId, 'sweepError', { 
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

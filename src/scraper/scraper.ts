@@ -742,9 +742,15 @@ async function testCheckout(
     console.log(`  [checkout] Testing checkout flow... (${elapsed}s)`);
   }
 
+  let checkoutTick: ReturnType<typeof setInterval> | undefined;
   try {
+    // Keep progress/UI alive during long checkout (and help SSE stay meaningful)
+    checkoutTick = setInterval(() => {
+      opts.onProgress({ phase: 'checkout', message: 'Testing checkout flow…' });
+    }, 12000);
+
     const checkoutPromise = testCheckoutFlow(context, seedUrl, { timeout: opts.timeout, verbose: opts.verbose });
-    const checkoutTimeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 30000));
+    const checkoutTimeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 25000));
     const checkoutResult = await Promise.race([checkoutPromise, checkoutTimeoutPromise]);
 
     if (checkoutResult) {
@@ -773,6 +779,8 @@ async function testCheckout(
     if (opts.verbose) {
       console.log(`  ⚠ Checkout test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  } finally {
+    if (checkoutTick) clearInterval(checkoutTick);
   }
 
   if (opts.verbose && !state.checkoutReached) {

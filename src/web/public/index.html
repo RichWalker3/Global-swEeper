@@ -1370,9 +1370,15 @@
     const connectionDot = document.getElementById('connectionDot');
     const connectionStatus = document.getElementById('connectionStatus');
 
-    // Connect to SSE
+    // Connect to SSE (reuse clientId on reconnect so long scrapes still receive events after a dropped connection)
     function connect() {
-      clientId = crypto.randomUUID();
+      if (eventSource) {
+        try { eventSource.close(); } catch (_) {}
+        eventSource = null;
+      }
+      if (!clientId) {
+        clientId = crypto.randomUUID();
+      }
       eventSource = new EventSource(`/events?clientId=${clientId}`);
 
       eventSource.addEventListener('connected', (e) => {
@@ -1414,7 +1420,7 @@
         onExtractionComplete(data);
       });
 
-      eventSource.addEventListener('error', (e) => {
+      eventSource.addEventListener('sweepError', (e) => {
         if (e.data) {
           const data = JSON.parse(e.data);
           progressText.textContent = `Error: ${data.message}`;
@@ -1425,8 +1431,8 @@
 
       eventSource.onerror = () => {
         connectionDot.classList.remove('connected');
-        connectionStatus.textContent = 'Disconnected';
-        setTimeout(connect, 3000);
+        connectionStatus.textContent = 'Reconnecting…';
+        setTimeout(connect, 1500);
       };
     }
 

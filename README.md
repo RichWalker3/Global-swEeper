@@ -240,7 +240,7 @@ npm run web
 # (or Tasks: Run Task → "Open Sweep in Simple Browser")
 ```
 
-**Team / non-coders:** For a **single prompt** that clones, installs, and launches Sweep: see **[ONE_SHOT_SETUP_PROMPT.md](./docs/ONE_SHOT_SETUP_PROMPT.md)**. For a full walkthrough and slash commands: **[TEAM_SETUP.md](./docs/TEAM_SETUP.md)**.
+**Team / non-coders:** The install prompt is **`SETUP_PROMPT.txt`** at the repo root — drop it in an empty folder, open the folder in Cursor, then `@SETUP_PROMPT.txt` or paste it into chat (details in **[docs/ONE_SHOT_SETUP_PROMPT.md](./docs/ONE_SHOT_SETUP_PROMPT.md)**). Slash commands: **[docs/TEAM_SETUP.md](./docs/TEAM_SETUP.md)**.
 
 ### How to Use
 

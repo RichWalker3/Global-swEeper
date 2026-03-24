@@ -4,7 +4,7 @@
 
 This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You’ll use **GitHub** to get the tool and **Cursor** to run it (with simple “slash” commands).
 
-**Want one prompt that does everything?** See **[ONE_SHOT_SETUP_PROMPT.md](./ONE_SHOT_SETUP_PROMPT.md)** — paste it into Cursor and it will clone the repo, install, and launch Sweep with no extra steps.
+**Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root — see **[ONE_SHOT_SETUP_PROMPT.md](./ONE_SHOT_SETUP_PROMPT.md)** (`@SETUP_PROMPT.txt` or paste into Cursor chat).
 
 ---
 

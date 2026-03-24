@@ -1,73 +1,44 @@
 # One-shot setup: install, clone, and launch Sweep
 
-**Canonical repo (use everywhere):** `https://github.com/RichWalker3/Global-swEeper.git` — web: [github.com/RichWalker3/Global-swEeper](https://github.com/RichWalker3/Global-swEeper)
+**Canonical repo:** `https://github.com/RichWalker3/Global-swEeper.git` — [github.com/RichWalker3/Global-swEeper](https://github.com/RichWalker3/Global-swEeper)
 
-Send your coworkers this **single prompt**. They create an empty folder, open it in Cursor, paste the prompt, and the AI installs Git and Node (if needed), clones the repo, installs dependencies, starts the app, and opens Sweep **in Cursor’s Simple Browser** (built-in panel), not the system default browser. No Confluence/Jira setup — you can help them with that separately.
-
----
-
-## What they do (before pasting)
-
-1. **Create a new empty folder** (e.g. `global-sweep` on Desktop).
-2. **Open that folder in Cursor** (File → Open Folder → choose that folder).
-3. **Start a new chat** and paste the prompt below. Send.
-
-Because they already opened the folder in Cursor, when the AI clones the repo into that folder they stay in the right project — no need to “point Cursor” anywhere after setup.
+The **only** place the full prompt text lives is **[`SETUP_PROMPT.txt`](../SETUP_PROMPT.txt)** at the repo root. **Edit that file** when you change install steps — do not duplicate the prompt body here (avoids drift).
 
 ---
 
-## What they need first
+## What teammates do (no reading required)
 
-- **Cursor** installed ([cursor.com](https://cursor.com))
+They do **not** need to open this documentation. Give them **one file** and **one line** from you (Slack, email, etc.):
 
-**That’s it.** The prompt will install Git and Node if they’re missing, then clone the repo. The repo is **public**, so **no GitHub login or account** is required — clone works without signing in.
+1. **Create an empty folder** and put **`SETUP_PROMPT.txt`** in it. They can save it from the repo after you send a link, or download:  
+   **`https://raw.githubusercontent.com/RichWalker3/Global-swEeper/main/SETUP_PROMPT.txt`**
+2. **Open that folder in Cursor** (File → Open Folder).
+3. **New chat** — either:
+   - **@mention the file:** `@SETUP_PROMPT.txt` and send: *Execute every step in this file in order.*  
+   - **Or** paste the **entire** contents of `SETUP_PROMPT.txt` into the chat and send.
 
-**Confluence/Jira** — Not part of this setup. You can help them add API tokens and config later.
+Cursor does **not** run a dropped file by itself — they need **one chat message** that attaches or pastes the prompt. That’s the whole “instruction surface” for them.
 
-**`.env` file** — **Not required** for the default web UI and scraper. The app runs with built-in defaults (e.g. port 3847). Add a `.env` only if someone needs optional settings: custom port, proxy, Anthropic API key, or Atlassian credentials (see `env.example`).
-
-### Windows teammates
-
-Shell choice, **`winget` fallbacks**, and **Simple Browser** (not `start http://...`) are all spelled out **inside the prompt block below** — they only need to paste that block. This section is a quick human-readable pointer; the pasted prompt is the source of truth.
-
----
-
-## The prompt (copy this whole block)
-
-```
-Set up Global-sweep from GitHub and launch it in Cursor's Simple Browser (inside the IDE), not in my default external browser. I have already opened the folder where I want the project (this folder) in Cursor. Do every step below in order. Do not ask for my confirmation; run all commands. Do not set up or ask for Confluence/Jira credentials — those will be configured separately.
-
-Repo: https://github.com/RichWalker3/Global-swEeper.git
-
-1. Ensure Git and Node.js 18+ are installed (verify with git --version and node -v).
-   - macOS: If git is missing, install Homebrew from https://brew.sh if needed, then run "brew install git". If node is missing or older than v18, run "brew install node".
-   - Windows: Use PowerShell or Command Prompt for all commands below. If git is missing, run "winget install Git.Git". If node is missing or older than v18, run "winget install OpenJS.NodeJS.LTS". If winget fails (not installed, no admin rights, or policy blocks it), install Git from https://git-scm.com/download/win and Node.js LTS from https://nodejs.org — then close and reopen the terminal and verify git --version and node -v again.
-   If Git or Node still cannot be installed, tell me exactly what failed and what to install manually.
-
-2. Clone the repo into the current folder: git clone https://github.com/RichWalker3/Global-swEeper.git .   (the dot means this folder; it must be empty). No GitHub login needed — the repo is public. If this folder already has the repo (.git exists), run "git pull" instead.
-
-3. In this folder run: npm install
-
-4. Then run: npx playwright install chromium
-
-5. Optional: only if I need custom port, proxy, Anthropic, or Atlassian settings later, copy env.example to .env and fill values. Otherwise skip — .env is not required for the default app. Do not add or request Confluence/Jira/Atlassian credentials unless I already have them.
-
-6. Start the web app in the background with: npm run web
-
-7. Open http://localhost:3847 in Cursor's Simple Browser (inside Cursor), NOT in Chrome/Safari/Edge/Firefox. Prefer this order:
-   a) Run the workspace task named "Open Sweep in Simple Browser" (Command Palette: "Tasks: Run Task" → choose that task). The repo includes .vscode/tasks.json for this after clone.
-   b) If you can execute editor commands in Cursor, run command "simpleBrowser.show" with the string argument "http://localhost:3847".
-   c) If neither (a) nor (b) is possible, tell me exactly: press Cmd+Shift+P on Mac or Ctrl+Shift+P on Windows, type "Simple Browser: Show", enter http://localhost:3847, press Enter.
-   Do NOT use "open http://localhost:3847" (Mac) or "start http://localhost:3847" (Windows) — those open the default external browser.
-
-When done, tell me briefly that Sweep is running and Simple Browser in Cursor should show the app. If anything failed, say what to fix.
-```
+After that, the AI installs Git/Node if needed, clones the repo into the folder, runs `npm install`, Playwright, `npm run web`, and opens Sweep in **Cursor’s Simple Browser** (see the prompt file). No Confluence/Jira in this flow.
 
 ---
 
-## What happens after
+## What you can tell them (copy)
 
-- The app runs at **http://localhost:3847** and the AI opens it in **Cursor’s Simple Browser** (or tells them the Command Palette steps).
-- They’re already in the project folder in Cursor, so **launch sweep**, **update sweep**, and **/wa** work in future chats (see [TEAM_SETUP.md](./TEAM_SETUP.md)).
+Use this as the only sentence they need:
 
-**Confluence/Jira:** Not included in this setup. When you’re ready, they can add API token and base URL to `.env` (optional file — see `env.example` and the Atlassian rule in the repo).
+> Put **`SETUP_PROMPT.txt`** in an empty folder, open that folder in Cursor, start a new chat, type **`@SETUP_PROMPT.txt`** and say to run every step — or paste the whole file into chat.
+
+---
+
+## Maintainer notes (optional)
+
+- **Cursor** — [cursor.com](https://cursor.com)
+- Repo is **public** — no GitHub login to clone.
+- **`.env`** — not required for default use; see `env.example` if needed later.
+- **Windows** — covered inside `SETUP_PROMPT.txt` (PowerShell/CMD, `winget`, fallbacks, Simple Browser).
+</think>
+
+
+<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
+Read

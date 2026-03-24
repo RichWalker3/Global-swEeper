@@ -111,9 +111,10 @@ export function getRandomViewport(): { width: number; height: number } {
 
 /**
  * Classify error type from error message and status code
+ * (400/402/404 and other 4xx are skipped quickly in navigation — see gotoWithRetry.)
  */
 export function classifyError(errorMsg: string, statusCode?: number): CrawlError['type'] {
-  if (statusCode === 404) return 'not_found';
+  if (statusCode === 404 || statusCode === 410) return 'not_found';
   if (statusCode === 401 || statusCode === 403) return 'auth_required';
   if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) return 'timeout';
   if (errorMsg.includes('blocked') || errorMsg.includes('challenge') || errorMsg.includes('captcha')) return 'blocked';
@@ -167,7 +168,12 @@ export async function gotoWithRetry(
 
       // First wait for DOM content
       const response = await page.goto(url, { timeout: options.timeout, waitUntil: 'domcontentloaded' });
-      
+
+      // 4xx/5xx (400, 402, 404, 503, …) often never reach network idle — avoid long waits that look like timeouts.
+      if (response && response.status() >= 400) {
+        return { response, blocked: false, blockType: null, error: null };
+      }
+
       // Then optionally wait for network idle (with shorter timeout)
       if (waitForNetworkIdle) {
         try {

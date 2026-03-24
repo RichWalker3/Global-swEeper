@@ -175,16 +175,19 @@ async function discoverPages(
   if (opts.verbose) console.log('  Discovering site structure...');
 
   const discoveryPage = await context.newPage();
-  await discoveryPage.goto(seedUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
-  
-  // Wait for network idle with short timeout
-  try {
-    await discoveryPage.waitForLoadState('networkidle', { timeout: 5000 });
-  } catch {
-    // Network idle timeout is fine
+  const seedResponse = await discoveryPage.goto(seedUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
+
+  // Same as gotoWithRetry: error pages (400, 402, 404, …) often never hit network idle — don't wait 5s per seed.
+  if (!seedResponse || seedResponse.status() < 400) {
+    try {
+      await discoveryPage.waitForLoadState('networkidle', { timeout: 5000 });
+    } catch {
+      // Network idle timeout is fine
+    }
+    await discoveryPage.waitForTimeout(1000);
+  } else if (opts.verbose) {
+    console.log(`  ⚠ Seed URL HTTP ${seedResponse.status()} — skipping network idle wait`);
   }
-  
-  await discoveryPage.waitForTimeout(1000);
 
   // Dismiss cookie consent banner if present
   await dismissCookieConsent(discoveryPage, opts.verbose);
@@ -609,6 +612,18 @@ async function scrapeProductPages(
           error: navResult.error || `Bot detection: ${navResult.blockType}`,
           type: navResult.blocked ? 'blocked' : classifyError(navResult.error || ''),
         });
+        await page.close();
+        continue;
+      }
+
+      const productStatus = navResult.response?.status();
+      if (productStatus && productStatus >= 400) {
+        state.errors.push({
+          url: productUrl,
+          error: `HTTP ${productStatus}`,
+          type: classifyError('', productStatus),
+        });
+        if (opts.verbose) console.log(`  ✗ PDP: ${productUrl} - HTTP ${productStatus}`);
         await page.close();
         continue;
       }

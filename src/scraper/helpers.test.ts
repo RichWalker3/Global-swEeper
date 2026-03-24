@@ -181,6 +181,15 @@ describe('classifyError', () => {
       expect(classifyError('', 404)).toBe('not_found');
     });
 
+    it('classifies 410 as not_found', () => {
+      expect(classifyError('', 410)).toBe('not_found');
+    });
+
+    it('classifies 400 and 402 as other', () => {
+      expect(classifyError('', 400)).toBe('other');
+      expect(classifyError('', 402)).toBe('other');
+    });
+
     it('classifies 401 as auth_required', () => {
       expect(classifyError('', 401)).toBe('auth_required');
     });

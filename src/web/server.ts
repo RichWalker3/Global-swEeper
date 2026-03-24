@@ -275,7 +275,7 @@ const server = createServer(async (req, res) => {
 
   // API: Increment feedback count (called after successful submission)
   if (url.pathname === '/api/feedback/increment' && req.method === 'POST') {
-    const data = incrementFeedbackCount();
+    incrementFeedbackCount();
     const status = getFeedbackStatus();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, ...status }));

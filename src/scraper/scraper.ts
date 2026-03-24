@@ -10,7 +10,7 @@ import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policy
 import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
 import { logAssessment, type DebugInfo } from '../logger/index.js';
 import { gotoWithRetry, classifyError, randomDelay } from './helpers.js';
-import { launchStealthBrowser } from './browser.js';
+import { launchStealthBrowser, dismissCookieConsent, slowScroll } from './browser.js';
 import { discoverCrawlTargets, getFallbackTargets, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
@@ -176,7 +176,18 @@ async function discoverPages(
 
   const discoveryPage = await context.newPage();
   await discoveryPage.goto(seedUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
-  await discoveryPage.waitForTimeout(1500);
+  
+  // Wait for network idle with short timeout
+  try {
+    await discoveryPage.waitForLoadState('networkidle', { timeout: 5000 });
+  } catch {
+    // Network idle timeout is fine
+  }
+  
+  await discoveryPage.waitForTimeout(1000);
+
+  // Dismiss cookie consent banner if present
+  await dismissCookieConsent(discoveryPage, opts.verbose);
 
   let targets: CrawlTarget[];
   try {
@@ -208,6 +219,7 @@ async function scrapeDiscoveredPages(
 ): Promise<void> {
   const totalTargets = Math.min(targets.length, opts.maxPages);
   let pageIndex = 0;
+  let lastVisitedUrl: string | undefined;
 
   for (const target of targets) {
     if (state.visited.size >= opts.maxPages) break;
@@ -240,11 +252,13 @@ async function scrapeDiscoveredPages(
       // Set up network tracking
       setupNetworkTracking(page, state, networkRequests, debugInfo);
 
-      // Navigate with retry
+      // Navigate with retry, including referer from last visited page
       const navResult = await gotoWithRetry(page, target.url, {
         timeout: opts.timeout,
         maxRetries: 2,
         verbose: opts.verbose,
+        referer: lastVisitedUrl,
+        waitForNetworkIdle: true,
       });
 
       // Handle errors
@@ -270,6 +284,17 @@ async function scrapeDiscoveredPages(
       }
 
       state.visited.add(target.url);
+      lastVisitedUrl = page.url();
+
+      // Dismiss cookie consent on first few pages (may appear after navigation)
+      if (pageIndex <= 3) {
+        await dismissCookieConsent(page, opts.verbose);
+      }
+
+      // Slow scroll to trigger lazy loading and mimic human behavior
+      if (target.type === 'home' || target.type === 'collection' || target.type === 'policy') {
+        await slowScroll(page, { steps: 3, verbose: opts.verbose });
+      }
 
       // Detect platform
       if (!state.platformDetected) {
@@ -544,6 +569,10 @@ async function scrapeProductPages(
     console.log(`  [products] Scraping ${productCount} product pages... (${elapsed}s)`);
   }
 
+  // Use last collection URL as referer for product pages
+  const collectionPage = state.pages.find(p => p.url.includes('/collection'));
+  let lastProductUrl = collectionPage?.url;
+
   for (let i = 0; i < Math.min(state.discoveredProductUrls.length, maxProducts); i++) {
     const productUrl = state.discoveredProductUrls[i];
     if (state.visited.has(productUrl)) continue;
@@ -570,6 +599,8 @@ async function scrapeProductPages(
         timeout: opts.timeout,
         maxRetries: 1,
         verbose: opts.verbose,
+        referer: lastProductUrl,
+        waitForNetworkIdle: true,
       });
 
       if (navResult.error || navResult.blocked) {
@@ -584,6 +615,10 @@ async function scrapeProductPages(
 
       state.visited.add(productUrl);
       state.productPagesScraped++;
+      lastProductUrl = page.url();
+
+      // Slow scroll on product pages to trigger lazy images and BNPL widgets
+      await slowScroll(page, { steps: 2, verbose: opts.verbose });
 
       const pageData = await extractPageData(page, navResult.response, networkRequests, opts);
       pageData.matchedCategories.push('pdp');

@@ -4,7 +4,7 @@
  */
 
 import { createServer } from 'http';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, extname } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -18,6 +18,68 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const PORT = process.env.PORT || 3847;
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['*'];
+
+// Feedback counter config
+const FEEDBACK_MONTHLY_LIMIT = 250;
+const FEEDBACK_WARNING_THRESHOLD = 20;
+const FEEDBACK_DATA_PATH = join(dirname(__dirname), '..', 'logs', 'feedback-count.json');
+
+interface FeedbackCount {
+  month: string;  // "2026-03"
+  count: number;
+  resetDay: number;  // Day of month to reset (1 = 1st)
+}
+
+function ensureLogsDir(): void {
+  const logsDir = join(dirname(__dirname), '..', 'logs');
+  if (!existsSync(logsDir)) {
+    mkdirSync(logsDir, { recursive: true });
+  }
+}
+
+function getFeedbackCount(): FeedbackCount {
+  ensureLogsDir();
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentDay = new Date().getDate();
+  
+  try {
+    if (existsSync(FEEDBACK_DATA_PATH)) {
+      const data: FeedbackCount = JSON.parse(readFileSync(FEEDBACK_DATA_PATH, 'utf-8'));
+      
+      // Check if we need to reset (new month or past reset day)
+      if (data.month !== currentMonth) {
+        // New month - reset if we're on or past the reset day
+        if (currentDay >= (data.resetDay || 1)) {
+          return { month: currentMonth, count: 0, resetDay: data.resetDay || 1 };
+        }
+      }
+      return data;
+    }
+  } catch {
+    // File doesn't exist or is invalid
+  }
+  
+  return { month: currentMonth, count: 0, resetDay: 1 };
+}
+
+function incrementFeedbackCount(): FeedbackCount {
+  const data = getFeedbackCount();
+  data.count++;
+  writeFileSync(FEEDBACK_DATA_PATH, JSON.stringify(data, null, 2));
+  return data;
+}
+
+function getFeedbackStatus(): { remaining: number; warning: boolean; limit: number } {
+  const data = getFeedbackCount();
+  const remaining = FEEDBACK_MONTHLY_LIMIT - data.count;
+  return {
+    remaining: Math.max(0, remaining),
+    warning: remaining <= FEEDBACK_WARNING_THRESHOLD,
+    limit: FEEDBACK_MONTHLY_LIMIT,
+  };
+}
 
 // MIME types for static files
 const MIME_TYPES: Record<string, string> = {
@@ -51,10 +113,15 @@ async function parseBody(req: import('http').IncomingMessage): Promise<string> {
 
 // Main server
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url || '/', `http://localhost:${PORT}`);
+  const url = new URL(req.url || '/', BASE_URL);
   
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS headers - check origin against allowed list
+  const origin = req.headers.origin || '';
+  const allowedOrigin = ALLOWED_ORIGINS.includes('*') 
+    ? '*' 
+    : ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -76,7 +143,17 @@ const server = createServer(async (req, res) => {
 
     clients.set(clientId, (data) => res.write(data));
     
+    // Send heartbeat every 15 seconds to keep connection alive
+    const heartbeat = setInterval(() => {
+      if (clients.has(clientId)) {
+        res.write(': heartbeat\n\n');
+      } else {
+        clearInterval(heartbeat);
+      }
+    }, 15000);
+    
     req.on('close', () => {
+      clearInterval(heartbeat);
       clients.delete(clientId);
     });
 
@@ -186,6 +263,22 @@ const server = createServer(async (req, res) => {
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }));
+    return;
+  }
+
+  // API: Get feedback status (remaining credits)
+  if (url.pathname === '/api/feedback/status') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getFeedbackStatus()));
+    return;
+  }
+
+  // API: Increment feedback count (called after successful submission)
+  if (url.pathname === '/api/feedback/increment' && req.method === 'POST') {
+    const data = incrementFeedbackCount();
+    const status = getFeedbackStatus();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, ...status }));
     return;
   }
 
@@ -314,12 +407,13 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
 }
 
 server.listen(PORT, () => {
+  const displayUrl = BASE_URL.includes('localhost') ? `http://localhost:${PORT}` : BASE_URL;
   console.log(`
   ╔══════════════════════════════════════════════════════════╗
   ║                                                          ║
   ║   🧹 Global-swEep is running!                            ║
   ║                                                          ║
-  ║   Open: http://localhost:${PORT}                           ║
+  ║   Open: ${displayUrl.padEnd(45)}║
   ║                                                          ║
   ║   Press Ctrl+C to stop                                   ║
   ║                                                          ║

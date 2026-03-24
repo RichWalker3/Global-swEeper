@@ -131,6 +131,8 @@ export interface GotoOptions {
   timeout: number;
   maxRetries?: number;
   verbose?: boolean;
+  referer?: string;
+  waitForNetworkIdle?: boolean;
 }
 
 /**
@@ -142,7 +144,15 @@ export async function gotoWithRetry(
   options: GotoOptions
 ): Promise<GotoResult> {
   const maxRetries = options.maxRetries ?? 2;
+  const waitForNetworkIdle = options.waitForNetworkIdle ?? true;
   let lastError: string | null = null;
+
+  // Set referer header if provided
+  if (options.referer) {
+    await page.setExtraHTTPHeaders({
+      'Referer': options.referer,
+    });
+  }
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -155,10 +165,20 @@ export async function gotoWithRetry(
         await page.waitForTimeout(delay);
       }
 
+      // First wait for DOM content
       const response = await page.goto(url, { timeout: options.timeout, waitUntil: 'domcontentloaded' });
       
-      // Wait a bit for dynamic content
-      await page.waitForTimeout(1500);
+      // Then optionally wait for network idle (with shorter timeout)
+      if (waitForNetworkIdle) {
+        try {
+          await page.waitForLoadState('networkidle', { timeout: 5000 });
+        } catch {
+          // Network idle timeout is fine, page may have long-polling/websockets
+        }
+      }
+      
+      // Brief additional wait for any late JS execution
+      await page.waitForTimeout(800);
 
       // Check for bot detection
       const html = await page.content();

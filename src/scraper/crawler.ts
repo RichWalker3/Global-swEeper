@@ -15,15 +15,21 @@ export interface CrawlTarget {
 const LINK_CLASSIFIERS: { pattern: RegExp; type: CrawlTarget['type']; priority: number }[] = [
   // Policy pages (high priority)
   { pattern: /\/(pages?\/)?(policies?|terms|privacy|refund|returns?|shipping|exchange|warranty|guarantee)/i, type: 'policy', priority: 10 },
-  { pattern: /\/(pages?\/)?(faq|help|support|contact)/i, type: 'other', priority: 5 },
+  { pattern: /\/(pages?\/)?(delivery|returns?-policy|shipping-policy|refund-policy)/i, type: 'policy', priority: 10 },
+  { pattern: /\/(pages?\/)?(customer-service|help-center|support)/i, type: 'other', priority: 8 },
+  { pattern: /\/(pages?\/)?(faq|faqs|help|contact|contact-us)/i, type: 'other', priority: 7 },
+  { pattern: /\/(info|information)\/(shipping|returns|delivery)/i, type: 'policy', priority: 9 },
+  { pattern: /\/help\/(shipping|returns|orders|payments)/i, type: 'policy', priority: 9 },
 
   // Rewards/Loyalty pages (high priority)
-  { pattern: /\/(pages?\/)?(rewards?|loyalty|points|vip|member|referr?als?)/i, type: 'rewards', priority: 10 },
+  { pattern: /\/(pages?\/)?(rewards?|loyalty|points|vip|member|referr?als?|perks)/i, type: 'rewards', priority: 10 },
+  { pattern: /\/(pages?\/)?(refer-a-friend|ambassador|affiliate)/i, type: 'rewards', priority: 8 },
 
   // Collection pages
   { pattern: /\/(collections?|shop|category|categories|products?)$/i, type: 'collection', priority: 8 },
   { pattern: /\/collections\/[^\/]+$/i, type: 'collection', priority: 7 },
-  { pattern: /\/(mens?|womens?|kids?|sale|new|best-sellers?)/i, type: 'collection', priority: 6 },
+  { pattern: /\/(mens?|womens?|kids?|sale|new|best-sellers?|all)/i, type: 'collection', priority: 6 },
+  { pattern: /\/shop\/(all|mens?|womens?|new)/i, type: 'collection', priority: 7 },
 
   // Cart/Checkout
   { pattern: /\/(cart|bag|basket)$/i, type: 'cart', priority: 6 },
@@ -57,6 +63,9 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
   discovered.set(base, { url: base, type: 'home', source: 'seed' });
   discovered.set(base + '/', { url: base + '/', type: 'home', source: 'seed' });
 
+  // Scroll to footer to trigger lazy-loading of footer content
+  await scrollToFooter(page, verbose);
+
   // Extract all links from the page
   const links = await page.evaluate(new Function(`
     var results = [];
@@ -67,9 +76,10 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
       var text = (anchor.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 100);
       var ariaLabel = anchor.getAttribute('aria-label') || '';
       var location = 'body';
-      if (anchor.closest('footer, [class*="footer"], [id*="footer"], [role="contentinfo"]')) {
+      // Expanded footer detection selectors
+      if (anchor.closest('footer, [class*="footer"], [class*="Footer"], [id*="footer"], [id*="Footer"], [role="contentinfo"], [data-section-type="footer"], .site-footer, #site-footer, .page-footer, #shopify-section-footer')) {
         location = 'footer';
-      } else if (anchor.closest('nav, [class*="nav"], [id*="nav"], header, [role="navigation"]')) {
+      } else if (anchor.closest('nav, [class*="nav"], [class*="Nav"], [id*="nav"], header, [role="navigation"], .header, #header, .site-header')) {
         location = 'nav';
       }
       if (href && (text || ariaLabel)) {
@@ -80,7 +90,8 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
   `) as () => { href: string; text: string; location: string }[]);
 
   if (verbose) {
-    console.log(`  → Found ${links.length} links on homepage`);
+    const footerLinks = links.filter(l => l.location === 'footer').length;
+    console.log(`  → Found ${links.length} links on homepage (${footerLinks} from footer)`);
   }
 
   // Process discovered links
@@ -207,4 +218,58 @@ export function getFallbackTargets(seedUrl: string): CrawlTarget[] {
     { url: `${base}/pages/faq`, type: 'other', source: 'fallback' },
     { url: `${base}/cart`, type: 'cart', source: 'fallback' },
   ];
+}
+
+/**
+ * Scroll to footer to trigger lazy-loading of footer content
+ */
+async function scrollToFooter(page: Page, verbose: boolean): Promise<void> {
+  try {
+    // First, scroll down in steps to trigger any lazy-loading along the way
+    const scrollHeight = await page.evaluate(() => document.body.scrollHeight);
+    const viewportHeight = await page.evaluate(() => window.innerHeight);
+    
+    // Scroll in 3 steps to bottom
+    const steps = 3;
+    for (let i = 1; i <= steps; i++) {
+      const scrollTo = Math.min((scrollHeight / steps) * i, scrollHeight - viewportHeight);
+      await page.evaluate((y) => window.scrollTo({ top: y, behavior: 'smooth' }), scrollTo);
+      await page.waitForTimeout(300);
+    }
+
+    // Scroll to absolute bottom
+    await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
+    await page.waitForTimeout(500);
+
+    // Try to scroll footer element into view if it exists
+    await page.evaluate(() => {
+      const footer = document.querySelector('footer, [class*="footer"], [id*="footer"], [role="contentinfo"]');
+      if (footer) {
+        footer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    });
+
+    // Wait for lazy content to load
+    await page.waitForTimeout(800);
+
+    // Wait for any network activity to settle
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 3000 });
+    } catch {
+      // Network idle timeout is fine
+    }
+
+    // Scroll back to top for consistent state
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    await page.waitForTimeout(300);
+
+    if (verbose) {
+      console.log(`  → Scrolled to footer to discover links`);
+    }
+  } catch (error) {
+    // Scroll failed, continue without error
+    if (verbose) {
+      console.log(`  → Footer scroll skipped: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+  }
 }

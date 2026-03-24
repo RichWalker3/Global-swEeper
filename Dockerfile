@@ -46,6 +46,9 @@ COPY src/web/public ./dist/web/public
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Memory settings for Playwright/Chromium
+ENV NODE_OPTIONS="--max-old-space-size=1536"
+
 # Expose port
 EXPOSE 3000
 

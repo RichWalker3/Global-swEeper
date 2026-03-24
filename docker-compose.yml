@@ -10,13 +10,13 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - JIRA_EMAIL=${JIRA_EMAIL}
-      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
-      - JIRA_BASE_URL=${JIRA_BASE_URL}
-    volumes:
-      # Persist logs
-      - ./logs:/app/logs
+    # Memory limits for Playwright/Chromium
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
@@ -24,19 +24,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-
-  # Development service with hot reload
-  dev:
-    image: node:20-slim
-    working_dir: /app
-    ports:
-      - "${PORT:-3000}:3000"
-    environment:
-      - NODE_ENV=development
-      - PORT=3000
-    volumes:
-      - .:/app
-      - /app/node_modules
-    command: npm run dev
-    profiles:
-      - dev

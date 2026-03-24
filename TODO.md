@@ -1,5 +1,26 @@
 # Global Sweep - TODO
 
+## Pre-Launch Checklist
+
+- [ ] **Set BASE_URL in production**
+  - Set `BASE_URL=https://your-app.example.com` in hosting platform
+  - Falls back to `http://localhost:PORT` if not set
+
+- [ ] **Set ALLOWED_ORIGINS for CORS**
+  - Set `ALLOWED_ORIGINS=https://your-app.example.com` for security
+  - Currently defaults to `*` (allows all origins)
+
+- [ ] **Set up feedback form**
+  - Go to https://web3forms.com and create free account
+  - Get your access key and add your email
+  - Update `FEEDBACK_ACCESS_KEY` in `src/web/public/index.html`
+
+- [ ] **Verify memory limits work**
+  - Container is set to 2GB limit
+  - Monitor for OOM issues on first few runs
+
+---
+
 ## UI Improvements
 
 - [x] **Move assessment bar above results on wide screens** ✅
@@ -61,17 +82,31 @@
 
 ### Future Improvements
 
-- [ ] **Cookie persistence**
-  - Save/restore cookies between scrapes for same domain
-  - Accept cookie consent banners automatically
+- [x] **Cookie consent handling** ✅
+  - Automatically dismisses cookie consent banners (OneTrust, Cookiebot, generic)
+  - Checks for banners after navigation on first few pages
 
-- [ ] **Residential proxy support**
-  - Option to route through proxy
-  - Config in `.env`: `PROXY_URL=http://user:pass@proxy:port`
+- [x] **Residential proxy support** ✅
+  - Route through proxy via `.env`: `PROXY_URL=http://user:pass@proxy:port`
+  - Supports authenticated proxies
 
-- [ ] Wait for network idle instead of just `domcontentloaded`
-- [ ] Add `referer` header when navigating between pages
-- [ ] Scroll page slowly before extracting content (mimics human)
+- [x] **Wait for network idle** ✅
+  - Waits for `networkidle` state (5s timeout) after DOM content loaded
+  - Better captures dynamically loaded content
+
+- [x] **Referer header** ✅
+  - Tracks last visited URL and passes as referer to next navigation
+  - More realistic browsing behavior
+
+- [x] **Slow scroll** ✅
+  - Scrolls page in 3 steps before extraction on key pages (home, collection, policy)
+  - Triggers lazy loading and mimics human behavior
+
+- [x] **Footer link discovery** ✅
+  - Scrolls to footer before extracting links to trigger lazy-loading
+  - Expanded footer detection selectors (Shopify-specific, data attributes)
+  - Logs footer link count separately for debugging
+  - Added more policy/help URL patterns
 
 ---
 
@@ -93,4 +128,4 @@
 
 ---
 
-Last updated: 2026-03-12
+Last updated: 2026-03-12 (bot detection improvements)

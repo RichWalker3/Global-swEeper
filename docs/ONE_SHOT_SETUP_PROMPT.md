@@ -10,14 +10,12 @@ The **only** place the full prompt text lives is **[`SETUP_PROMPT.txt`](../SETUP
 
 They do **not** need to open this documentation. Give them **one file** and **one line** from you (Slack, email, etc.):
 
-1. **Create an empty folder** and put **`SETUP_PROMPT.txt`** in it. They can save it from the repo after you send a link, or download:  
-   **`https://raw.githubusercontent.com/RichWalker3/Global-swEeper/main/SETUP_PROMPT.txt`**
+1. **Create a new folder** and put **`SETUP_PROMPT.txt`** in it (from the repo or download: **`https://raw.githubusercontent.com/RichWalker3/Global-swEeper/main/SETUP_PROMPT.txt`**).
 2. **Open that folder in Cursor** (File → Open Folder).
-3. **New chat** — either:
-   - **@mention the file:** `@SETUP_PROMPT.txt` and send: *Execute every step in this file in order.*  
-   - **Or** paste the **entire** contents of `SETUP_PROMPT.txt` into the chat and send.
+3. **New chat** — type **`@SETUP_PROMPT.txt`** and send: **Read and run the setup prompt.**  
+   (Or paste the **entire** file into chat and send the same phrase.)
 
-Cursor does **not** run a dropped file by itself — they need **one chat message** that attaches or pastes the prompt. That’s the whole “instruction surface” for them.
+Cursor does **not** run a dropped file by itself — they need that **one message** so the model sees the file. The text inside `SETUP_PROMPT.txt` is written for that phrase.
 
 After that, the AI installs Git/Node if needed, clones the repo into the folder, runs `npm install`, Playwright, `npm run web`, and opens Sweep in **Cursor’s Simple Browser** (see the prompt file). No Confluence/Jira in this flow.
 
@@ -27,7 +25,7 @@ After that, the AI installs Git/Node if needed, clones the repo into the folder,
 
 Use this as the only sentence they need:
 
-> Put **`SETUP_PROMPT.txt`** in an empty folder, open that folder in Cursor, start a new chat, type **`@SETUP_PROMPT.txt`** and say to run every step — or paste the whole file into chat.
+> Put **`SETUP_PROMPT.txt`** in a new folder, open that folder in Cursor, new chat: **`@SETUP_PROMPT.txt`** then **Read and run the setup prompt.**
 
 ---
 

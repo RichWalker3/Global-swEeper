@@ -236,8 +236,8 @@ No `.env` file is required for the default app (port **3847**). Add `.env` only 
 # Start the web server
 npm run web
 
-# Open in browser
-# http://localhost:3847
+# Open in Cursor: Simple Browser → http://localhost:3847
+# (or Tasks: Run Task → "Open Sweep in Simple Browser")
 ```
 
 **Team / non-coders:** For a **single prompt** that clones, installs, and launches Sweep: see **[ONE_SHOT_SETUP_PROMPT.md](./docs/ONE_SHOT_SETUP_PROMPT.md)**. For a full walkthrough and slash commands: **[TEAM_SETUP.md](./docs/TEAM_SETUP.md)**.

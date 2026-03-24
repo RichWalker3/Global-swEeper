@@ -18,7 +18,7 @@ I'm setting up Global-sweep on my machine. Please:
 2. Run `npm install` in this project if dependencies aren't installed.
 3. Remind me to run `npx playwright install chromium` if I haven't already.
 4. If I need optional settings (proxy, Anthropic, Atlassian, custom port), remind me I can copy env.example to .env — otherwise .env is not required.
-5. Tell me the exact command to launch the app and the URL to open in my browser (e.g. http://localhost:3847).
+5. Tell me the exact command to launch the app and how to open http://localhost:3847 in Cursor’s Simple Browser (task **Open Sweep in Simple Browser**, or Command Palette → **Simple Browser: Show**).
 
 After that, tell me how to use "/launch sweep" and "/update sweep" in future chats.
 ```

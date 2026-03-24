@@ -101,7 +101,7 @@ I'm setting up Global-sweep on my machine. Please:
 2. Run `npm install` in this project if dependencies aren't installed.
 3. Remind me to run `npx playwright install chromium` if I haven't already.
 4. If I need optional settings (proxy, API keys, custom port), remind me I can copy env.example to .env — otherwise .env is not required.
-5. Tell me the exact command to launch the app and the URL to open in my browser (e.g. http://localhost:3847).
+5. Tell me the exact command to launch the app and how to open http://localhost:3847 in Cursor’s Simple Browser (task **Open Sweep in Simple Browser**, or Command Palette → **Simple Browser: Show**).
 
 After that, tell me how to use "/launch sweep" and "/update sweep" in future chats.
 ```
@@ -114,7 +114,7 @@ You don’t need to remember terminal commands. In **Cursor chat**, you can say:
 
 | You say (in Cursor)      | What happens |
 |--------------------------|--------------|
-| **Launch sweep** or **/launch sweep** | Start the web app. You’ll get the command to run and the URL (e.g. http://localhost:3847). |
+| **Launch sweep** or **/launch sweep** | Start the web app. You’ll get the command to run and the URL (e.g. http://localhost:3847). Open in **Cursor’s Simple Browser** or your external browser. |
 | **Update sweep** or **/update sweep** | Get the latest code and reinstall dependencies so you’re up to date. |
 | **/wa https://example.com**          | Run a Website Assessment for that URL (see main README for the full workflow). |
 
@@ -149,7 +149,7 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
 ### Windows-specific
 
 - **`winget` doesn’t work** (policy, no admin, not installed): Install **Git** from [git-scm.com](https://git-scm.com/download/win) and **Node.js LTS** from [nodejs.org](https://nodejs.org), then **close and reopen** Command Prompt or PowerShell and verify `git --version` and `node -v`.
-- **Open the app in the browser:** `start http://localhost:3847`
+- **Open the app in Cursor:** Command Palette (**Ctrl+Shift+P** / **Cmd+Shift+P**) → **Simple Browser: Show** → `http://localhost:3847`, or **Tasks: Run Task** → **Open Sweep in Simple Browser** (from `.vscode/tasks.json`).
 - **Paths:** Use `cd` into your project folder, e.g. `cd %USERPROFILE%\Desktop\global-sweep` (adjust if your folder is elsewhere).
 
 ---

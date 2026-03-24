@@ -2,7 +2,7 @@
 
 **Canonical repo (use everywhere):** `https://github.com/RichWalker3/Global-swEeper.git` — web: [github.com/RichWalker3/Global-swEeper](https://github.com/RichWalker3/Global-swEeper)
 
-Send your coworkers this **single prompt**. They create an empty folder, open it in Cursor, paste the prompt, and the AI installs Git and Node (if needed), clones the repo, installs dependencies, starts the app, and opens it in their browser. No Confluence/Jira setup — you can help them with that separately.
+Send your coworkers this **single prompt**. They create an empty folder, open it in Cursor, paste the prompt, and the AI installs Git and Node (if needed), clones the repo, installs dependencies, starts the app, and opens Sweep **in Cursor’s Simple Browser** (built-in panel), not the system default browser. No Confluence/Jira setup — you can help them with that separately.
 
 ---
 
@@ -33,16 +33,14 @@ Use the same prompt; the AI should prefer **PowerShell** or **Command Prompt** f
 - **Git:** [git-scm.com](https://git-scm.com/download/win) — then reopen the terminal.
 - **Node.js LTS:** [nodejs.org](https://nodejs.org) — then reopen the terminal.
 
-Verify with `git --version` and `node -v` (v18+). Clone and `npm` steps are the same as on Mac. Open the app in the browser with:
-
-`start http://localhost:3847`
+Verify with `git --version` and `node -v` (v18+). Clone and `npm` steps are the same as on Mac. After the server runs, open Sweep **inside Cursor** using the same **Simple Browser** steps as on Mac (workspace task or Command Palette → **Simple Browser: Show** → `http://localhost:3847`). Do not rely on `start http://...` for the default external browser.
 
 ---
 
 ## The prompt (copy this whole block)
 
 ```
-Set up Global-sweep from GitHub and launch it in my browser. I have already opened the folder where I want the project (this folder) in Cursor. Do every step below in order. Do not ask for my confirmation; run all commands. Do not set up or ask for Confluence/Jira credentials — those will be configured separately.
+Set up Global-sweep from GitHub and launch it in Cursor's Simple Browser (inside the IDE), not in my default external browser. I have already opened the folder where I want the project (this folder) in Cursor. Do every step below in order. Do not ask for my confirmation; run all commands. Do not set up or ask for Confluence/Jira credentials — those will be configured separately.
 
 Repo: https://github.com/RichWalker3/Global-swEeper.git
 
@@ -58,16 +56,20 @@ Repo: https://github.com/RichWalker3/Global-swEeper.git
 
 6. Start the web app in the background with: npm run web
 
-7. Open http://localhost:3847 in my default browser: on macOS run "open http://localhost:3847", on Windows run "start http://localhost:3847".
+7. Open http://localhost:3847 in Cursor's Simple Browser (inside Cursor), NOT in Chrome/Safari/Edge/Firefox. Prefer this order:
+   a) Run the workspace task named "Open Sweep in Simple Browser" (Command Palette: "Tasks: Run Task" → choose that task). The repo includes .vscode/tasks.json for this after clone.
+   b) If you can execute editor commands in Cursor, run command "simpleBrowser.show" with the string argument "http://localhost:3847".
+   c) If neither (a) nor (b) is possible, tell me exactly: press Cmd+Shift+P on Mac or Ctrl+Shift+P on Windows, type "Simple Browser: Show", enter http://localhost:3847, press Enter.
+   Do NOT use "open http://localhost:3847" (Mac) or "start http://localhost:3847" (Windows) — those open the default external browser.
 
-When done, tell me briefly that Sweep is running and the browser should have opened. If anything failed, say what to fix.
+When done, tell me briefly that Sweep is running and Simple Browser in Cursor should show the app. If anything failed, say what to fix.
 ```
 
 ---
 
 ## What happens after
 
-- The app runs at **http://localhost:3847** and the AI opens it in their browser.
+- The app runs at **http://localhost:3847** and the AI opens it in **Cursor’s Simple Browser** (or tells them the Command Palette steps).
 - They’re already in the project folder in Cursor, so **launch sweep**, **update sweep**, and **/wa** work in future chats (see [TEAM_SETUP.md](./TEAM_SETUP.md)).
 
 **Confluence/Jira:** Not included in this setup. When you’re ready, they can add API token and base URL to `.env` (optional file — see `env.example` and the Atlassian rule in the repo).

@@ -11,7 +11,7 @@ When the user says any of the following in chat, perform the corresponding actio
 ## /launch sweep (or "launch sweep")
 
 - Run in the project root: `npm run web` (or `npm start`).
-- Tell them: "Sweep is starting. Open your browser to **http://localhost:3847** (or the port shown in the terminal)."
+- Tell them: "Sweep is starting. Open **http://localhost:3847** in Cursor’s **Simple Browser** (Command Palette → *Simple Browser: Show*, or **Tasks: Run Task** → *Open Sweep in Simple Browser*), or use your external browser if you prefer."
 - If they're not in the project root, tell them to open the global-sweep folder in Cursor and try again, or run the command from the folder where they cloned the repo.
 
 ## /update sweep (or "update sweep")

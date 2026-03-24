@@ -1,5 +1,3 @@
-This file is SETUP_PROMPT.txt. The user opened this folder in Cursor and asked you to read and run the setup prompt — execute every numbered step below in order. Do not ask them to read other docs.
-
 Set up Global-sweep from GitHub and launch it in Cursor's Simple Browser (inside the IDE), not in my default external browser. I have already opened the folder where I want the project (this folder) in Cursor. Do every step below in order. Do not ask for my confirmation; run all commands. Do not set up or ask for Confluence/Jira credentials — those will be configured separately.
 
 Repo: https://github.com/RichWalker3/Global-swEeper.git

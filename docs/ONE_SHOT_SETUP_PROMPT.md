@@ -26,14 +26,9 @@ Because they already opened the folder in Cursor, when the AI clones the repo in
 
 **`.env` file** — **Not required** for the default web UI and scraper. The app runs with built-in defaults (e.g. port 3847). Add a `.env` only if someone needs optional settings: custom port, proxy, Anthropic API key, or Atlassian credentials (see `env.example`).
 
-### Windows (when someone is on Windows)
+### Windows teammates
 
-Use the same prompt; the AI should prefer **PowerShell** or **Command Prompt** for commands. If **`winget`** fails (not installed, no admin rights, or policy blocks it), install manually:
-
-- **Git:** [git-scm.com](https://git-scm.com/download/win) — then reopen the terminal.
-- **Node.js LTS:** [nodejs.org](https://nodejs.org) — then reopen the terminal.
-
-Verify with `git --version` and `node -v` (v18+). Clone and `npm` steps are the same as on Mac. After the server runs, open Sweep **inside Cursor** using the same **Simple Browser** steps as on Mac (workspace task or Command Palette → **Simple Browser: Show** → `http://localhost:3847`). Do not rely on `start http://...` for the default external browser.
+Shell choice, **`winget` fallbacks**, and **Simple Browser** (not `start http://...`) are all spelled out **inside the prompt block below** — they only need to paste that block. This section is a quick human-readable pointer; the pasted prompt is the source of truth.
 
 ---
 
@@ -44,7 +39,10 @@ Set up Global-sweep from GitHub and launch it in Cursor's Simple Browser (inside
 
 Repo: https://github.com/RichWalker3/Global-swEeper.git
 
-1. Ensure Git is installed. If not (git --version fails): on macOS run "brew install git" (install Homebrew first from https://brew.sh if needed); on Windows run "winget install Git.Git". Then ensure Node.js 18+ is installed: if not (or node -v shows older), on macOS run "brew install node", on Windows run "winget install OpenJS.NodeJS.LTS". If something fails, tell me what to install and I can run the prompt again.
+1. Ensure Git and Node.js 18+ are installed (verify with git --version and node -v).
+   - macOS: If git is missing, install Homebrew from https://brew.sh if needed, then run "brew install git". If node is missing or older than v18, run "brew install node".
+   - Windows: Use PowerShell or Command Prompt for all commands below. If git is missing, run "winget install Git.Git". If node is missing or older than v18, run "winget install OpenJS.NodeJS.LTS". If winget fails (not installed, no admin rights, or policy blocks it), install Git from https://git-scm.com/download/win and Node.js LTS from https://nodejs.org — then close and reopen the terminal and verify git --version and node -v again.
+   If Git or Node still cannot be installed, tell me exactly what failed and what to install manually.
 
 2. Clone the repo into the current folder: git clone https://github.com/RichWalker3/Global-swEeper.git .   (the dot means this folder; it must be empty). No GitHub login needed — the repo is public. If this folder already has the repo (.git exists), run "git pull" instead.
 

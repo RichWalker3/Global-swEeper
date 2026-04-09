@@ -3,82 +3,20 @@
  * Coordinates browser, crawling, extraction, and analysis
  */
 
-import type { ScrapeResult, ScrapeOptions, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence } from './types.js';
-import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, extractProductLinks } from './detectors.js';
+import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence } from './types.js';
+import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, detectDropshipFulfillment, extractProductLinks } from './detectors.js';
 import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
 import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
 import { logAssessment, type DebugInfo } from '../logger/index.js';
 import { gotoWithRetry, classifyError, randomDelay } from './helpers.js';
-import { launchStealthBrowser, dismissCookieConsent, slowScroll } from './browser.js';
+import { launchStealthBrowser, createStealthContext, dismissCookieConsent, slowScroll } from './browser.js';
 import { discoverCrawlTargets, getFallbackTargets, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
+import type { Browser, BrowserContext } from 'playwright';
 
-const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
-  maxPages: 50,
-  timeout: 15000,
-  scrapeTimeout: 120000,
-  takeScreenshots: true,
-  verbose: false,
-  onProgress: () => {},
-};
-
-let scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: '' };
-
-export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Promise<ScrapeResult> {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
-  scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: seedUrl };
-
-  const scrapePromise = scrapeInternal(seedUrl, opts);
-  const timeoutPromise = new Promise<ScrapeResult>((_, reject) => {
-    setTimeout(() => {
-      const timeoutSecs = (opts.scrapeTimeout / 1000).toFixed(0);
-      const reason = `Timed out after ${timeoutSecs}s during "${scrapeProgress.phase}" phase. ` +
-        `Progress: ${scrapeProgress.pagesScraped} pages scraped. ` +
-        (scrapeProgress.currentUrl ? `Last URL: ${scrapeProgress.currentUrl}` : '');
-      reject(new Error(`Scrape timeout: ${reason}`));
-    }, opts.scrapeTimeout);
-  });
-
-  return Promise.race([scrapePromise, timeoutPromise]);
-}
-
-async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): Promise<ScrapeResult> {
-  const startedAt = new Date().toISOString();
-
-  // Initialize services
-  const wappalyzerReady = await initWappalyzer();
-  if (opts.verbose && wappalyzerReady) console.log('  ✓ Wappalyzer initialized');
-
-  // Launch browser with stealth config
-  const { browser, context, config } = await launchStealthBrowser(opts.verbose);
-
-  // Initialize accumulators
-  const state = createInitialState(seedUrl, config);
-  const debugInfo = createDebugInfo(config);
-
-  try {
-    // Phase 0: Discover pages
-    const targets = await discoverPages(context, seedUrl, opts);
-
-    // Phase 1: Scrape discovered pages
-    await scrapeDiscoveredPages(context, targets, state, opts, debugInfo, wappalyzerReady, startedAt);
-
-    // Phase 2: Scrape product pages
-    await scrapeProductPages(context, state, opts, startedAt);
-
-    // Phase 3: Test checkout
-    await testCheckout(context, seedUrl, state, opts, startedAt);
-
-  } finally {
-    await browser.close();
-  }
-
-  return buildResult(seedUrl, startedAt, state, debugInfo);
-}
-
-// ============ State Management ============
+// ============ State Management (declared early for scrape snapshot typing) ============
 
 interface ScrapeState {
   pages: PageData[];
@@ -87,6 +25,7 @@ interface ScrapeState {
   allTechnologies: Map<string, DetectedTechnology>;
   redFlags: Set<string>;
   b2bIndicators: Set<string>;
+  dropshipIndicators: Set<string>;
   dangerousGoods: DGFinding[];
   errors: CrawlSummary['errors'];
   platformDetected?: string;
@@ -94,6 +33,7 @@ interface ScrapeState {
   returngoDetected: boolean;
   shopPayDetected: boolean;
   checkoutReached: boolean;
+  checkoutSkipped: boolean;
   checkoutStoppedAt?: string;
   productPagesScraped: number;
   extractedPolicies: ExtractedPolicy[];
@@ -125,12 +65,14 @@ function createInitialState(seedUrl: string, _config: { userAgent: string }): Sc
     allTechnologies: new Map(),
     redFlags: new Set(),
     b2bIndicators: new Set(),
+    dropshipIndicators: new Set(),
     dangerousGoods: [],
     errors: [],
     globalEDetected: false,
     returngoDetected: false,
     shopPayDetected: false,
     checkoutReached: false,
+    checkoutSkipped: false,
     productPagesScraped: 0,
     extractedPolicies: [],
     bundleEvidence: [],
@@ -163,11 +105,299 @@ function createDebugInfo(config: { userAgent: string; viewport: { width: number;
   };
 }
 
+/** Max time for each teardown step (context vs browser). Avoids indefinite hang on stuck Chromium. */
+const BROWSER_TEARDOWN_STEP_MS = 15_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function tryKillBrowserProcess(browser: Browser): void {
+  try {
+    const proc = (browser as unknown as { process?: () => import('child_process').ChildProcess }).process?.();
+    proc?.kill?.('SIGKILL');
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Tear down Playwright without hanging forever. A single stuck `page.close()` or `browser.close()` can block the
+ * Node process until Chromium exits; we cap each step and SIGKILL the browser child if Playwright exposes it.
+ */
+async function closeBrowserWithTimeout(
+  browser: Browser,
+  context: BrowserContext,
+  opts: { verbose: boolean; onProgress: Required<ScrapeOptions>['onProgress'] }
+): Promise<void> {
+  const step = async (label: string, fn: () => Promise<void>): Promise<void> => {
+    const out = await Promise.race([
+      fn().then(() => 'done' as const),
+      sleep(BROWSER_TEARDOWN_STEP_MS).then(() => 'slow' as const),
+    ]);
+    if (out === 'slow' && opts.verbose) {
+      console.warn(`  ⚠ ${label} exceeded ${BROWSER_TEARDOWN_STEP_MS / 1000}s; continuing`);
+    }
+  };
+
+  // context.close() closes all pages; avoids N sequential page.close() calls that can each stall.
+  await step('context.close', () => context.close().catch(() => {}));
+
+  await step('browser.close', () => browser.close().catch(() => {}));
+
+  if (browser.isConnected()) {
+    if (opts.verbose) console.warn('  ⚠ Browser still connected after close; attempting SIGKILL');
+    tryKillBrowserProcess(browser);
+    // Do not await browser.close() without a cap — it can block like the first call.
+    await Promise.race([browser.close().catch(() => {}), sleep(3000)]);
+  }
+}
+
+const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
+  maxPages: 50,
+  timeout: 15000,
+  scrapeTimeout: 120000,
+  takeScreenshots: true,
+  verbose: false,
+  skipCheckout: false,
+  onProgress: () => {},
+};
+
+let scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: '' };
+
+/** True when the overall scrape timeout won the race; full run still finishes in the background. */
+let scrapeRaceResolvedWithTimeout = false;
+
+/** Live scrape bundle for timeout partials (state mutates in place until buildResult). */
+let lastScrapeSnapshot: {
+  seedUrl: string;
+  startedAt: string;
+  state: ScrapeState;
+  debugInfo: Partial<DebugInfo>;
+} | null = null;
+
+function describeIncompletePhase(phase: string): string {
+  switch (phase) {
+    case 'initializing':
+    case 'init':
+      return 'Discovery and later steps did not finish.';
+    case 'discovery':
+      return 'Discovery did not finish; later steps were not started.';
+    case 'scraping':
+      return 'Some pages, product passes, or checkout may not have finished.';
+    case 'page-scraping':
+      return 'The crawl list was still being scraped when the time limit hit; dedicated product-page sampling did not run yet.';
+    case 'product-pages':
+      return 'Product URL sampling did not finish; checkout may not have run.';
+    case 'checkout':
+      return 'Checkout was not completed (listed pages may still be collected).';
+    case 'analyzing':
+      return 'The run ended during browser shutdown (data above was already collected).';
+    default:
+      return 'Not all steps completed.';
+  }
+}
+
+/** Called when scrapeTimeout fires: returns partial data + warning (never rejects). */
+function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions>): ScrapeResult {
+  const snap = lastScrapeSnapshot;
+  const completedAt = new Date().toISOString();
+  const domain = (() => {
+    try {
+      return new URL(seedUrl).hostname;
+    } catch {
+      return '';
+    }
+  })();
+
+  if (!snap) {
+    const warning = `Timed out after ${opts.scrapeTimeout / 1000}s before any pages were stored (still initializing).`;
+    return {
+      pages: [],
+      summary: {
+        seedUrl,
+        domain,
+        startedAt: completedAt,
+        completedAt,
+        pagesVisited: 0,
+        pagesBlocked: 1,
+        checkoutReached: false,
+        checkoutSkipped: opts.skipCheckout,
+        errors: [{ url: seedUrl, error: warning, type: 'timeout' }],
+        scrapingCompletionWarning: warning,
+        thirdPartiesDetected: [],
+        technologies: [],
+        redFlags: [],
+        dangerousGoods: [],
+        b2bIndicators: [],
+        dropshipIndicators: [],
+        productPagesScraped: 0,
+      },
+    };
+  }
+
+  const result = buildResult(snap.seedUrl, snap.startedAt, snap.state, snap.debugInfo, { skipLog: false });
+  const warning =
+    `Timed out after ${opts.scrapeTimeout / 1000}s during "${scrapeProgress.phase}" phase. ` +
+    `Collected ${result.pages.length} page(s) and ${result.summary.productPagesScraped} product page(s). ` +
+    describeIncompletePhase(scrapeProgress.phase);
+  result.summary.scrapingCompletionWarning = warning;
+  const timeoutErr = { url: seedUrl, error: warning, type: 'timeout' as const };
+  result.summary.errors = [...result.summary.errors, timeoutErr];
+  result.summary.pagesBlocked = result.summary.errors.length;
+  return result;
+}
+
+const HEARTBEAT_MS = 12_000;
+
+function formatDurationSeconds(totalSec: number): string {
+  const s = Math.max(0, Math.floor(totalSec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if (m <= 0) return `${r}s`;
+  return `${m}m ${r}s`;
+}
+
+function mapProgressPhaseForUi(internal: string): ScrapeProgress['phase'] {
+  switch (internal) {
+    case 'discovery':
+    case 'initializing':
+      return 'init';
+    case 'page-scraping':
+    case 'product-pages':
+      return 'scraping';
+    case 'checkout':
+      return 'checkout';
+    case 'analyzing':
+      return 'analyzing';
+    default:
+      return 'scraping';
+  }
+}
+
+function humanizeScrapePhase(internal: string): string {
+  switch (internal) {
+    case 'discovery':
+      return 'discovery';
+    case 'page-scraping':
+      return 'listing crawl targets';
+    case 'product-pages':
+      return 'product page samples';
+    case 'checkout':
+      return 'checkout';
+    case 'analyzing':
+      return 'wrapping up';
+    case 'initializing':
+      return 'starting';
+    default:
+      return internal;
+  }
+}
+
+function emitScrapeHeartbeat(opts: Required<ScrapeOptions>, scrapeStartedAt: number): void {
+  const elapsed = Date.now() - scrapeStartedAt;
+  const remainingMs = Math.max(0, opts.scrapeTimeout - elapsed);
+  const secondsRemaining = Math.ceil(remainingMs / 1000);
+  const elapsedSeconds = Math.floor(elapsed / 1000);
+  const phase = humanizeScrapePhase(scrapeProgress.phase);
+  const pageHint = scrapeProgress.pagesScraped > 0 ? ` · ${scrapeProgress.pagesScraped} pages collected` : '';
+  opts.onProgress({
+    phase: mapProgressPhaseForUi(scrapeProgress.phase),
+    message: `Still working — ${formatDurationSeconds(secondsRemaining)} left · ${phase}${pageHint}`,
+    secondsRemaining,
+    elapsedSeconds,
+  });
+}
+
+export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Promise<ScrapeResult> {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: seedUrl };
+  scrapeRaceResolvedWithTimeout = false;
+  lastScrapeSnapshot = null;
+
+  const scrapeStartedAt = Date.now();
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  let firstHeartbeat: ReturnType<typeof setTimeout> | undefined;
+  const tickHeartbeat = (): void => {
+    emitScrapeHeartbeat(opts, scrapeStartedAt);
+  };
+  firstHeartbeat = setTimeout(() => {
+    firstHeartbeat = undefined;
+    tickHeartbeat();
+  }, 1000);
+  heartbeat = setInterval(tickHeartbeat, HEARTBEAT_MS);
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<ScrapeResult>((resolve) => {
+    timeoutId = setTimeout(() => {
+      scrapeRaceResolvedWithTimeout = true;
+      resolve(buildPartialTimeoutResult(seedUrl, opts));
+    }, opts.scrapeTimeout);
+  });
+
+  const scrapePromise = scrapeInternal(seedUrl, opts);
+
+  try {
+    const result = await Promise.race([scrapePromise, timeoutPromise]);
+    return result;
+  } finally {
+    if (firstHeartbeat !== undefined) clearTimeout(firstHeartbeat);
+    if (heartbeat) clearInterval(heartbeat);
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
+async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): Promise<ScrapeResult> {
+  const startedAt = new Date().toISOString();
+
+  // Initialize services
+  const wappalyzerReady = await initWappalyzer();
+  if (opts.verbose && wappalyzerReady) console.log('  ✓ Wappalyzer initialized');
+
+  // Launch browser with stealth config
+  const { browser, context, config } = await launchStealthBrowser(opts.verbose);
+
+  // Initialize accumulators
+  const state = createInitialState(seedUrl, config);
+  const debugInfo = createDebugInfo(config);
+  lastScrapeSnapshot = { seedUrl, startedAt, state, debugInfo };
+
+  try {
+    // Phase 0: Discover pages
+    const targets = await discoverPages(browser, context, seedUrl, state, opts);
+
+    // Phase 1: Scrape discovered pages
+    await scrapeDiscoveredPages(browser, context, targets, state, opts, debugInfo, wappalyzerReady, startedAt);
+
+    // Phase 2: Scrape product pages
+    await scrapeProductPages(context, state, opts, startedAt);
+
+    // Phase 3: Test checkout (optional; web UI often skips to avoid long stalls)
+    if (!opts.skipCheckout) {
+      await testCheckout(browser, context, seedUrl, state, opts, startedAt);
+    } else {
+      state.checkoutSkipped = true;
+      scrapeProgress.phase = 'checkout';
+      scrapeProgress.currentUrl = '';
+      opts.onProgress({ phase: 'checkout', message: 'Skipping checkout test (faster).' });
+    }
+
+    // Build result before browser teardown so the UI always receives data even if Chromium hangs on close.
+    return buildResult(seedUrl, startedAt, state, debugInfo, { skipLog: scrapeRaceResolvedWithTimeout });
+  } finally {
+    scrapeProgress.phase = 'analyzing';
+    scrapeProgress.currentUrl = '';
+    void closeBrowserWithTimeout(browser, context, { verbose: opts.verbose, onProgress: () => {} }).catch(() => {});
+  }
+}
+
 // ============ Discovery Phase ============
 
 async function discoverPages(
+  browser: Browser,
   context: Awaited<ReturnType<typeof launchStealthBrowser>>['context'],
   seedUrl: string,
+  state: ScrapeState,
   opts: Required<ScrapeOptions>
 ): Promise<CrawlTarget[]> {
   scrapeProgress.phase = 'discovery';
@@ -175,18 +405,62 @@ async function discoverPages(
   if (opts.verbose) console.log('  Discovering site structure...');
 
   const discoveryPage = await context.newPage();
-  const seedResponse = await discoveryPage.goto(seedUrl, { timeout: opts.timeout, waitUntil: 'domcontentloaded' });
+  let navResult = await gotoWithRetry(discoveryPage, seedUrl, {
+    timeout: opts.timeout,
+    maxRetries: 2,
+    verbose: opts.verbose,
+    waitForNetworkIdle: true,
+  });
+  let activeContext: BrowserContext | undefined;
 
-  // Same as gotoWithRetry: error pages (400, 402, 404, …) often never hit network idle — don't wait 5s per seed.
-  if (!seedResponse || seedResponse.status() < 400) {
-    try {
-      await discoveryPage.waitForLoadState('networkidle', { timeout: 5000 });
-    } catch {
-      // Network idle timeout is fine
+  if (navResult.blocked) {
+    await discoveryPage.close().catch(() => {});
+    const rotated = await createStealthContext(browser, { verbose: false });
+    activeContext = rotated.context;
+    const retryPage = await activeContext.newPage();
+    if (opts.verbose) {
+      console.log('  ↻ Seed URL hit a challenge, retrying discovery in a fresh context');
     }
-    await discoveryPage.waitForTimeout(1000);
-  } else if (opts.verbose) {
-    console.log(`  ⚠ Seed URL HTTP ${seedResponse.status()} — skipping network idle wait`);
+    navResult = await gotoWithRetry(retryPage, seedUrl, {
+      timeout: opts.timeout,
+      maxRetries: 1,
+      verbose: opts.verbose,
+      waitForNetworkIdle: true,
+    });
+    if (!navResult.error && !navResult.blocked && (!navResult.response || navResult.response.status() < 400)) {
+      await dismissCookieConsent(retryPage, opts.verbose);
+      try {
+        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose);
+        const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
+          setTimeout(() => reject(new Error('Discovery timeout')), 10000)
+        );
+        const targets = await Promise.race([discoveryPromise, timeoutPromise]);
+        await retryPage.close().catch(() => {});
+        await activeContext.close().catch(() => {});
+        if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl`);
+        return targets;
+      } catch (discoveryError) {
+        if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError}), using fallback targets`);
+      }
+    }
+    await retryPage.close().catch(() => {});
+  }
+
+  if (navResult.error || navResult.blocked) {
+    handleNavigationError({ url: seedUrl, type: 'home' }, navResult, state, opts);
+    await activeContext?.close().catch(() => {});
+    await discoveryPage.close().catch(() => {});
+    if (opts.verbose) console.log('  ⚠ Discovery seed failed, using fallback targets');
+    return getFallbackTargets(seedUrl);
+  }
+
+  const seedStatus = navResult.response?.status();
+  if (seedStatus && seedStatus >= 400) {
+    state.errors.push({ url: seedUrl, error: `HTTP ${seedStatus}`, type: classifyError('', seedStatus) });
+    if (opts.verbose) console.log(`  ⚠ Seed URL HTTP ${seedStatus}, using fallback targets`);
+    await activeContext?.close().catch(() => {});
+    await discoveryPage.close().catch(() => {});
+    return getFallbackTargets(seedUrl);
   }
 
   // Dismiss cookie consent banner if present
@@ -204,14 +478,92 @@ async function discoverPages(
     targets = getFallbackTargets(seedUrl);
   }
 
-  await discoveryPage.close();
+  await activeContext?.close().catch(() => {});
+  await discoveryPage.close().catch(() => {});
   if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl`);
   return targets;
+}
+
+async function scrapeTargetAttempt(
+  context: BrowserContext,
+  target: CrawlTarget,
+  state: ScrapeState,
+  opts: Required<ScrapeOptions>,
+  debugInfo: Partial<DebugInfo>,
+  wappalyzerReady: boolean,
+  lastVisitedUrl: string | undefined
+): Promise<{ success: boolean; finalUrl?: string; blockedNav?: { blocked: boolean; blockType: string | null } }> {
+  const page = await context.newPage();
+  const networkRequests: NetworkRequest[] = [];
+
+  try {
+    setupNetworkTracking(page, state, networkRequests, debugInfo);
+
+    const navResult = await gotoWithRetry(page, target.url, {
+      timeout: opts.timeout,
+      maxRetries: 2,
+      verbose: opts.verbose,
+      referer: lastVisitedUrl,
+      waitForNetworkIdle: true,
+    });
+
+    if (navResult.error) {
+      handleNavigationError(target, navResult, state, opts);
+      return { success: false };
+    }
+
+    if (navResult.blocked) {
+      return { success: false, blockedNav: { blocked: true, blockType: navResult.blockType } };
+    }
+
+    const statusCode = navResult.response?.status();
+    if (statusCode && statusCode >= 400) {
+      state.errors.push({ url: target.url, error: `HTTP ${statusCode}`, type: classifyError('', statusCode) });
+      if (opts.verbose) console.log(`  ✗ ${target.type}: ${target.url} - HTTP ${statusCode}`);
+      return { success: false };
+    }
+
+    if (!validateRedirect(page, target, state, debugInfo)) {
+      return { success: false };
+    }
+
+    state.visited.add(target.url);
+
+    await dismissCookieConsent(page, opts.verbose);
+    if (target.type === 'home' || target.type === 'collection' || target.type === 'policy') {
+      await slowScroll(page, { steps: 3, verbose: opts.verbose });
+      await dismissCookieConsent(page, opts.verbose);
+    }
+
+    if (!state.platformDetected) {
+      state.platformDetected = await detectPlatform(page);
+    }
+
+    if (target.type === 'checkout') {
+      state.checkoutReached = true;
+      state.checkoutStoppedAt = page.url();
+    }
+
+    const pageData = await extractPageData(page, navResult.response, networkRequests, opts);
+    state.pages.push(pageData);
+    scrapeProgress.pagesScraped = state.pages.length;
+
+    await processPageContent(target, pageData, state, wappalyzerReady, opts);
+
+    if (opts.verbose) console.log(`  ✓ ${target.type}: ${pageData.url}`);
+    return { success: true, finalUrl: page.url() };
+  } catch (error) {
+    handlePageError(error, target, state, opts);
+    return { success: false };
+  } finally {
+    await page.close().catch(() => {});
+  }
 }
 
 // ============ Page Scraping Phase ============
 
 async function scrapeDiscoveredPages(
+  browser: Browser,
   context: Awaited<ReturnType<typeof launchStealthBrowser>>['context'],
   targets: CrawlTarget[],
   state: ScrapeState,
@@ -248,79 +600,46 @@ async function scrapeDiscoveredPages(
 
     try {
       if (pageIndex > 1) await randomDelay(500, 1500);
-
-      const page = await context.newPage();
-      const networkRequests: NetworkRequest[] = [];
-
-      // Set up network tracking
-      setupNetworkTracking(page, state, networkRequests, debugInfo);
-
-      // Navigate with retry, including referer from last visited page
-      const navResult = await gotoWithRetry(page, target.url, {
-        timeout: opts.timeout,
-        maxRetries: 2,
-        verbose: opts.verbose,
-        referer: lastVisitedUrl,
-        waitForNetworkIdle: true,
-      });
-
-      // Handle errors
-      if (navResult.error || navResult.blocked) {
-        handleNavigationError(target, navResult, state, opts);
-        await page.close();
+      const primaryAttempt = await scrapeTargetAttempt(
+        context,
+        target,
+        state,
+        opts,
+        debugInfo,
+        wappalyzerReady,
+        lastVisitedUrl
+      );
+      if (primaryAttempt.success) {
+        lastVisitedUrl = primaryAttempt.finalUrl;
         continue;
       }
 
-      // Check HTTP status
-      const statusCode = navResult.response?.status();
-      if (statusCode && statusCode >= 400) {
-        state.errors.push({ url: target.url, error: `HTTP ${statusCode}`, type: classifyError('', statusCode) });
-        if (opts.verbose) console.log(`  ✗ ${target.type}: ${target.url} - HTTP ${statusCode}`);
-        await page.close();
-        continue;
+      if (primaryAttempt.blockedNav) {
+        if (opts.verbose) {
+          console.log(`  ↻ ${target.type}: ${target.url} - Retrying in a fresh context`);
+        }
+        const rotated = await createStealthContext(browser, { verbose: false });
+        try {
+          const recoveryAttempt = await scrapeTargetAttempt(
+            rotated.context,
+            target,
+            state,
+            opts,
+            debugInfo,
+            wappalyzerReady,
+            lastVisitedUrl
+          );
+          if (recoveryAttempt.success) {
+            lastVisitedUrl = recoveryAttempt.finalUrl;
+            continue;
+          }
+          if (recoveryAttempt.blockedNav) {
+            handleNavigationError(target, recoveryAttempt.blockedNav, state, opts);
+          }
+        } finally {
+          await rotated.context.close().catch(() => {});
+        }
       }
-
-      // Check for cross-domain redirects
-      if (!validateRedirect(page, target, state, debugInfo)) {
-        await page.close();
-        continue;
-      }
-
-      state.visited.add(target.url);
-      lastVisitedUrl = page.url();
-
-      // Dismiss cookie consent on first few pages (may appear after navigation)
-      if (pageIndex <= 3) {
-        await dismissCookieConsent(page, opts.verbose);
-      }
-
-      // Slow scroll to trigger lazy loading and mimic human behavior
-      if (target.type === 'home' || target.type === 'collection' || target.type === 'policy') {
-        await slowScroll(page, { steps: 3, verbose: opts.verbose });
-      }
-
-      // Detect platform
-      if (!state.platformDetected) {
-        state.platformDetected = await detectPlatform(page);
-      }
-
-      // Track checkout
-      if (target.type === 'checkout') {
-        state.checkoutReached = true;
-        state.checkoutStoppedAt = page.url();
-      }
-
-      // Extract page data
-      const pageData = await extractPageData(page, navResult.response, networkRequests, opts);
-      state.pages.push(pageData);
-      scrapeProgress.pagesScraped = state.pages.length;
-
-      // Process page content
-      await processPageContent(target, pageData, state, wappalyzerReady, opts);
-
-      if (opts.verbose) console.log(`  ✓ ${target.type}: ${pageData.url}`);
-      await page.close();
-
     } catch (error) {
       handlePageError(error, target, state, opts);
     }
@@ -368,7 +687,12 @@ function handleNavigationError(
     state.errors.push({ url: target.url, error: navResult.error, type: classifyError(navResult.error) });
     if (opts.verbose) console.log(`  ✗ ${target.type}: ${target.url} - ${navResult.error}`);
   } else if (navResult.blocked) {
-    state.errors.push({ url: target.url, error: `Bot detection: ${navResult.blockType}`, type: 'blocked' });
+    state.errors.push({
+      url: target.url,
+      error: `Bot detection: ${navResult.blockType}`,
+      type: 'blocked',
+      blockType: navResult.blockType || undefined,
+    });
     if (opts.verbose) console.log(`  ⚠️ ${target.type}: ${target.url} - Blocked by ${navResult.blockType}`);
   }
 }
@@ -457,6 +781,11 @@ async function processPageContent(
   const b2b = detectB2B(pageData.cleanedText, pageData.url);
   for (const indicator of b2b.evidence) {
     state.b2bIndicators.add(indicator);
+  }
+
+  const dropship = detectDropshipFulfillment(pageData.cleanedText, pageData.url);
+  for (const indicator of dropship.evidence) {
+    state.dropshipIndicators.add(indicator);
   }
 
   // Product link extraction
@@ -557,7 +886,12 @@ async function scrapeProductPages(
   startedAt: string
 ): Promise<void> {
   scrapeProgress.phase = 'product-pages';
-  const maxProducts = Math.min(5, opts.maxPages - state.visited.size);
+  const remainingBudget = Math.max(0, opts.maxPages - state.visited.size);
+  const hasDedicatedPdpEvidence = state.pages.some(page =>
+    page.matchedCategories.includes('pdp') || /\/products?\//i.test(page.url)
+  );
+  const desiredProducts = hasDedicatedPdpEvidence ? 6 : 8;
+  const maxProducts = Math.min(desiredProducts, remainingBudget);
   const productCount = Math.min(state.discoveredProductUrls.length, maxProducts);
 
   opts.onProgress({
@@ -573,7 +907,11 @@ async function scrapeProductPages(
   }
 
   // Use last collection URL as referer for product pages
-  const collectionPage = state.pages.find(p => p.url.includes('/collection'));
+  const collectionPage = state.pages.find(page =>
+    page.matchedCategories.includes('collection') ||
+    /\/collections?\b/i.test(page.url) ||
+    /\/shop\b/i.test(page.url)
+  );
   let lastProductUrl = collectionPage?.url;
 
   for (let i = 0; i < Math.min(state.discoveredProductUrls.length, maxProducts); i++) {
@@ -726,14 +1064,17 @@ async function processProductPage(pageData: PageData, state: ScrapeState, opts: 
 // ============ Checkout Phase ============
 
 async function testCheckout(
+  browser: Browser,
   context: Awaited<ReturnType<typeof launchStealthBrowser>>['context'],
   seedUrl: string,
   state: ScrapeState,
   opts: Required<ScrapeOptions>,
   startedAt: string
 ): Promise<void> {
+  const checkoutUrl = new URL('/checkout', seedUrl).toString();
+  const checkoutProductCandidates = collectCheckoutProductCandidates(state);
   scrapeProgress.phase = 'checkout';
-  scrapeProgress.currentUrl = `${seedUrl}/checkout`;
+  scrapeProgress.currentUrl = checkoutUrl;
 
   opts.onProgress({ phase: 'checkout', message: 'Testing checkout flow...' });
 
@@ -749,11 +1090,44 @@ async function testCheckout(
       opts.onProgress({ phase: 'checkout', message: 'Testing checkout flow…' });
     }, 12000);
 
-    const checkoutPromise = testCheckoutFlow(context, seedUrl, { timeout: opts.timeout, verbose: opts.verbose });
-    const checkoutTimeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 25000));
-    const checkoutResult = await Promise.race([checkoutPromise, checkoutTimeoutPromise]);
+    const abortController = new AbortController();
+    const checkoutPromise = testCheckoutFlow(context, seedUrl, {
+      timeout: opts.timeout,
+      verbose: opts.verbose,
+      preferredProductUrls: checkoutProductCandidates,
+      abortSignal: abortController.signal,
+    });
+    let checkoutTimer: ReturnType<typeof setTimeout> | undefined;
+    const checkoutTimeoutPromise = new Promise<null>((resolve) => {
+      checkoutTimer = setTimeout(() => {
+        abortController.abort();
+        resolve(null);
+      }, 45000);
+    });
+    let checkoutResult = await Promise.race([checkoutPromise, checkoutTimeoutPromise]);
+    if (checkoutTimer !== undefined) clearTimeout(checkoutTimer);
+
+    if (checkoutResult && !checkoutResult.reachedCheckout && checkoutResult.errors.some(error => error.type === 'blocked')) {
+      if (opts.verbose) {
+        console.log('  ↻ Checkout hit a challenge, retrying in a fresh context');
+      }
+      const rotated = await createStealthContext(browser, { verbose: false });
+      try {
+        checkoutResult = await testCheckoutFlow(rotated.context, seedUrl, {
+          timeout: opts.timeout,
+          verbose: opts.verbose,
+          preferredProductUrls: checkoutProductCandidates,
+        });
+      } finally {
+        await rotated.context.close().catch(() => {});
+      }
+    }
 
     if (checkoutResult) {
+      if (checkoutResult.errors.length > 0) {
+        state.errors.push(...checkoutResult.errors);
+      }
+
       state.checkoutInfo = checkoutResult.checkoutInfo;
       state.checkoutReached = checkoutResult.reachedCheckout;
       state.checkoutStoppedAt = checkoutResult.stoppedAt;
@@ -766,7 +1140,11 @@ async function testCheckout(
       }
 
       if (opts.verbose) {
-        console.log(`  ✓ Checkout: ${checkoutResult.stoppedAt || 'reached'}`);
+        console.log(
+          checkoutResult.reachedCheckout
+            ? `  ✓ Checkout: ${checkoutResult.stoppedAt || 'reached'}`
+            : `  ⚠ Checkout: ${checkoutResult.stoppedAt || 'not reached'}`
+        );
         if (checkoutResult.checkoutInfo.expressWallets.length > 0) {
           console.log(`    → Express wallets: ${checkoutResult.checkoutInfo.expressWallets.join(', ')}`);
         }
@@ -774,8 +1152,15 @@ async function testCheckout(
           console.log(`    → BNPL options: ${checkoutResult.checkoutInfo.bnplOptions.join(', ')}`);
         }
       }
+    } else {
+      state.errors.push({ url: checkoutUrl, error: 'Checkout test timed out', type: 'timeout' });
     }
   } catch (error) {
+    state.errors.push({
+      url: checkoutUrl,
+      error: error instanceof Error ? error.message : 'Unknown checkout error',
+      type: classifyError(error instanceof Error ? error.message : 'Unknown checkout error'),
+    });
     if (opts.verbose) {
       console.log(`  ⚠ Checkout test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -788,25 +1173,41 @@ async function testCheckout(
   }
 }
 
+function collectCheckoutProductCandidates(state: ScrapeState): string[] {
+  return Array.from(
+    new Set([
+      ...state.pages
+        .filter((page) => page.matchedCategories.includes('pdp') || /\/products\/[^/?#]+/i.test(page.url))
+        .map((page) => page.url),
+      ...state.discoveredProductUrls,
+    ])
+  );
+}
+
 // ============ Result Building ============
+
+function mergeDerivedThirdParties(state: ScrapeState): void {
+  if (state.subscriptionsDetected && state.subscriptionProvider) {
+    state.thirdParties.add(state.subscriptionProvider);
+    if (state.subscriptionProvider === 'Recharge') state.redFlags.add('Recharge');
+  }
+
+  if (state.loyaltyInfo.detected && state.loyaltyInfo.provider) {
+    state.thirdParties.add(state.loyaltyInfo.provider);
+    if (state.loyaltyInfo.provider === 'Smile.io') state.redFlags.add('Smile.io');
+  }
+}
 
 function buildResult(
   seedUrl: string,
   startedAt: string,
   state: ScrapeState,
-  debugInfo: Partial<DebugInfo>
+  debugInfo: Partial<DebugInfo>,
+  options?: { skipLog?: boolean }
 ): ScrapeResult {
   const completedAt = new Date().toISOString();
 
-  // Add providers to third parties
-  if (state.subscriptionsDetected && state.subscriptionProvider) {
-    state.thirdParties.add(state.subscriptionProvider);
-    if (state.subscriptionProvider === 'Recharge') state.redFlags.add('Recharge');
-  }
-  if (state.loyaltyInfo.detected && state.loyaltyInfo.provider) {
-    state.thirdParties.add(state.loyaltyInfo.provider);
-    if (state.loyaltyInfo.provider === 'Smile.io') state.redFlags.add('Smile.io');
-  }
+  mergeDerivedThirdParties(state);
 
   // Merge policies
   const mergedPolicy = mergePolicies(state.extractedPolicies);
@@ -848,6 +1249,7 @@ function buildResult(
       pagesVisited: state.pages.length,
       pagesBlocked: state.errors.length,
       checkoutReached: state.checkoutReached,
+      checkoutSkipped: state.checkoutSkipped,
       checkoutStoppedAt: state.checkoutStoppedAt,
       platformDetected: state.platformDetected,
       headlessDetected: detectHeadless(state.pages),
@@ -860,6 +1262,7 @@ function buildResult(
       redFlags: Array.from(state.redFlags),
       dangerousGoods: state.dangerousGoods,
       b2bIndicators: Array.from(state.b2bIndicators),
+      dropshipIndicators: Array.from(state.dropshipIndicators),
       productPagesScraped: state.productPagesScraped,
       policyInfo,
       checkoutInfo: state.checkoutInfo,
@@ -871,11 +1274,13 @@ function buildResult(
     pages: state.pages,
   };
 
-  // Log for debugging
-  try {
-    logAssessment(result, debugInfo);
-  } catch (logError) {
-    console.warn(`  ⚠️ Failed to log assessment: ${logError}`);
+  // Log for debugging (skip when a timeout already emitted a partial log)
+  if (!options?.skipLog) {
+    try {
+      logAssessment(result, debugInfo);
+    } catch (logError) {
+      console.warn(`  ⚠️ Failed to log assessment: ${logError}`);
+    }
   }
 
   return result;

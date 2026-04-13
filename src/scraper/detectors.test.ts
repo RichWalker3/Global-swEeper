@@ -10,6 +10,7 @@ import {
   getCategoryForThirdParty,
   scanForDangerousGoods,
   detectB2B,
+  detectDropshipFulfillment,
   extractProductLinks,
 } from './detectors.js';
 
@@ -51,8 +52,12 @@ describe('detectThirdParty', () => {
       expect(detectThirdParty('https://sdk.loyaltylion.com/widget.js')).toBe('LoyaltyLion');
     });
 
-    it('detects Yotpo', () => {
-      expect(detectThirdParty('https://staticw2.yotpo.com/widget.js')).toBe('Yotpo Loyalty');
+    it('detects Yotpo reviews separately from loyalty', () => {
+      expect(detectThirdParty('https://staticw2.yotpo.com/widget.js')).toBe('Yotpo Reviews');
+    });
+
+    it('detects Yotpo loyalty only on loyalty-specific URLs', () => {
+      expect(detectThirdParty('https://cdn.yotpo.com/loyalty/widget.js')).toBe('Yotpo Loyalty');
     });
   });
 
@@ -124,6 +129,10 @@ describe('detectThirdParty', () => {
     it('returns undefined for Shopify CDN', () => {
       expect(detectThirdParty('https://cdn.shopify.com/s/files/script.js')).toBeUndefined();
     });
+  });
+
+  it('keeps Route separate from Checkout+', () => {
+    expect(detectThirdParty('https://cdn.route.com/widget.js')).toBe('Route');
   });
 });
 
@@ -258,6 +267,19 @@ describe('scanForDangerousGoods', () => {
       expect(matches[0].context.length).toBeGreaterThan(10);
     });
   });
+
+  describe('Lightweight compliance coverage', () => {
+    it('detects shipping restriction messaging', () => {
+      const matches = scanForDangerousGoods('This item is restricted and cannot ship to Alaska or Hawaii');
+      expect(matches.some(match => match.category === 'shipping_restriction')).toBe(true);
+    });
+
+    it('detects hazmat-style restricted item messaging', () => {
+      const matches = scanForDangerousGoods('Hazmat item: adult signature required on delivery');
+      expect(matches.some(match => match.category === 'restricted_items')).toBe(true);
+      expect(matches.some(match => match.category === 'compliance')).toBe(true);
+    });
+  });
 });
 
 describe('detectB2B', () => {
@@ -339,12 +361,12 @@ describe('extractProductLinks', () => {
     expect(links).not.toContain('https://example.com/products/shirt?variant=123');
   });
 
-  it('limits to 5 products', () => {
+  it('limits to 12 products', () => {
     const html = Array.from({ length: 10 }, (_, i) => 
       `<a href="/products/product-${i}">Product ${i}</a>`
     ).join('\n');
     const links = extractProductLinks(html, 'https://example.com');
-    expect(links.length).toBe(5);
+    expect(links.length).toBe(10);
   });
 
   it('handles absolute URLs', () => {
@@ -360,5 +382,33 @@ describe('extractProductLinks', () => {
     `;
     const links = extractProductLinks(html, 'https://example.com');
     expect(links.filter(l => l.includes('shirt')).length).toBe(1);
+  });
+});
+
+describe('detectDropshipFulfillment', () => {
+  it('detects dropship language in text', () => {
+    const result = detectDropshipFulfillment(
+      'Some oversized items are fulfilled by partner warehouses and are shipped separately',
+      'https://example.com/faq'
+    );
+    expect(result.detected).toBe(true);
+    expect(result.evidence).toContain('fulfilled by partner');
+    expect(result.evidence).toContain('shipped separately');
+  });
+
+  it('detects dropship-style URLs', () => {
+    const result = detectDropshipFulfillment(
+      'Learn more about our shipping policies',
+      'https://example.com/pages/drop-ship-vendors'
+    );
+    expect(result.detected).toBe(true);
+  });
+
+  it('returns false when no dropship signals exist', () => {
+    const result = detectDropshipFulfillment(
+      'Shop our latest arrivals with free shipping over $50',
+      'https://example.com/collections/new'
+    );
+    expect(result.detected).toBe(false);
   });
 });

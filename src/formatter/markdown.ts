@@ -334,14 +334,17 @@ function formatCheck(label: string, check: Check, extra?: string): string {
   }
 
   if (check.evidence?.length) {
-    const mainEvidence = check.evidence[0];
-    line += `\n  * Evidence: ${mainEvidence.url}`;
-    if (mainEvidence.quote) {
-      line += ` — "${mainEvidence.quote.slice(0, 100)}${mainEvidence.quote.length > 100 ? '...' : ''}"`;
+    for (const evidence of check.evidence.slice(0, 2)) {
+      line += `\n  * Evidence: ${evidence.url}`;
+      if (evidence.quote) {
+        line += ` — "${evidence.quote.slice(0, 180)}${evidence.quote.length > 180 ? '...' : ''}"`;
+      }
+      if (evidence.inference) {
+        line += ' [Inference]';
+      }
     }
-    if (mainEvidence.inference) {
-      line += ' [Inference]';
-    }
+  } else if (check.searchedUrls?.length) {
+    line += `\n  * Searched: ${check.searchedUrls.slice(0, 4).join(', ')}`;
   }
 
   return line;

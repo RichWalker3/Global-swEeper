@@ -65,10 +65,26 @@ export const CATEGORY_PATTERNS: CategoryPattern[] = [
     ],
   },
   {
+    category: 'compliance',
+    keywords: [
+      'restricted item', 'restricted items', 'cannot ship', 'can\'t ship',
+      'ground shipping only', 'hazmat', 'age verification', 'prop 65',
+      'lithium battery', 'flammable', 'shipping restrictions',
+    ],
+  },
+  {
     category: 'b2b',
     keywords: [
       'wholesale', 'trade', 'business account', 'bulk', 'b2b', 'reseller',
       'trade program', 'wholesale pricing', 'bulk order', 'corporate',
+    ],
+  },
+  {
+    category: 'dropship',
+    keywords: [
+      'dropship', 'drop ship', 'fulfilled by partner', 'fulfilled by vendor',
+      'third-party seller', 'third party seller', 'ships separately',
+      'vendor fulfilled', 'fulfilled separately',
     ],
   },
   {

@@ -1,8 +1,8 @@
 # Global-sweep: Team Setup Guide
 
-**Repo:** [github.com/RichWalker3/Global-swEeper](https://github.com/RichWalker3/Global-swEeper) — clone URL: `https://github.com/RichWalker3/Global-swEeper.git`
+**Repo:** use the clone URL your team shares for this project.
 
-This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You’ll use **GitHub** to get the tool and **Cursor** to run it (with simple “slash” commands).
+This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You can get the tool from your team's Git host and use **Cursor** to run it with simple slash-style commands.
 
 **Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root — see **[ONE_SHOT_SETUP_PROMPT.md](./ONE_SHOT_SETUP_PROMPT.md)** (`@SETUP_PROMPT.txt` or paste into Cursor chat).
 
@@ -31,11 +31,11 @@ Node.js is the runtime the tool needs.
 
 ---
 
-## Step 2: Get the tool from GitHub
+## Step 2: Get the tool from your team's repo
 
 ### Option A: Download as ZIP (easiest, but updates are manual)
 
-1. Open **https://github.com/RichWalker3/Global-swEeper** (or the repo URL your team uses).
+1. Open the repo URL your team gives you.
 2. Click the green **Code** button → **Download ZIP**.
 3. Unzip the folder and remember where it is (e.g. `Desktop/global-sweep`).
 
@@ -44,16 +44,16 @@ Node.js is the runtime the tool needs.
 ### Option B: Clone with GitHub Desktop (best for regular updates)
 
 1. Install **GitHub Desktop**: https://desktop.github.com
-2. Sign in with your GitHub account.
+2. Sign in with your Git account if needed.
 3. **File → Clone repository**.  
-   - Choose **URL**, paste: `https://github.com/RichWalker3/Global-swEeper.git`  
+   - Choose **URL**, then paste the clone URL your team provides.  
    - Pick a folder (e.g. `Desktop/global-sweep`) and clone.
 4. **To update later:** open the repo in GitHub Desktop and click **Fetch origin** / **Pull origin**.
 
 ### Option C: Clone with Git (if you already use it)
 
 ```bash
-git clone https://github.com/RichWalker3/Global-swEeper.git
+git clone <repo-url>
 cd global-sweep
 ```
 
@@ -157,7 +157,7 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
 ## Summary
 
 1. Install Node.js and (optional) GitHub Desktop.
-2. Get the repo (ZIP or clone) from `https://github.com/RichWalker3/Global-swEeper.git`.
+2. Get the repo (ZIP or clone) from the Git URL your team provides.
 3. In the project folder: `npm install` and `npx playwright install chromium`.
 4. **Optional:** copy `env.example` to `.env` only if you need proxy, API keys, or a custom port.
 5. Open the project in Cursor and paste the setup prompt once.

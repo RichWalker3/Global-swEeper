@@ -141,6 +141,7 @@ These findings should generate warnings in the WA:
 | **Recharge subscriptions** | Proprietary checkout, often OoS | 🔴 High |
 | **Variable restocking fees** | GE needs static fee | 🟡 Medium |
 | **Bitcoin/crypto payments** | Not supported | 🔴 High |
+| **Split tender / multiple cards on one order** | GE checkout expects a single payment flow per order (not pay-with-two-cards) | 🔴 High |
 | **Amazon fulfillment** | OoS (ships from Amazon) | 🔴 High |
 | **Fine Jewelry (18k+ gold)** | Can't ship to France | 🟡 Medium |
 | **High AOV ($1500+)** | Express shipping only, may need exceptions | 🟡 Medium |
@@ -256,6 +257,12 @@ Flag these items - they require special handling:
 | **Glasses/Contact Lenses** | US import requirements |
 | **MID Required** | Orders >$800 USD with China COO |
 
+### Shipping insurance (merchant claim)
+
+When the merchant says **all packages are fully insured**, capture it with a **cited URL** (shipping FAQ, policy, checkout copy), not only as verbal scope.
+
+For **Global-e**, still clarify in presales: coverage for **international** vs **US-only** lanes, whether it is **carrier-declared value / GE logistics** vs a **Shopify third-party** (e.g. Route—often partial or domestic-only), and that **marketing “insured”** must line up with **customs declared value** and carrier terms. High-AOV jewelry may need **Operations** confirmation either way.
+
 ---
 
 ## Bundles / Sets / Kits
@@ -319,6 +326,12 @@ After the WA, certain findings trigger questions:
 
 ### GE Support Gaps
 > "[Feature] is not supported by GE. The system expects [X]."
+
+### Split payments
+> "Splitting one order across multiple credit cards is OoS on Global-e. For cross-border, scope assumes one payment instrument (or standard BNPL where enabled), not multi-card checkout."
+
+### Long lead time / made-to-order (capture vs authorization)
+> "With ~8 week (or longer) production, **card authorizations cannot stay open** for the whole build—networks and issuers expire holds in days, not weeks. They need a clear **capture process** with Global-e: whether the shopper is **charged at order** (full capture up front), **deposit + balance** (two captures / two orders), or another **GE-approved** pattern. Confirm timing vs **CAD/stone approval**, **chargebacks**, and how **Bread Pay** (if used) funds the merchant relative to ship date."
 
 ### Verification Needed
 > "Their [policy] mentions [X] but I didn't see it on the site. If they have/plan this, who services it?"

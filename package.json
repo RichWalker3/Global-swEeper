@@ -6,14 +6,17 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts",
-    "web": "tsx src/web/server.ts",
-    "sweep": "tsx src/web/server.ts",
-    "cli": "tsx src/cli/sweep.ts",
-    "start": "tsx src/web/server.ts",
+    "dev": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/index.ts",
+    "web": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts",
+    "sweep": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts",
+    "cli": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/cli/sweep.ts",
+    "start": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts",
+    "pilot:bundle": "tsx scripts/create-pilot-bundle.ts",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
-    "dna": "tsx src/cli/get-dna.ts"
+    "dna": "tsx src/cli/get-dna.ts",
+    "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium",
+    "postinstall": "npm run playwright:install"
   },
   "keywords": [
     "e-commerce",

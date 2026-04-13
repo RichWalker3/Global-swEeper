@@ -215,6 +215,7 @@ const CrawlSummarySchema = z.object({
   pagesVisited: z.number(),
   pagesBlocked: z.number(),
   checkoutReached: z.boolean(),
+  checkoutSkipped: z.boolean().optional(),
   checkoutStoppedAt: z.string().optional(),
   platformDetected: z.string().optional(),
   headlessDetected: z.boolean().optional(),

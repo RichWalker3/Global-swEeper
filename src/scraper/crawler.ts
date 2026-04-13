@@ -164,7 +164,8 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
   targets.sort((a, b) => (typePriority[b.type] || 0) - (typePriority[a.type] || 0));
 
   // Limit bulk page types
-  const MAX_COLLECTIONS = 2;
+  const MAX_COLLECTIONS = 4;
+  const MAX_DISCOVERED_PDPS = 3;
   let collectionCount = 0;
   let pdpCount = 0;
 
@@ -175,7 +176,7 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
     }
     if (t.type === 'pdp') {
       pdpCount++;
-      return pdpCount <= 0; // PDPs discovered from collections
+      return pdpCount <= MAX_DISCOVERED_PDPS;
     }
     return true;
   });
@@ -212,10 +213,16 @@ export function getFallbackTargets(seedUrl: string): CrawlTarget[] {
   return [
     { url: base, type: 'home', source: 'fallback' },
     { url: `${base}/collections/all`, type: 'collection', source: 'fallback' },
+    { url: `${base}/collections`, type: 'collection', source: 'fallback' },
+    { url: `${base}/shop`, type: 'collection', source: 'fallback' },
     { url: `${base}/products`, type: 'collection', source: 'fallback' },
     { url: `${base}/policies/shipping-policy`, type: 'policy', source: 'fallback' },
     { url: `${base}/policies/refund-policy`, type: 'policy', source: 'fallback' },
+    { url: `${base}/pages/shipping`, type: 'policy', source: 'fallback' },
+    { url: `${base}/pages/returns`, type: 'policy', source: 'fallback' },
+    { url: `${base}/pages/shipping-returns`, type: 'policy', source: 'fallback' },
     { url: `${base}/pages/faq`, type: 'other', source: 'fallback' },
+    { url: `${base}/help`, type: 'other', source: 'fallback' },
     { url: `${base}/cart`, type: 'cart', source: 'fallback' },
   ];
 }

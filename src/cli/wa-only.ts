@@ -69,7 +69,7 @@ async function main() {
           allResults.push(r);
         }
       }
-    } catch (e) {
+    } catch {
       console.log('  (collection page not accessible)');
     }
     
@@ -96,7 +96,7 @@ async function main() {
           }
         }
       }
-    } catch (e) {
+    } catch {
       console.log('  (product page not accessible)');
     }
     
@@ -112,7 +112,7 @@ async function main() {
           allResults.push(r);
         }
       }
-    } catch (e) {
+    } catch {
       console.log('  (cart not accessible)');
     }
     

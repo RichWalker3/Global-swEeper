@@ -96,7 +96,7 @@ function parseJiraTicket(ticketPath: string): any {
       hasBNPL: /afterpay|klarna|affirm|buy now pay later|bnpl|sezzle|zip/i.test(fullText),
       hasSubscription: /subscription|subscribe|recurring/i.test(fullText),
     };
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -160,7 +160,7 @@ function parseScrapeResult(scrapePath: string): any {
       subscriptionProvider: catalogFeatures.subscriptionProvider,
       loyaltyProgramName: loyaltyProgram.programName,
     };
-  } catch (e) {
+  } catch {
     return null;
   }
 }

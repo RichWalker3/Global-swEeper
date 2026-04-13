@@ -12,6 +12,8 @@
 
 The chat output should be the complete, formatted assessment ready to copy-paste into Jira, Confluence, or Slack.
 
+**Writing perspective:** Write the WA from the perspective of a Global-e Presales Solutions Engineer documenting the merchant's current state and the future project scope the merchant may want in scope. Focus on what the merchant is doing today for cross-border, checkout, logistics, payments, localization, and related workflows. Do **not** explain where Global-e would fit, do **not** include "GE to provide" language, and do **not** turn the WA into a solution proposal. The purpose is to capture the merchant's current operating model, any future-state needs that should inform project scoping, and any integration callouts that should be identified before signature.
+
 ---
 
 ## 1) Playbook — how to run a Website Assessment
@@ -42,7 +44,7 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
    * Note any region selector, language selector, or currency behavior.
 
-2. **Evidence Log first**
+2. **Evidence Log last**
 
    * Paste working links with descriptive titles.
 
@@ -50,7 +52,7 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 3. **Platform snapshot**
 
-   * Confirm platform and any headless stack hints. Capture one proof link.
+   * Confirm platform and any headless stack hints. Capture one proof link. If headless mark with the green check. if not headless mark with red x
 
 4. **Checkout pass**
 
@@ -180,17 +182,6 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
   * **Evidence:**
 
-* **UGC / Reviews provider** (nice to have) — Status: ___
-
-  * **Evidence:**
-
-* **PLP filters and sort** — Status: ___
-
-  * **Evidence:**
-
-* **On‑site search behavior** — Status: ___
-
-  * **Evidence:**
 
 **Takeaway:**
 
@@ -210,11 +201,11 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
   * **Evidence:**
 
-* **Gift cards** (native or vendor) — Status: ___
+* **Gift cards** (native or vendor, digital and/or physical) — Status: ___
 
   * **Evidence:**
 
-* **Fraud / risk hints** (visible only) — Status: ___
+* **Fraud / risk hints** (visible only - only mention if it is come acreoss. no need to search extensively) — Status: ___
 
   * **Evidence:**
 
@@ -272,13 +263,6 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
   * **Evidence:**
 
-* **Email / SMS** (visible tags or UI) — Status: ___
-
-  * **Evidence:**
-
-* **Personalization / testing** (CDP, A/B tools visible) — Status: ___
-
-  * **Evidence:**
 
 ---
 
@@ -326,13 +310,6 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Legal and Compliance (surface‑level)
 
-* **Policies present** (Shipping, Returns, Privacy, Terms) — Status: ___
-
-  * **Evidence:**
-
-* **Cookie consent or CMP behavior** — Status: ___
-
-  * **Evidence:**
 
 * **Restricted products or disclaimers** — Status: ___
 
@@ -366,13 +343,6 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
   * **Evidence:**
 
-* **Analytics tags** (GA4, GTM, others if visible in UI) — Status: ___
-
-  * **Evidence:**
-
-* **Sitemaps or robots hints** — Status: ___
-
-  * **Evidence:**
 
 **Takeaway:**
 
@@ -383,18 +353,6 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 * **Constraints or red flags:**
 
 * **Likely integration surfaces** (webhooks, APIs, metafields) **[Inference]**
-
-* **Level of effort estimate** (T‑shirt size) **[Inference]**
-
----
-
-## Opportunities and Recommendations
-
-* **Quick wins (0–4 weeks):**
-
-* **Near‑term (1–3 months):**
-
-* **Strategic (quarter and beyond):**
 
 ---
 

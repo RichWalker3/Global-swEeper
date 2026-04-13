@@ -202,17 +202,34 @@ export class AssessmentLogger {
   private async cleanupOldLogs(): Promise<void> {
     const files = fs.readdirSync(this.logDir)
       .filter(f => f.endsWith('.json'))
-      .map(f => ({
-        name: f,
-        path: path.join(this.logDir, f),
-        time: fs.statSync(path.join(this.logDir, f)).mtime.getTime(),
-      }))
+      .map(f => {
+        const filePath = path.join(this.logDir, f);
+        try {
+          return {
+            name: f,
+            path: filePath,
+            time: fs.statSync(filePath).mtime.getTime(),
+          };
+        } catch {
+          return null;
+        }
+      })
+      .filter((file): file is { name: string; path: string; time: number } => file !== null)
       .sort((a, b) => b.time - a.time); // Newest first
 
     // Remove files beyond the limit
     const toRemove = files.slice(this.maxAssessments);
+    let removedCount = 0;
     for (const file of toRemove) {
-      fs.unlinkSync(file.path);
+      try {
+        fs.unlinkSync(file.path);
+        removedCount++;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
       // Also remove the summary file if it exists
       const summaryPath = file.path.replace('.json', '_summary.txt');
       if (fs.existsSync(summaryPath)) {
@@ -220,8 +237,8 @@ export class AssessmentLogger {
       }
     }
 
-    if (toRemove.length > 0) {
-      console.log(`🧹 Cleaned up ${toRemove.length} old assessment log(s)`);
+    if (removedCount > 0) {
+      console.log(`🧹 Cleaned up ${removedCount} old assessment log(s)`);
     }
   }
 

@@ -4,7 +4,24 @@
 
 import type { ScrapeResult, PageData } from '../scraper/types.js';
 
-const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce website. Your task is to produce a formatted Website Assessment (WA) document in standard Markdown format (compatible with Jira, Confluence, and other tools).
+export type PromptResponseFormat = 'markdown' | 'json';
+
+interface BuildPromptOptions {
+  responseFormat?: PromptResponseFormat;
+}
+
+const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce website. Your task is to produce a Website Assessment (WA) using only the provided evidence bundle.
+
+## Writing Perspective
+
+Write from the perspective of a Global-e Presales Solutions Engineer documenting the merchant's current state and any future project scope that the merchant may want included.
+
+- Focus on what the merchant is doing today.
+- Capture current cross-border behavior, checkout flows, logistics, payments, localization, and related operating details.
+- Note future-state needs only when they are explicitly visible or clearly implied by the evidence.
+- Do **not** explain where Global-e fits.
+- Do **not** use "GE to provide", "Global-e will", or solution-proposal language.
+- Do **not** turn the WA into a recommendation memo. This is a current-state and scope-capture document first.
 
 ## Ground Rules
 
@@ -12,6 +29,8 @@ const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce w
 2. **Show receipts.** Add explicit evidence URLs that resolve to specific pages.
 3. **Be honest about certainty.** If something involves deduction, mark it with **[Inference]**.
 4. **Use bullet points (-)** not numbered lists (Jira doesn't render numbered lists well).
+5. **Anchor the assessment in concrete proof.** Prefer one real PDP URL, one real shipping/returns page, and the farthest checkout/cart state actually reached.
+6. **Differentiate skipped vs failed checkout.** If checkout was intentionally skipped for speed, say so plainly instead of implying the site blocked progress.
 
 ## Output Template
 
@@ -192,11 +211,72 @@ Generate a complete Website Assessment following this EXACT structure:
 - **Use plain URLs:** So document can be copy-pasted into Jira/Confluence.
 - **Use bullet points (-):** Not numbered lists.`;
 
-export function buildPrompt(scrapeResult: ScrapeResult): { system: string; user: string } {
+const HIGH_SIGNAL_CATEGORIES = new Set([
+  'shipping',
+  'returns',
+  'faq',
+  'checkout',
+  'pdp',
+  'payments',
+  'duties_taxes',
+  'international',
+  'subscriptions',
+  'loyalty',
+  'gift_cards',
+  'compliance',
+  'b2b',
+  'dropship',
+]);
+
+const HIGH_SIGNAL_URL_PATTERNS = [
+  /\/(products?|p)\//i,
+  /\/(cart|bag|basket)\b/i,
+  /\/(checkout|checkouts)\b/i,
+  /\/(shipping|returns?|refund|faq|help|support|loyalty|rewards?|subscriptions?)\b/i,
+];
+
+export function buildPrompt(
+  scrapeResult: ScrapeResult,
+  options: BuildPromptOptions = {}
+): { system: string; user: string } {
   const { summary, pages } = scrapeResult;
+  const responseFormat = options.responseFormat || 'markdown';
 
   // Group pages by tier for token optimization
   const { tierOne, tierTwo, tierThree } = groupPagesByTier(pages);
+
+  const responseContract =
+    responseFormat === 'json'
+      ? `## Response Format
+
+Return a single valid JSON object. Do not return Markdown.
+
+Use these exact top-level keys:
+- meta
+- evidenceLog
+- platform
+- catalog
+- checkout
+- shipping
+- loyaltyCrm
+- internationalization
+- legal
+- businessRestrictions
+- integrations
+- techRisks
+- openQuestions
+- nextSteps
+- crawlSummary
+
+For every check-style field:
+- status must be one of "verified", "unconfirmed", or "absent"
+- evidence must be an array of { "url", "quote", "inference?" } when available
+- notes and searchedUrls are optional
+
+Keep crawlSummary aligned to the provided summary.`
+      : `## Response Format
+
+Respond with ONLY the Markdown Website Assessment. No preamble, no explanation after.`;
 
   // Build the user prompt with evidence
   const userPrompt = `# Website Assessment Request
@@ -216,6 +296,8 @@ ${formatExcerpts(tierTwo)}
 
 ### Other Pages Visited
 ${formatMetadataOnly(tierThree)}
+
+${responseContract}
 
 ## Required Output
 
@@ -242,8 +324,8 @@ Generate a complete Website Assessment following the EXACT template structure fr
 - Every ✅ item needs an **Evidence:** line with URL and brief quote
 - Add **Takeaway:** summaries after major sections
 - Mark deductions with **[Inference]**
-
-Respond with ONLY the Markdown. No preamble, no explanation after.`;
+- Make the scope note explicit about whether checkout was reached, skipped for speed, login-gated, or blocked
+- Prefer at least one concrete PDP example and one concrete shipping/returns proof URL when the evidence bundle supports them`;
 
   return {
     system: SYSTEM_PROMPT,
@@ -263,11 +345,10 @@ function groupPagesByTier(pages: PageData[]): TieredPages {
   const tierThree: PageData[] = [];
 
   for (const page of pages) {
-    const hasHighSignalCategory = page.matchedCategories.some(c =>
-      ['shipping', 'returns', 'faq', 'checkout', 'pdp'].includes(c)
-    );
+    const hasHighSignalCategory = page.matchedCategories.some(category => HIGH_SIGNAL_CATEGORIES.has(category));
+    const hasHighSignalUrl = HIGH_SIGNAL_URL_PATTERNS.some(pattern => pattern.test(page.url));
 
-    if (hasHighSignalCategory) {
+    if (hasHighSignalCategory || hasHighSignalUrl) {
       tierOne.push(page);
     } else if (page.matchedCategories.length > 0) {
       tierTwo.push(page);
@@ -278,8 +359,8 @@ function groupPagesByTier(pages: PageData[]): TieredPages {
 
   // Limit tier one to max 10 pages
   return {
-    tierOne: tierOne.slice(0, 10),
-    tierTwo: tierTwo.slice(0, 10),
+    tierOne: tierOne.slice(0, 12),
+    tierTwo: tierTwo.slice(0, 12),
     tierThree,
   };
 }
@@ -295,9 +376,8 @@ function formatFullPages(pages: PageData[]): string {
 **Key Phrases:** ${page.keyPhrases.slice(0, 10).join(', ') || 'none'}
 ${page.networkRequests.filter(r => r.thirdParty).length > 0 ? `**Third-parties detected:** ${[...new Set(page.networkRequests.filter(r => r.thirdParty).map(r => r.thirdParty))].join(', ')}` : ''}
 
-**Content:**
-${page.cleanedText.slice(0, 4000)}
-${page.cleanedText.length > 4000 ? '\n[...truncated...]' : ''}
+**Evidence Snapshot:**
+${page.evidenceText}
 ---`).join('\n');
 }
 
@@ -307,7 +387,7 @@ function formatExcerpts(pages: PageData[]): string {
   return pages.map(page => `
 - **${page.title}** (${page.url})
   Categories: ${page.matchedCategories.join(', ')}
-  Excerpt: ${page.excerpt.slice(0, 300)}...`).join('\n');
+  Excerpt: ${page.excerpt.slice(0, 300)}${page.excerpt.length > 300 ? '...' : ''}`).join('\n');
 }
 
 function formatMetadataOnly(pages: PageData[]): string {

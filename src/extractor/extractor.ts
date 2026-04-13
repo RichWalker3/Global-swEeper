@@ -40,7 +40,7 @@ export async function extract(
   }
 
   const client = new Anthropic({ apiKey });
-  const { system, user } = buildPrompt(scrapeResult);
+  const { system, user } = buildPrompt(scrapeResult, { responseFormat: 'json' });
 
   if (options.verbose) {
     console.log(`  Using model: ${model}`);

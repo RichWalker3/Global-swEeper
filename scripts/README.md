@@ -2,6 +2,8 @@
 
 Testing and development scripts for Global-swEep. These are **not** part of the main application.
 
+These scripts are primarily maintainer tools for validation, comparison, ticketing, or internal content workflows. They are not required for a teammate to run the pilot locally.
+
 ## Scripts
 
 ### `test-wa.ts`
@@ -30,3 +32,7 @@ These scripts use hardcoded ticket IDs and merchant URLs for testing. Edit the a
 
 - Jira credentials in `.env` (for test-wa.ts and compare-results.ts)
 - Network access to merchant sites (for batch-test.ts)
+
+## Pilot Note
+
+For a small internal pilot, treat this folder as maintainer-only unless a script is explicitly documented as part of the shared workflow.

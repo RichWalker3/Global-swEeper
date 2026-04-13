@@ -224,9 +224,40 @@
       min-height: calc(100vh - 80px);
     }
 
+    .input-panel,
+    .right-panel {
+      min-width: 0;
+    }
+
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: calc(100vh - 80px);
+    }
+
     @media (max-width: 1024px) {
       main {
         grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .card-header {
+        flex-wrap: wrap;
+      }
+
+      .output-tabs {
+        margin-left: 0;
+        width: 100%;
+      }
+
+      .output-tabs .tab-btn {
+        flex: 1;
+      }
+
+      .action-buttons .btn {
+        min-width: 100%;
       }
     }
 
@@ -253,7 +284,7 @@
         margin-top: 0;
       }
 
-      main > .output-panel {
+      main > .right-panel > .output-panel {
         order: 2;
         height: auto;
         min-height: 500px;
@@ -669,9 +700,16 @@
 
     /* Output Panel */
     .output-panel {
-      height: calc(100vh - 140px);
+      min-height: 500px;
       display: flex;
       flex-direction: column;
+    }
+
+    @media (min-width: 1025px) {
+      .right-panel > .output-panel {
+        flex: 1;
+        min-height: 0;
+      }
     }
 
     .output-tabs {
@@ -715,6 +753,57 @@
       min-height: 200px;
     }
 
+    .output-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .output-action-meta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .output-action-title {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+      min-width: 0;
+    }
+
+    .output-action-title strong {
+      font-size: 0.875rem;
+      color: var(--black);
+    }
+
+    .output-action-title span {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      line-height: 1.4;
+    }
+
+    .copy-status {
+      font-size: 0.75rem;
+      color: var(--green);
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .copy-status.visible {
+      opacity: 1;
+    }
+
     .output-placeholder {
       display: flex;
       flex-direction: column;
@@ -736,12 +825,13 @@
     .action-buttons {
       display: flex;
       gap: 0.75rem;
-      margin-top: 1rem;
+      flex-wrap: wrap;
       flex-shrink: 0; /* Don't shrink - always visible */
     }
 
     .action-buttons .btn {
       flex: 1;
+      min-width: 180px;
     }
 
     /* Alerts */
@@ -854,6 +944,10 @@
       margin-top: 1rem;
     }
 
+    .summary-next-step {
+      margin-top: 1rem;
+    }
+
     .stat-box {
       background: var(--gray-100);
       border: 1px solid var(--gray-200);
@@ -934,7 +1028,7 @@
 
   <main>
     <!-- Left Panel: Input -->
-    <div class="input-panel">
+    <div class="input-panel" id="inputPanel">
       <!-- How It Works -->
       <div class="card" id="howItWorksCard" style="margin-bottom: 1rem;">
         <div class="card-header" style="cursor: pointer;" onclick="toggleHowItWorks()">
@@ -947,7 +1041,7 @@
             <li><strong>Enter URL:</strong> Paste the merchant's website URL below</li>
             <li><strong>Run Assessment:</strong> Click the button to scrape the site (20-40 sec)</li>
             <li><strong>Review Summary:</strong> Check platform, third-parties, red flags</li>
-            <li><strong>Copy Prompt:</strong> Click "📋 Copy for Cursor" in the Output panel</li>
+            <li><strong>Copy Prompt:</strong> Click "📋 Copy Prompt for Cursor" in the Output panel</li>
             <li><strong>Paste in Cursor:</strong> Start a new Cursor chat and paste</li>
             <li><strong>Copy to Jira:</strong> Cursor generates the WA - copy to your ticket!</li>
           </ol>
@@ -980,12 +1074,12 @@
             </div>
           </div>
           <p style="font-size: 0.75rem; color: var(--gray-400); margin-top: 0.5rem;">
-            Direct API integration coming soon. For now, use the "Copy for Cursor" workflow below.
+            Direct API integration coming soon. For now, use the "Copy Prompt for Cursor" workflow below.
           </p>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="assessmentCard">
         <div class="card-header">
           <span>🎯</span>
           <h2>New Assessment</h2>
@@ -1003,6 +1097,15 @@
               >
             </div>
 
+            <div class="form-group" style="margin-top: 0.75rem;">
+              <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 400; cursor: pointer;">
+                <input type="checkbox" id="includeCheckout" name="includeCheckout" style="margin-top: 0.2rem;" checked>
+                <span style="font-size: 0.8125rem; color: var(--gray-400); line-height: 1.4;">
+                  Full WA mode: include checkout flow test (add-to-cart → checkout). Adds ~20s and can stall on some stores; uncheck for a faster quick scan.
+                </span>
+              </label>
+            </div>
+
             <button type="submit" class="btn" id="startBtn">
               <span>🚀</span>
               Run Assessment
@@ -1014,9 +1117,12 @@
             <div class="progress-bar-container">
               <div class="progress-bar" id="progressBar"></div>
             </div>
-            <div class="progress-status">
-              <div class="spinner" id="progressSpinner"></div>
-              <span id="progressText">Starting...</span>
+            <div class="progress-status" style="flex-direction: column; align-items: flex-start; gap: 0.35rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="spinner" id="progressSpinner"></div>
+                <span id="progressText">Starting...</span>
+              </div>
+              <span id="progressTimeHint" class="hidden" style="font-size: 0.75rem; color: var(--gray-400); padding-left: 1.75rem; line-height: 1.35;"></span>
             </div>
             <div class="pages-log" id="pagesLog"></div>
             
@@ -1036,6 +1142,7 @@
           <h2>Summary</h2>
         </div>
         <div class="card-body">
+          <div id="scrapingWarningBanner" class="hidden" style="margin-bottom: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; line-height: 1.45; background: rgba(245, 158, 11, 0.15); color: var(--yellow); border: 1px solid rgba(245, 158, 11, 0.35);"></div>
           <div class="summary-stats">
             <div class="stat-box">
               <div class="stat-value" id="statPages">0</div>
@@ -1060,6 +1167,13 @@
           <div style="font-size: 0.75rem; color: var(--gray-400); margin-top: 1rem;">
             <span style="color: var(--green);">✓</span> = GE Supported &nbsp;
             <span style="color: var(--red);">⚠️</span> = Red Flag
+          </div>
+          <div class="alert alert-info summary-next-step">
+            <span class="alert-icon">➡️</span>
+            <div class="alert-content">
+              <strong>Next step</strong>
+              Review the summary, then copy the prompt from the Output panel to generate your final assessment.
+            </div>
           </div>
           <div class="third-parties" id="thirdParties"></div>
 
@@ -1116,13 +1230,13 @@
             <span class="alert-icon">💡</span>
             <div class="alert-content">
               <strong>How to extract:</strong>
-              Copy the prompt below and paste it into Cursor. Cursor will return JSON which you can convert to Markdown.
+              Copy the prompt and paste it into Cursor. Cursor will return JSON which you can convert to Markdown below.
             </div>
           </div>
 
           <div class="action-buttons">
             <button class="btn" id="copyEvidenceBtn">
-              📋 Copy for Cursor
+              📋 Copy Prompt for Cursor
             </button>
           </div>
         </div>
@@ -1152,35 +1266,47 @@
       </div>
     </div>
 
-    <!-- Right Panel: Output -->
-    <div class="output-panel card">
-      <div class="card-header">
-        <span>📄</span>
-        <h2>Output</h2>
-        <div class="output-tabs">
-          <button class="tab-btn" data-tab="markdown">Markdown</button>
-          <button class="tab-btn" data-tab="json">JSON</button>
-          <button class="tab-btn active" data-tab="prompt">Prompt</button>
-        </div>
-      </div>
-      <div class="card-body" style="flex: 1; display: flex; flex-direction: column; padding: 1rem; min-height: 0; overflow: hidden;">
-        <div class="output-content" id="outputContent">
-          <div class="output-placeholder">
-            <div class="output-placeholder-icon">🧹</div>
-            <p>Enter a merchant URL and click "Run Assessment" to get started.</p>
-            <p style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.7;">
-              The tool will crawl the site, detect third-party apps,<br>
-              and prepare evidence for your Website Assessment.
-            </p>
+    <!-- Right Panel -->
+    <div class="right-panel" id="rightPanel">
+      <!-- Output -->
+      <div class="output-panel card" id="outputPanel">
+        <div class="card-header">
+          <span>📄</span>
+          <h2>Output</h2>
+          <div class="output-tabs">
+            <button class="tab-btn" data-tab="markdown">Markdown</button>
+            <button class="tab-btn" data-tab="json">JSON</button>
+            <button class="tab-btn active" data-tab="prompt">Prompt</button>
           </div>
         </div>
-        <div class="action-buttons" id="outputActions">
-          <button class="btn" id="copyOutputBtn">
-            📋 Copy <span id="copyTabName">Prompt</span>
-          </button>
-          <button class="btn btn-secondary" id="downloadBtn">
-            💾 Download
-          </button>
+        <div class="card-body" style="flex: 1; display: flex; flex-direction: column; padding: 1rem; min-height: 0; overflow: hidden;">
+          <div class="output-toolbar" id="outputToolbar">
+            <div class="output-action-meta">
+              <div class="output-action-title">
+                <strong id="outputActionTitle">Prompt ready for Cursor</strong>
+                <span id="outputActionHint">Copy the prompt first, then paste it into Cursor to get JSON back.</span>
+              </div>
+              <span class="copy-status" id="copyStatus">Copied to clipboard</span>
+            </div>
+            <div class="action-buttons" id="outputActions">
+              <button class="btn" id="copyOutputBtn">
+                📋 Copy Prompt for Cursor
+              </button>
+              <button class="btn btn-secondary" id="downloadBtn">
+                💾 Download Prompt
+              </button>
+            </div>
+          </div>
+          <div class="output-content" id="outputContent">
+            <div class="output-placeholder">
+              <div class="output-placeholder-icon">🧹</div>
+              <p>Enter a merchant URL and click "Run Assessment" to get started.</p>
+              <p style="margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.7;">
+                The tool will crawl the site, detect third-party apps,<br>
+                and prepare evidence for your Website Assessment.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1273,6 +1399,45 @@
     };
     let totalTokensUsed = 0;
 
+    const tabMeta = {
+      prompt: {
+        copyLabel: '📋 Copy Prompt for Cursor',
+        downloadLabel: '💾 Download Prompt',
+        title: 'Prompt ready for Cursor',
+        hint: 'Copy the prompt first, then paste it into Cursor to get JSON back.',
+      },
+      markdown: {
+        copyLabel: '📋 Copy Markdown for Jira',
+        downloadLabel: '💾 Download Markdown',
+        title: 'Markdown ready to paste',
+        hint: 'Use this when you want a reviewable Website Assessment draft for Jira or notes.',
+      },
+      json: {
+        copyLabel: '📋 Copy JSON Output',
+        downloadLabel: '💾 Download JSON',
+        title: 'Structured JSON output',
+        hint: 'Use this for validation, debugging, or converting back into Markdown.',
+      },
+    };
+
+    function refreshOutputActionLabels() {
+      const meta = tabMeta[currentTab];
+      document.getElementById('copyOutputBtn').innerHTML = meta.copyLabel;
+      document.getElementById('downloadBtn').innerHTML = meta.downloadLabel;
+      document.getElementById('outputActionTitle').textContent = meta.title;
+      document.getElementById('outputActionHint').textContent = meta.hint;
+    }
+
+    function showCopyStatus(message) {
+      const status = document.getElementById('copyStatus');
+      status.textContent = message;
+      status.classList.add('visible');
+      clearTimeout(showCopyStatus.timeoutId);
+      showCopyStatus.timeoutId = setTimeout(() => {
+        status.classList.remove('visible');
+      }, 2000);
+    }
+
     // Credits tracking
     function updateCreditsDisplay(inputTokens, outputTokens) {
       totalTokensUsed += (inputTokens || 0) + (outputTokens || 0);
@@ -1303,13 +1468,13 @@
       const noApiKeyAlert = document.getElementById('noApiKeyAlert');
       
       if (key && key.startsWith('sk-ant-')) {
-        statusEl.classList.add('configured');
-        statusText.textContent = 'Key saved';
+        if (statusEl) statusEl.classList.add('configured');
+        if (statusText) statusText.textContent = 'Key saved';
         if (autoExtractBtn) autoExtractBtn.classList.remove('hidden');
         if (noApiKeyAlert) noApiKeyAlert.classList.add('hidden');
       } else {
-        statusEl.classList.remove('configured');
-        statusText.textContent = key ? 'Invalid format' : 'No key';
+        if (statusEl) statusEl.classList.remove('configured');
+        if (statusText) statusText.textContent = key ? 'Invalid format' : 'No key';
         if (autoExtractBtn) autoExtractBtn.classList.add('hidden');
         if (noApiKeyAlert) noApiKeyAlert.classList.remove('hidden');
       }
@@ -1363,12 +1528,31 @@
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
     const pagesLog = document.getElementById('pagesLog');
+    const inputPanel = document.getElementById('inputPanel');
+    const rightPanel = document.getElementById('rightPanel');
+    const outputPanel = document.getElementById('outputPanel');
+    const assessmentCard = document.getElementById('assessmentCard');
     const summaryCard = document.getElementById('summaryCard');
     const extractionCard = document.getElementById('extractionCard');
     const outputContent = document.getElementById('outputContent');
     const outputActions = document.getElementById('outputActions');
     const connectionDot = document.getElementById('connectionDot');
     const connectionStatus = document.getElementById('connectionStatus');
+
+    function placeAssessmentCard() {
+      if (!assessmentCard || !inputPanel || !rightPanel || !outputPanel || !summaryCard) return;
+
+      if (window.matchMedia('(min-width: 1025px)').matches) {
+        if (assessmentCard.parentElement !== rightPanel || rightPanel.firstElementChild !== assessmentCard) {
+          rightPanel.insertBefore(assessmentCard, outputPanel);
+        }
+      } else if (assessmentCard.parentElement !== inputPanel || assessmentCard.nextElementSibling !== summaryCard) {
+        inputPanel.insertBefore(assessmentCard, summaryCard);
+      }
+    }
+
+    placeAssessmentCard();
+    window.addEventListener('resize', placeAssessmentCard);
 
     // Connect to SSE (reuse clientId on reconnect so long scrapes still receive events after a dropped connection)
     function connect() {
@@ -1393,6 +1577,24 @@
         progressText.textContent = data.message;
         if (data.progress !== undefined) {
           progressBar.style.width = `${data.progress}%`;
+        }
+        const timeHint = document.getElementById('progressTimeHint');
+        if (timeHint) {
+          if (typeof data.remainingSeconds === 'number' && data.remainingSeconds > 0) {
+            const rem = data.remainingSeconds;
+            const rm = Math.floor(rem / 60);
+            const rs = rem % 60;
+            const remStr = rm > 0 ? `${rm}m ${rs}s` : `${rs}s`;
+            const el = typeof data.elapsedSeconds === 'number' ? data.elapsedSeconds : 0;
+            const em = Math.floor(el / 60);
+            const es = el % 60;
+            const elStr = em > 0 ? `${em}m ${es}s` : `${es}s`;
+            timeHint.textContent = `Run budget: ~${remStr} left · ${elStr} elapsed`;
+            timeHint.classList.remove('hidden');
+          } else {
+            timeHint.textContent = '';
+            timeHint.classList.add('hidden');
+          }
         }
       });
 
@@ -1425,6 +1627,11 @@
           const data = JSON.parse(e.data);
           progressText.textContent = `Error: ${data.message}`;
           progressBar.style.background = 'var(--red)';
+        }
+        const thErr = document.getElementById('progressTimeHint');
+        if (thErr) {
+          thErr.textContent = '';
+          thErr.classList.add('hidden');
         }
         startBtn.disabled = false;
       });
@@ -1503,8 +1710,26 @@
 
       // Update progress - hide spinner and show completion
       document.getElementById('progressSpinner').classList.add('hidden');
-      progressText.innerHTML = '✅ Scraping complete!';
+      const partialWarn = summary.scrapingCompletionWarning;
+      progressText.innerHTML = partialWarn
+        ? '⚠️ Partial scrape — results below may be incomplete.'
+        : '✅ Scraping complete!';
       progressBar.style.width = '100%';
+
+      const timeHintDone = document.getElementById('progressTimeHint');
+      if (timeHintDone) {
+        timeHintDone.textContent = '';
+        timeHintDone.classList.add('hidden');
+      }
+
+      const warnBanner = document.getElementById('scrapingWarningBanner');
+      if (partialWarn) {
+        warnBanner.textContent = partialWarn;
+        warnBanner.classList.remove('hidden');
+      } else {
+        warnBanner.textContent = '';
+        warnBanner.classList.add('hidden');
+      }
 
       // Show summary
       summaryCard.classList.remove('hidden');
@@ -1616,6 +1841,11 @@
       const b2bIndicators = summary.b2bIndicators || [];
       if (b2bIndicators.length > 0) {
         flags.push(`📦 B2B/Wholesale detected: ${b2bIndicators.join(', ')} - Usually OoS due to GMV`);
+      }
+
+      const dropshipIndicators = summary.dropshipIndicators || [];
+      if (dropshipIndicators.length > 0) {
+        flags.push(`🚚 Dropship / 3P fulfillment signals: ${dropshipIndicators.join(', ')}`);
       }
       
       if (flags.length > 0) {
@@ -1878,6 +2108,11 @@
         });
       }
 
+      if (dropshipIndicators.length > 0) {
+        summaryText += `\n\n## 🚚 Dropship / 3P Fulfillment\n\n`;
+        summaryText += `- **Signals found:** ${dropshipIndicators.join(', ')}\n`;
+      }
+
       // Store outputs
       outputs.prompt = `=== SYSTEM PROMPT ===\n\n${prompt.system}\n\n=== USER PROMPT ===\n\n${prompt.user}`;
       outputs.json = JSON.stringify(scrapeResult, null, 2);
@@ -1908,7 +2143,7 @@
       document.querySelectorAll('.tab-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.tab === 'markdown');
       });
-      document.getElementById('copyTabName').textContent = 'Markdown';
+      refreshOutputActionLabels();
     }
 
     // Update output display
@@ -1921,7 +2156,8 @@
       e.preventDefault();
 
       const url = document.getElementById('merchantUrl').value;
-      const options = {};
+      const includeCheckout = document.getElementById('includeCheckout').checked;
+      const options = { skipCheckout: !includeCheckout };
 
       // Reset UI
       startBtn.disabled = true;
@@ -1931,6 +2167,11 @@
       progressBar.style.background = '';
       pagesLog.innerHTML = '';
       document.getElementById('progressSpinner').classList.remove('hidden');
+      const timeHintReset = document.getElementById('progressTimeHint');
+      if (timeHintReset) {
+        timeHintReset.textContent = '';
+        timeHintReset.classList.add('hidden');
+      }
       document.getElementById('scrapeErrors').classList.add('hidden');
       document.getElementById('scrapeErrorsList').innerHTML = '';
       summaryCard.classList.add('hidden');
@@ -1957,9 +2198,7 @@
         btn.classList.add('active');
         currentTab = btn.dataset.tab;
         updateOutput();
-        // Update copy button label
-        const tabNames = { markdown: 'Markdown', json: 'JSON', prompt: 'Prompt' };
-        document.getElementById('copyTabName').textContent = tabNames[currentTab];
+        refreshOutputActionLabels();
       });
     });
 
@@ -1968,22 +2207,25 @@
       const text = outputs.prompt;
       navigator.clipboard.writeText(text);
       const btn = document.getElementById('copyEvidenceBtn');
-      btn.innerHTML = '✅ Copied!';
-      setTimeout(() => btn.innerHTML = '📋 Copy for Cursor', 2000);
+      btn.innerHTML = '✅ Prompt Copied!';
+      showCopyStatus('Prompt copied to clipboard');
+      setTimeout(() => btn.innerHTML = '📋 Copy Prompt for Cursor', 2000);
     });
 
     // Copy output button
     document.getElementById('copyOutputBtn').addEventListener('click', () => {
       navigator.clipboard.writeText(outputs[currentTab]);
       const btn = document.getElementById('copyOutputBtn');
-      const tabNames = { markdown: 'Markdown', json: 'JSON', prompt: 'Prompt' };
       btn.innerHTML = '✅ Copied!';
-      setTimeout(() => btn.innerHTML = `📋 Copy <span id="copyTabName">${tabNames[currentTab]}</span>`, 2000);
+      showCopyStatus(`${currentTab === 'prompt' ? 'Prompt' : currentTab.toUpperCase()} copied to clipboard`);
+      setTimeout(() => {
+        btn.innerHTML = tabMeta[currentTab].copyLabel;
+      }, 2000);
     });
 
     // Download button
     document.getElementById('downloadBtn').addEventListener('click', () => {
-      const ext = currentTab === 'json' ? 'json' : 'md';
+      const ext = currentTab === 'json' ? 'json' : currentTab === 'prompt' ? 'txt' : 'md';
       const blob = new Blob([outputs[currentTab]], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2032,7 +2274,7 @@
         document.querySelectorAll('.tab-btn').forEach(b => {
           b.classList.toggle('active', b.dataset.tab === 'markdown');
         });
-        document.getElementById('copyTabName').textContent = 'Markdown';
+        refreshOutputActionLabels();
 
         btn.innerHTML = '✅ Converted!';
         setTimeout(() => {
@@ -2099,6 +2341,8 @@
       }
       });
     }
+
+    refreshOutputActionLabels();
 
     // Initialize
     connect();

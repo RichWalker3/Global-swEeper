@@ -7,6 +7,7 @@ export interface PageData {
   title: string;
   cleanedText: string;
   excerpt: string;
+  evidenceText: string;
   rawHtml?: string; // For product link extraction
   screenshot?: string;
   matchedCategories: string[];
@@ -135,6 +136,8 @@ export interface CrawlSummary {
   pagesVisited: number;
   pagesBlocked: number;
   checkoutReached: boolean;
+  /** True when checkout was intentionally skipped to keep the run fast. */
+  checkoutSkipped?: boolean;
   checkoutStoppedAt?: string;
   platformDetected?: string;
   headlessDetected?: boolean;
@@ -147,6 +150,7 @@ export interface CrawlSummary {
   redFlags: string[];
   dangerousGoods: DGFinding[];
   b2bIndicators: string[];
+  dropshipIndicators: string[];
   productPagesScraped: number;
   // Extracted policy and checkout info
   policyInfo?: ExtractedPolicyInfo;
@@ -159,6 +163,8 @@ export interface CrawlSummary {
   localization?: LocalizationDetected;
   // Marketplace presence
   marketplacePresence?: MarketplacePresence;
+  /** Set when the run stopped early (timeout) but partial scrape data is still valid. */
+  scrapingCompletionWarning?: string;
 }
 
 export interface ScrapeResult {
@@ -172,6 +178,9 @@ export interface ScrapeProgress {
   current?: number;
   total?: number;
   url?: string;
+  /** Overall scrape budget (periodic heartbeat from scrape()) */
+  secondsRemaining?: number;
+  elapsedSeconds?: number;
 }
 
 export interface ScrapeOptions {
@@ -180,5 +189,7 @@ export interface ScrapeOptions {
   scrapeTimeout?: number; // Overall timeout for entire scrape (default: 120000ms = 2 min)
   takeScreenshots?: boolean;
   verbose?: boolean;
+  /** When true, skip add-to-cart / checkout navigation (faster; avoids stalls on some stores). Default false for CLI. */
+  skipCheckout?: boolean;
   onProgress?: (progress: ScrapeProgress) => void;
 }

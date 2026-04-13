@@ -1,0 +1,11 @@
+flowchart TD
+  A[Orders flow into Cin7 from Shopify / channels] --> B{Recognised as a<br/>Global-e order?}
+
+  B -->|Yes| C[Hold in Cin7]
+  C --> D[Wait for Global-e fraud / risk outcome]
+  D --> E{Approved?}
+  E -->|Yes| F[Release to pick, pack, ship]
+  E -->|No| G[Handle per your cancel / exception process]
+
+  B -->|No — e.g. regular Meta,<br/>not a GE order| H[Proceed with your<br/>normal fulfilment rules]
+  H --> I[Fulfil as you do today]

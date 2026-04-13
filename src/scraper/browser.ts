@@ -3,7 +3,7 @@
  * Handles Playwright browser launch with anti-detection measures
  */
 
-import { chromium, BrowserContext, Page } from 'playwright';
+import { chromium, BrowserContext, Page, Frame } from 'playwright';
 import { getRandomUserAgent, getRandomViewport } from './helpers.js';
 
 export interface BrowserConfig {
@@ -23,6 +23,18 @@ export interface LaunchOptions {
   proxyUrl?: string;
 }
 
+export interface ContextOptions {
+  verbose?: boolean;
+  config?: BrowserConfig;
+}
+
+function createBrowserConfig(): BrowserConfig {
+  const userAgent = getRandomUserAgent();
+  const viewport = getRandomViewport();
+  const chromeVersion = userAgent.match(/Chrome\/(\d+)/)?.[1] || '122';
+  return { userAgent, viewport, chromeVersion };
+}
+
 /**
  * Launch browser with stealth configuration to avoid bot detection
  */
@@ -32,10 +44,8 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   const verbose = opts.verbose ?? false;
   const proxyUrl = opts.proxyUrl || process.env.PROXY_URL;
 
-  const userAgent = getRandomUserAgent();
-  const viewport = getRandomViewport();
-  const isChrome = userAgent.includes('Chrome');
-  const chromeVersion = userAgent.match(/Chrome\/(\d+)/)?.[1] || '122';
+  const config = createBrowserConfig();
+  const { viewport } = config;
 
   if (verbose) {
     console.log(`  ✓ Using viewport ${viewport.width}x${viewport.height}`);
@@ -67,6 +77,27 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   }
 
   const browser = await chromium.launch(launchOptions);
+  const { context } = await createStealthContext(browser, { verbose, config });
+
+  return {
+    browser,
+    context,
+    config,
+  };
+}
+
+export async function createStealthContext(
+  browser: Awaited<ReturnType<typeof chromium.launch>>,
+  options: ContextOptions = {}
+): Promise<{ context: BrowserContext; config: BrowserConfig }> {
+  const verbose = options.verbose ?? false;
+  const config = options.config ?? createBrowserConfig();
+  const { userAgent, viewport, chromeVersion } = config;
+  const isChrome = userAgent.includes('Chrome');
+
+  if (verbose) {
+    console.log(`  ✓ Using viewport ${viewport.width}x${viewport.height}`);
+  }
 
   const context = await browser.newContext({
     userAgent,
@@ -79,12 +110,7 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   });
 
   await addStealthScripts(context);
-
-  return {
-    browser,
-    context,
-    config: { userAgent, viewport, chromeVersion },
-  };
+  return { context, config };
 }
 
 /**
@@ -162,41 +188,110 @@ const COOKIE_CONSENT_SELECTORS = [
   '#onetrust-accept-btn-handler',
   '.onetrust-accept-btn-handler',
   '[data-testid="accept-all-cookies"]',
+  'button#onetrust-accept-btn-handler',
   
   // Cookiebot
   '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
   '#CybotCookiebotDialogBodyButtonAccept',
+
+  // Didomi
+  '#didomi-notice-agree-button',
+  '.didomi-consent-popup-actions button',
+
+  // Usercentrics
+  '[data-testid="uc-accept-all-button"]',
+
+  // TrustArc / generic CMPs
+  '#truste-consent-button',
+  '.truste-button1',
+  '[id*="consent-accept"]',
+  '[id*="cookie-accept"]',
+  '[id*="allow-all"]',
+  '[data-action="accept"]',
+  '[data-action="accept-cookies"]',
+  '[data-testid="cookie-accept"]',
+  '[aria-label="Accept cookies"]',
+  '[aria-label="Accept all cookies"]',
+  '[title="Accept"]',
   
   // Generic accept buttons (text-based)
   'button:has-text("Accept All")',
   'button:has-text("Accept all")',
-  'button:has-text("Accept Cookies")',
+  'button:has-text("Accept all cookies")',
   'button:has-text("Accept cookies")',
+  'button:has-text("Accept Cookies")',
   'button:has-text("Allow All")',
   'button:has-text("Allow all")',
+  'button:has-text("Allow all cookies")',
+  'button:has-text("Allow cookies")',
   'button:has-text("I Accept")',
   'button:has-text("I agree")',
+  'button:has-text("Understood")',
   'button:has-text("Got it")',
-  'button:has-text("OK")',
+  '[class*="cookie"] button:has-text("Accept")',
+  '[class*="consent"] button:has-text("Accept")',
+  '[class*="cookie"] [role="button"]:has-text("Accept")',
+  '[class*="consent"] [role="button"]:has-text("Accept")',
   
   // Common class/id patterns
   '[class*="cookie-accept"]',
   '[class*="cookie-consent"] button[class*="accept"]',
   '[class*="cookieConsent"] button[class*="accept"]',
-  '[id*="cookie-accept"]',
-  '[data-action="accept-cookies"]',
-  '[data-testid="cookie-accept"]',
+  '[class*="consent"] button[class*="accept"]',
+  '[class*="privacy"] button[class*="accept"]',
+  '[class*="gdpr"] button[class*="accept"]',
   
   // GDPR banners
   '.gdpr-accept',
   '.cc-accept',
   '.cc-dismiss',
-  '[aria-label="Accept cookies"]',
   
   // Shopify-specific
   '.shopify-privacy-banner button',
   '[class*="privacy-banner"] button:first-of-type',
 ];
+
+const COOKIE_CONSENT_CONTAINER_SELECTORS = [
+  '#onetrust-banner-sdk',
+  '#CybotCookiebotDialog',
+  '.didomi-popup-container',
+  '[data-testid="uc-banner-content"]',
+  '[class*="cookie-banner"]',
+  '[class*="cookie-consent"]',
+  '[class*="cookieConsent"]',
+  '[class*="consent-banner"]',
+  '[class*="gdpr"]',
+  '[id*="cookie-banner"]',
+  '[id*="cookie-consent"]',
+];
+
+type ConsentScope = Page | Frame;
+
+async function tryDismissCookieConsentOnScope(scope: ConsentScope, verbose: boolean, source: string): Promise<boolean> {
+  for (const selector of COOKIE_CONSENT_SELECTORS) {
+    try {
+      const button = scope.locator(selector).first();
+      const isVisible = await button.isVisible().catch(() => false);
+      if (!isVisible) continue;
+
+      await button.scrollIntoViewIfNeeded().catch(() => {});
+      try {
+        await button.click({ timeout: 1500 });
+      } catch {
+        await button.click({ timeout: 1500, force: true });
+      }
+
+      if (verbose) {
+        console.log(`    → Dismissed cookie consent (${source}): ${selector}`);
+      }
+      return true;
+    } catch {
+      // Continue to next selector
+    }
+  }
+
+  return false;
+}
 
 /**
  * Attempt to dismiss cookie consent banners
@@ -204,23 +299,37 @@ const COOKIE_CONSENT_SELECTORS = [
  */
 export async function dismissCookieConsent(page: Page, verbose = false): Promise<boolean> {
   try {
-    for (const selector of COOKIE_CONSENT_SELECTORS) {
-      try {
-        const button = page.locator(selector).first();
-        const isVisible = await button.isVisible({ timeout: 100 }).catch(() => false);
-        
-        if (isVisible) {
-          await button.click({ timeout: 2000 });
-          if (verbose) {
-            console.log(`    → Dismissed cookie consent: ${selector}`);
-          }
+    for (let pass = 0; pass < 2; pass++) {
+      if (pass > 0) {
+        await page.waitForTimeout(700);
+      }
+
+      const mainDismissed = await tryDismissCookieConsentOnScope(page, verbose, 'page');
+      if (mainDismissed) {
+        await page.waitForTimeout(500);
+        return true;
+      }
+
+      for (const frame of page.frames()) {
+        const frameDismissed = await tryDismissCookieConsentOnScope(frame, verbose, `frame:${frame.url() || 'about:blank'}`);
+        if (frameDismissed) {
           await page.waitForTimeout(500);
           return true;
         }
-      } catch {
-        // Selector not found or not clickable, continue
+      }
+
+      const containerVisibility = await Promise.all(
+        COOKIE_CONSENT_CONTAINER_SELECTORS.map(async (selector) =>
+          page.locator(selector).first().isVisible().catch(() => false)
+        )
+      );
+      const containerVisible = containerVisibility.some(Boolean);
+
+      if (containerVisible) {
+        await page.keyboard.press('Escape').catch(() => {});
       }
     }
+
     return false;
   } catch {
     return false;

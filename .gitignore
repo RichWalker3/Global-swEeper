@@ -25,6 +25,7 @@ coverage/
 npm-debug.log*
 
 # Playwright
+.playwright-browsers/
 playwright-report/
 test-results/
 
@@ -35,6 +36,7 @@ screenshots/
 tmp/
 temp/
 *.tmp
+.cursor-tmp-*
 
 # Output files (we'll organize these later)
 output/

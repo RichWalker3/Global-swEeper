@@ -11,6 +11,7 @@ import { dirname } from 'path';
 import { scrape } from '../scraper/scraper.js';
 import { buildPrompt } from '../extractor/prompt.js';
 import { extract } from '../extractor/extractor.js';
+import { generateDna } from '../dna/generator.js';
 import { formatMarkdown } from '../formatter/markdown.js';
 import type { ScrapeResult } from '../scraper/types.js';
 
@@ -93,6 +94,11 @@ const MIME_TYPES: Record<string, string> = {
 
 // Store for SSE connections
 const clients = new Map<string, (data: string) => void>();
+
+interface SweepRequestOptions {
+  screenshots?: boolean;
+  skipCheckout?: boolean;
+}
 
 // Broadcast to a specific client
 function sendToClient(clientId: string, event: string, data: unknown) {
@@ -259,6 +265,47 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // API: Generate DNA markdown from WA + context
+  if (url.pathname === '/api/dna' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const {
+        merchantName,
+        websiteAssessmentMarkdown,
+        websiteAssessmentJson,
+        jiraContext,
+        confluenceContext,
+        additionalNotes,
+        apiKey,
+      } = body;
+
+      if (!websiteAssessmentMarkdown && !websiteAssessmentJson) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          error: 'Provide websiteAssessmentMarkdown or websiteAssessmentJson.',
+        }));
+        return;
+      }
+
+      const result = await generateDna({
+        merchantName,
+        websiteAssessmentMarkdown,
+        websiteAssessmentJson,
+        jiraContext,
+        confluenceContext,
+        additionalNotes,
+        apiKey,
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: String(error) }));
+    }
+    return;
+  }
+
   // Health check endpoint (for container orchestration)
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -299,7 +346,7 @@ const server = createServer(async (req, res) => {
   }
 });
 
-async function runSweep(targetUrl: string, clientId: string, options: Record<string, boolean>) {
+async function runSweep(targetUrl: string, clientId: string, options: SweepRequestOptions) {
   try {
     sendToClient(clientId, 'status', { 
       step: 'starting', 
@@ -313,10 +360,13 @@ async function runSweep(targetUrl: string, clientId: string, options: Record<str
     // Build prompt for Claude (or for manual copy)
     const { system, user } = buildPrompt(scrapeResult);
 
+    const partialNote = scrapeResult.summary.scrapingCompletionWarning;
     sendToClient(clientId, 'scraped', { 
       scrapeResult,
       prompt: { system, user },
-      message: 'Scraping complete! Ready for extraction.',
+      message: partialNote
+        ? `Partial result — ${partialNote}`
+        : 'Scraping complete! Ready for extraction.',
       progress: 100,
     });
 
@@ -327,7 +377,7 @@ async function runSweep(targetUrl: string, clientId: string, options: Record<str
   }
 }
 
-async function scrapeWithProgress(targetUrl: string, clientId: string, options: Record<string, boolean>): Promise<ScrapeResult> {
+async function scrapeWithProgress(targetUrl: string, clientId: string, options: SweepRequestOptions): Promise<ScrapeResult> {
   sendToClient(clientId, 'status', { 
     step: 'scraping', 
     message: 'Launching browser...',
@@ -338,6 +388,10 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
     takeScreenshots: options.screenshots !== false,
     verbose: true,
     maxPages: 25,
+    // Full WA runs need more time for add-to-cart and checkout; quick scans keep the shorter budget.
+    scrapeTimeout: options.skipCheckout === true ? 300000 : 420000,
+    // Full WA runs include checkout unless the user explicitly chooses a faster quick scan.
+    skipCheckout: options.skipCheckout === true,
     onProgress: (progress) => {
       // Map scraper phases to UI progress
       let progressPercent = 10;
@@ -365,6 +419,8 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
         step: progress.phase, 
         message,
         progress: progressPercent,
+        remainingSeconds: progress.secondsRemaining,
+        elapsedSeconds: progress.elapsedSeconds,
       });
     },
   });

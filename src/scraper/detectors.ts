@@ -54,15 +54,22 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
   },
   { 
     name: 'Global-e', 
-    patterns: [/global-e\.com/i, /globale\.com/i, /ge-scripts/i], 
+    patterns: [
+      /crossborder-integration\.global-e\.com/i,
+      /webservices\.global-e\.com/i,
+      /web\.global-e\.com/i,
+      /global-e\.com\/merchant/i,
+      /globale\.com\/merchant/i,
+      /ge-scripts/i,
+    ], 
     category: 'cross_border',
     priority: 'critical',
-    notes: 'Already using Global-e!'
+    notes: 'Global-e storefront scripts detected; confirm live shopper-facing markets and checkout behavior'
   },
 
   // ============ LOYALTY (need to know for scoping) ============
   { name: 'LoyaltyLion', patterns: [/loyaltylion\.com/i], category: 'loyalty', priority: 'high', notes: '✅ Supported' },
-  { name: 'Yotpo Loyalty', patterns: [/yotpo\.com/i, /staticw2\.yotpo/i], category: 'loyalty', priority: 'high', notes: '⚠️ In progress (slow)' },
+  { name: 'Yotpo Loyalty', patterns: [/loyalty/i, /swell\.rewards/i], category: 'loyalty', priority: 'high', notes: '⚠️ In progress (slow)' },
 
   // ============ SUBSCRIPTIONS ============
   { name: 'Bold Subscriptions', patterns: [/boldapps\.net/i, /boldcommerce\.com/i], category: 'subscriptions', priority: 'high' },
@@ -91,6 +98,7 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
 
   // ============ REVIEWS (relevant for customer experience) ============
   { name: 'Judge.me', patterns: [/judge\.me/i], category: 'reviews', priority: 'medium' },
+  { name: 'Yotpo Reviews', patterns: [/staticw2\.yotpo/i, /yotpo\.com/i], category: 'reviews', priority: 'medium' },
   { name: 'Stamped.io', patterns: [/stamped\.io/i], category: 'reviews', priority: 'medium' },
   { name: 'Loox', patterns: [/loox\.io/i], category: 'reviews', priority: 'medium' },
   { name: 'Okendo', patterns: [/okendo\.io/i], category: 'reviews', priority: 'medium' },
@@ -113,7 +121,7 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
   { name: 'Algolia', patterns: [/algolia\.com/i, /algolianet\.com/i], category: 'search', priority: 'medium' },
 
   // ============ CART / CHECKOUT UPSELL ============
-  { name: 'Checkout+', patterns: [/checkout-?plus/i, /shipping-?insurance/i, /route\.com/i], category: 'upsell', priority: 'medium', notes: 'Returns protection upsell' },
+  { name: 'Checkout+', patterns: [/checkout-?plus/i, /shipping-?insurance/i], category: 'upsell', priority: 'medium', notes: 'Checkout/cart upsell or protection widget' },
   { name: 'Route', patterns: [/route\.com/i], category: 'shipping_protection', priority: 'medium' },
 
   // ============ SHIPPING ============  
@@ -208,6 +216,18 @@ const DG_KEYWORDS: { keyword: string; category: string; risk: 'high' | 'medium' 
   { keyword: 'lighter', category: 'flammable', risk: 'high' },
   { keyword: 'matches', category: 'flammable', risk: 'high' },
   { keyword: 'candle', category: 'flammable', risk: 'medium' },
+
+  // Lightweight compliance / restriction messaging
+  { keyword: 'ground shipping only', category: 'shipping_restriction', risk: 'medium' },
+  { keyword: 'cannot ship to', category: 'shipping_restriction', risk: 'medium' },
+  { keyword: 'can\'t ship to', category: 'shipping_restriction', risk: 'medium' },
+  { keyword: 'restricted item', category: 'restricted_items', risk: 'medium' },
+  { keyword: 'restricted items', category: 'restricted_items', risk: 'medium' },
+  { keyword: 'hazmat', category: 'restricted_items', risk: 'high' },
+  { keyword: 'orm-d', category: 'restricted_items', risk: 'high' },
+  { keyword: 'prop 65', category: 'compliance', risk: 'medium' },
+  { keyword: 'age verification', category: 'compliance', risk: 'medium' },
+  { keyword: 'adult signature required', category: 'compliance', risk: 'medium' },
 ];
 
 export interface DGMatch {
@@ -347,6 +367,39 @@ export function detectB2B(text: string, url: string): { detected: boolean; evide
   };
 }
 
+// ============ DROPSHIP / 3P FULFILLMENT DETECTION ============
+
+const DROPSHIP_KEYWORDS = [
+  'dropship',
+  'drop ship',
+  'dropshipping',
+  'fulfilled by partner',
+  'fulfilled by vendor',
+  'vendor fulfilled',
+  'third-party seller',
+  'third party seller',
+  'ships separately',
+  'fulfilled separately',
+  'shipped separately',
+];
+
+export function detectDropshipFulfillment(text: string, url: string): { detected: boolean; evidence: string[] } {
+  const lowerText = text.toLowerCase();
+  const lowerUrl = url.toLowerCase();
+  const evidence: string[] = [];
+
+  for (const keyword of DROPSHIP_KEYWORDS) {
+    if (lowerText.includes(keyword) || lowerUrl.includes(keyword.replace(/\s+/g, '-'))) {
+      evidence.push(keyword);
+    }
+  }
+
+  return {
+    detected: evidence.length > 0,
+    evidence: [...new Set(evidence)],
+  };
+}
+
 // ============ PRODUCT LINK EXTRACTION ============
 
 /**
@@ -381,6 +434,6 @@ export function extractProductLinks(html: string, baseUrl: string): string[] {
     }
   }
   
-  // Return first 5 unique products (don't want to scrape too many)
-  return productLinks.slice(0, 5);
+  // Return a wider sample so the scraper can choose stronger PDP evidence later.
+  return productLinks.slice(0, 12);
 }

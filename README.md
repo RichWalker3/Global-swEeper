@@ -2,6 +2,21 @@
 
 Global-sweep is a Shopify-first Website Assessment assistant for Global-e presales work. It crawls a merchant site, gathers high-signal evidence, and produces structured output that can be turned into a WA without doing the whole review manually in a browser.
 
+![Global-sweep home screen](docs/assets/sweep-home.png)
+
+## Why It Exists
+
+Global-sweep is built to speed up the evidence-gathering part of a Website Assessment without turning the process into a black box.
+
+Instead of manually clicking through every merchant site from scratch, the tool helps you:
+
+- scan the storefront and key policy flows quickly
+- collect higher-signal evidence for scoping
+- surface likely integration callouts earlier
+- generate output that is easier to turn into a final WA
+
+It is meant to support presales review, not replace judgment.
+
 ## Current Status
 
 - Beta, usable for internal pilot testing
@@ -9,6 +24,14 @@ Global-sweep is a Shopify-first Website Assessment assistant for Global-e presal
 - Web UI is available locally
 - Checkout reachability has been hardened, but edge cases still exist
 - Final WA writeup is still a human-in-the-loop workflow
+
+## How It Works
+
+1. Enter a merchant URL and run a quick scan or fuller WA-style assessment.
+2. Global-sweep crawls high-value pages like homepage, PDPs, cart, checkout, shipping, and returns.
+3. The UI summarizes the evidence and prepares output you can copy into Cursor or your downstream workflow.
+
+![Global-sweep running an assessment](docs/assets/sweep-run.png)
 
 ## What It Does
 
@@ -21,6 +44,14 @@ Global-sweep helps with the evidence-gathering part of a Website Assessment:
 - Support quick scans and fuller WA-style runs
 
 The tool is intended to document a merchant's current state and surface integration callouts before signature. It is not meant to auto-sell a solution or replace human review.
+
+## Core Workflow
+
+- Run the merchant through the web UI
+- Review the summary, detected signals, and page evidence
+- Copy the generated prompt or structured output
+- Use Cursor to help draft the final WA
+- Review and finalize the writeup manually before sharing
 
 ## Pilot Scope
 

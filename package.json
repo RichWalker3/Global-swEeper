@@ -12,6 +12,7 @@
     "cli": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/cli/sweep.ts",
     "start": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts",
     "pilot:bundle": "tsx scripts/create-pilot-bundle.ts",
+    "pilot:package": "tsx scripts/package-pilot-bundle.ts",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
     "dna": "tsx src/cli/get-dna.ts",

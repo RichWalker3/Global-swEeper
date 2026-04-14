@@ -112,6 +112,7 @@ If Jira, Confluence, or other internal integrations are added for a given team s
 - `docs/TEAM_SETUP.md`
 - `docs/PILOT_READINESS.md`
 - `docs/SHAREABLE_BRANCH_AUDIT.md`
+- `docs/GITLAB_SHARE.md`
 
 ## Current Limitations
 
@@ -135,6 +136,12 @@ To generate a curated shareable copy without maintainer-only repo clutter, run:
 
 ```bash
 npm run pilot:bundle
+```
+
+To package that clean share as a GitLab-friendly release archive, run:
+
+```bash
+npm run pilot:package
 ```
 
 See `docs/PILOT_READINESS.md` for the current checklist and rollout notes.

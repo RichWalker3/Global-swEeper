@@ -47,6 +47,7 @@ Use this before giving the repo to a small test group.
 - Confirm README matches the actual workflow in the current UI.
 - Confirm known limitations are written down plainly.
 - If you want a curated handoff folder instead of the full repo, run `npm run pilot:bundle`.
+- If you want a GitLab release artifact instead of a raw folder, run `npm run pilot:package`.
 
 ## Recommended Pilot Package
 
@@ -89,3 +90,4 @@ For the first pilot, do not depend on:
 - Decide whether the pilot is local-only or whether a hosted version is also in scope.
 
 Use `docs/SHAREABLE_BRANCH_AUDIT.md` as the guide for deciding what belongs in the first team-facing branch.
+Use `docs/GITLAB_SHARE.md` for the maintainer workflow to distribute the clean share through GitLab.

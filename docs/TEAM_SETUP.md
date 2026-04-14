@@ -2,7 +2,7 @@
 
 **Repo:** use the clone URL your team shares for this project.
 
-This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You can get the tool from your team's Git host and use **Cursor** to run it with simple slash-style commands.
+This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You can get the tool from your team's Git host, including GitLab, and use **Cursor** to run it with simple slash-style commands.
 
 **Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root — see **[ONE_SHOT_SETUP_PROMPT.md](./ONE_SHOT_SETUP_PROMPT.md)** (`@SETUP_PROMPT.txt` or paste into Cursor chat).
 
@@ -13,7 +13,7 @@ This guide is for **non-coders** who want to run Global-sweep on their own machi
 - A **Mac or Windows** computer
 - **Node.js** (we’ll install it below)
 - **Cursor** (Cursor IDE, from cursor.com)
-- **Git** (optional but recommended for updates — we’ll use GitHub Desktop or the website)
+- **Git** (optional but recommended for updates — we’ll use a Git desktop app or the website)
 
 ---
 
@@ -41,14 +41,14 @@ Node.js is the runtime the tool needs.
 
 **To update later:** download the ZIP again and replace the folder (or merge the new files into your folder).
 
-### Option B: Clone with GitHub Desktop (best for regular updates)
+### Option B: Clone with a Git desktop app (best for regular updates)
 
-1. Install **GitHub Desktop**: https://desktop.github.com
-2. Sign in with your Git account if needed.
+1. Install a Git desktop app such as **GitHub Desktop**: https://desktop.github.com
+2. Sign in with your Git provider if needed.
 3. **File → Clone repository**.  
    - Choose **URL**, then paste the clone URL your team provides.  
    - Pick a folder (e.g. `Desktop/global-sweep`) and clone.
-4. **To update later:** open the repo in GitHub Desktop and click **Fetch origin** / **Pull origin**.
+4. **To update later:** open the repo in your Git app and pull the latest changes.
 
 ### Option C: Clone with Git (if you already use it)
 
@@ -124,7 +124,7 @@ The project’s Cursor rules (in `.cursor/rules/`) define these behaviors so the
 
 ## Getting regular updates
 
-- **If you use GitHub Desktop:** Open the repo → **Fetch origin** → **Pull origin**. Then in the project folder run: `npm install` (or ask Cursor: “update sweep”).
+- **If you use a Git desktop app:** Open the repo, pull the latest changes, then in the project folder run: `npm install` (or ask Cursor: “update sweep”).
 - **If you use Git in terminal:** `cd` into the project folder and run `git pull`, then `npm install`.
 - **If you use ZIP:** Download the latest ZIP from the repo and replace (or merge) your project folder, then run `npm install` in that folder.
 
@@ -156,7 +156,7 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
 
 ## Summary
 
-1. Install Node.js and (optional) GitHub Desktop.
+1. Install Node.js and optionally a Git desktop app.
 2. Get the repo (ZIP or clone) from the Git URL your team provides.
 3. In the project folder: `npm install` and `npx playwright install chromium`.
 4. **Optional:** copy `env.example` to `.env` only if you need proxy, API keys, or a custom port.

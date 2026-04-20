@@ -3,11 +3,11 @@
  * Provides real-time progress updates via Server-Sent Events
  */
 
+import 'dotenv/config';
 import { createServer } from 'http';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, extname } from 'path';
+import { dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { scrape } from '../scraper/scraper.js';
 import { buildPrompt } from '../extractor/prompt.js';
 import { extract } from '../extractor/extractor.js';

@@ -1895,6 +1895,14 @@
       const checkoutInfoEl = document.getElementById('checkoutInfoSection');
       const checkoutDetails = document.getElementById('checkoutDetails');
       const checkoutItems = [];
+
+      if (summary.checkoutSkipped) {
+        checkoutItems.push('<div><strong>Status:</strong> Checkout test skipped</div>');
+      } else if (summary.checkoutReached) {
+        checkoutItems.push('<div><strong>Status:</strong> Checkout reached</div>');
+      } else if (summary.checkoutStoppedAt) {
+        checkoutItems.push(`<div style="color: var(--yellow);"><strong>Status:</strong> Checkout not reached - ${summary.checkoutStoppedAt}</div>`);
+      }
       
       if (checkoutInfo.expressWallets && checkoutInfo.expressWallets.length > 0) {
         checkoutItems.push(`<div><strong>Express Wallets:</strong> ${checkoutInfo.expressWallets.join(', ')}</div>`);
@@ -2056,6 +2064,9 @@
       // Add checkout info to summary
       if (checkoutItems.length > 0) {
         summaryText += `\n\n## 💳 Checkout Flow\n\n`;
+        if (summary.checkoutSkipped) summaryText += `- **Status:** Checkout test skipped\n`;
+        else if (summary.checkoutReached) summaryText += `- **Status:** Checkout reached\n`;
+        else if (summary.checkoutStoppedAt) summaryText += `- **Status:** Checkout not reached - ${summary.checkoutStoppedAt}\n`;
         if (checkoutInfo.expressWallets && checkoutInfo.expressWallets.length > 0) summaryText += `- **Express Wallets:** ${checkoutInfo.expressWallets.join(', ')}\n`;
         if (checkoutInfo.paymentMethods && checkoutInfo.paymentMethods.length > 0) summaryText += `- **Payment Methods:** ${checkoutInfo.paymentMethods.join(', ')}\n`;
         if (checkoutInfo.bnplOptions && checkoutInfo.bnplOptions.length > 0) summaryText += `- **BNPL:** ${checkoutInfo.bnplOptions.join(', ')}\n`;

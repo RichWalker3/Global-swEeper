@@ -1073,6 +1073,11 @@ async function testCheckout(
 ): Promise<void> {
   const checkoutUrl = new URL('/checkout', seedUrl).toString();
   const checkoutProductCandidates = collectCheckoutProductCandidates(state);
+  const checkoutDebug: {
+    stage?: string;
+    stoppedAt?: string;
+    addToCartResult?: { added: boolean; currentUrl: string; cartReady: boolean };
+  } = {};
   scrapeProgress.phase = 'checkout';
   scrapeProgress.currentUrl = checkoutUrl;
 
@@ -1096,6 +1101,7 @@ async function testCheckout(
       verbose: opts.verbose,
       preferredProductUrls: checkoutProductCandidates,
       abortSignal: abortController.signal,
+      onDebugUpdate: (update) => Object.assign(checkoutDebug, update),
     });
     let checkoutTimer: ReturnType<typeof setTimeout> | undefined;
     const checkoutTimeoutPromise = new Promise<null>((resolve) => {
@@ -1130,7 +1136,10 @@ async function testCheckout(
 
       state.checkoutInfo = checkoutResult.checkoutInfo;
       state.checkoutReached = checkoutResult.reachedCheckout;
-      state.checkoutStoppedAt = checkoutResult.stoppedAt;
+      state.checkoutStoppedAt =
+        checkoutResult.stoppedAt ||
+        checkoutDebug.stoppedAt ||
+        formatCheckoutDebugStop(checkoutDebug);
 
       for (const wallet of checkoutResult.checkoutInfo.expressWallets) {
         state.thirdParties.add(wallet);
@@ -1153,6 +1162,7 @@ async function testCheckout(
         }
       }
     } else {
+      state.checkoutStoppedAt = formatCheckoutDebugStop(checkoutDebug);
       state.errors.push({ url: checkoutUrl, error: 'Checkout test timed out', type: 'timeout' });
     }
   } catch (error) {
@@ -1171,6 +1181,24 @@ async function testCheckout(
   if (opts.verbose && !state.checkoutReached) {
     console.log(`  ⚠ Checkout not reached (may have timed out or cart was empty)`);
   }
+}
+
+function formatCheckoutDebugStop(debug: {
+  stage?: string;
+  stoppedAt?: string;
+  addToCartResult?: { added: boolean; currentUrl: string; cartReady: boolean };
+}): string | undefined {
+  const parts: string[] = [];
+
+  if (debug.stoppedAt) parts.push(debug.stoppedAt);
+  if (debug.stage) parts.push(`stage=${debug.stage}`);
+
+  if (debug.addToCartResult) {
+    const { added, cartReady, currentUrl } = debug.addToCartResult;
+    parts.push(`addToCart(added=${added}, cartReady=${cartReady}, url=${currentUrl})`);
+  }
+
+  return parts.length > 0 ? parts.join(' | ') : undefined;
 }
 
 function collectCheckoutProductCandidates(state: ScrapeState): string[] {

@@ -30,7 +30,16 @@ without relying on tribal knowledge or local one-off setup.
 - Checkout automation is improved but not universal
 - Final WA drafting still depends on a human reviewer
 - Hosted deployment and security posture are not formalized
-- Broader rollout docs and enablement are still incomplete
+
+## Latest Validation Snapshot
+
+- Fresh-folder packaged release install succeeded
+- Packaged release launched successfully
+- `Underoutfit` completed successfully as a quick scan
+- `Felina` completed a full run and reached checkout
+- `HATCH` completed a corrected full-budget rerun and reached checkout
+
+This is strong enough for a small internal pilot, but not for broad "works everywhere" positioning.
 
 ## Share-Now Checklist
 
@@ -83,11 +92,8 @@ For the first pilot, do not depend on:
 
 ## Practical Next Steps
 
-- Clean the shareable branch contents.
-- Do one fresh-clone install test from scratch.
-- Replace any remaining repo links with the actual internal Git remote you want the team to use.
-- Add a short changelog or release note for the pilot drop.
-- Decide whether the pilot is local-only or whether a hosted version is also in scope.
-
-Use `docs/SHAREABLE_BRANCH_AUDIT.md` as the guide for deciding what belongs in the first team-facing branch.
+- Keep the shared doc set lean: `README.md`, `docs/TEAM_SETUP.md`, and this file.
+- Use a very small internal pilot group first.
+- Capture non-Shopify misses and hard merchants from real usage.
+- Start the next product branch around non-Shopify coverage.
 Use `docs/GITLAB_SHARE.md` for the maintainer workflow to distribute the clean share through GitLab.

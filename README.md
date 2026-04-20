@@ -117,7 +117,6 @@ npm test
 
 ```bash
 npm run web
-npm run cli -- --url https://example.com
 npm run build
 npm test
 ```
@@ -142,7 +141,6 @@ If Jira, Confluence, or other internal integrations are added for a given team s
 - `docs/DOMAIN_KNOWLEDGE.md`
 - `docs/TEAM_SETUP.md`
 - `docs/PILOT_READINESS.md`
-- `docs/SHAREABLE_BRANCH_AUDIT.md`
 - `docs/GITLAB_SHARE.md`
 
 ## Current Limitations

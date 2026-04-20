@@ -29,7 +29,6 @@ const sourcePaths = [
 
 const docFiles = [
   'docs/DOMAIN_KNOWLEDGE.md',
-  'docs/ONE_SHOT_SETUP_PROMPT.md',
   'docs/TEAM_SETUP.md',
   'docs/TEMPLATE.md',
 ];
@@ -75,10 +74,7 @@ async function writeBundledPackageJson(outputDir: string): Promise<void> {
     dependencies: {
       '@anthropic-ai/sdk': packageJson.dependencies?.['@anthropic-ai/sdk'],
       dotenv: packageJson.dependencies?.dotenv,
-      marked: packageJson.dependencies?.marked,
       playwright: packageJson.dependencies?.playwright,
-      'playwright-extra': packageJson.dependencies?.['playwright-extra'],
-      'puppeteer-extra-plugin-stealth': packageJson.dependencies?.['puppeteer-extra-plugin-stealth'],
       'simple-wappalyzer': '^1.1.95',
       tsx: '^4.20.6',
       zod: packageJson.dependencies?.zod,

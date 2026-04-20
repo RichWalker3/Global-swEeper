@@ -4,7 +4,7 @@
 
 This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You can get the tool from your team's Git host, including GitLab, and use **Cursor** to run it with simple slash-style commands.
 
-**Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root — see **[ONE_SHOT_SETUP_PROMPT.md](./ONE_SHOT_SETUP_PROMPT.md)** (`@SETUP_PROMPT.txt` or paste into Cursor chat).
+**Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root (`@SETUP_PROMPT.txt` or paste it into Cursor chat).
 
 ---
 
@@ -90,21 +90,9 @@ The project includes **Cursor rules** so you can use simple phrases instead of r
 
 ---
 
-## Step 5: One-time Cursor setup (paste this prompt)
+## Step 5: One-time Cursor setup
 
-In Cursor, start a **new chat** and paste the text below. (You can also open [CURSOR_SETUP_PROMPT.md](./CURSOR_SETUP_PROMPT.md) and copy the prompt from there.) The AI will check your setup and tell you what to do next (e.g. run `npm install`, open the app).
-
-```text
-I'm setting up Global-sweep on my machine. Please:
-
-1. Confirm Node is v18+ (I can run `node -v` if needed).
-2. Run `npm install` in this project if dependencies aren't installed.
-3. Remind me to run `npx playwright install chromium` if I haven't already.
-4. If I need optional settings (proxy, API keys, custom port), remind me I can copy env.example to .env — otherwise .env is not required.
-5. Tell me the exact command to launch the app and how to open http://localhost:3847 in Cursor’s Simple Browser (task **Open Sweep in Simple Browser**, or Command Palette → **Simple Browser: Show**).
-
-After that, tell me how to use "/launch sweep" and "/update sweep" in future chats.
-```
+In Cursor, start a **new chat** and either attach `@SETUP_PROMPT.txt` or paste the full contents of `SETUP_PROMPT.txt`. The AI will check your setup and tell you what to do next (for example `npm install`, Playwright install, and how to open the app).
 
 ---
 

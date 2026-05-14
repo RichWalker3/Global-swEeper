@@ -11,7 +11,7 @@ Repo: https://github.com/RichWalker3/Global-swEeper.git
 
 3. In this folder run: npm install
 
-4. Then run: npx playwright install chromium
+4. Then run: npm run playwright:install
 
 5. Optional: only if I need custom port or proxy settings later, copy env.example to .env and fill values. Otherwise skip — .env is not required for the default app. Do not add or request Confluence/Jira/Atlassian credentials during setup. Jira email/API token are entered later in the Sweep web UI only when I need BRD Jira updates.
 

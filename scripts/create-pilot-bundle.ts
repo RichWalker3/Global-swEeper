@@ -72,7 +72,7 @@ async function writeBundledPackageJson(outputDir: string): Promise<void> {
     scripts: {
       web: 'PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts',
       start: 'PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts',
-      'playwright:install': 'PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium',
+      'playwright:install': 'PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium --no-shell',
       postinstall: 'npm run playwright:install',
     },
     dependencies: {

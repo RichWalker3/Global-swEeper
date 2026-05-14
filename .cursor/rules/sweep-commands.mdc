@@ -19,7 +19,7 @@ When the user says any of the following in chat, perform the corresponding actio
 - Run in the project root, in order:
   1. `git pull` (to get latest code; if they don't use git, tell them to re-download the repo from GitHub and then run the next step).
   2. `npm install`
-  3. Optionally: `npx playwright install chromium` (only if release notes or errors mention Playwright/browser changes).
+  3. Optionally: `npm run playwright:install` (only if release notes or errors mention Playwright/browser changes).
 - Then say: "Sweep is updated. Use **launch sweep** when you're ready to run the app."
 
 ## /wa &lt;url&gt;

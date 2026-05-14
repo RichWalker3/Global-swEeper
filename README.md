@@ -127,6 +127,28 @@ npm run build
 npm test
 ```
 
+## Troubleshooting (Pilot)
+
+### Playwright or Chromium install issues
+
+The app uses Playwright's full bundled Chromium browser. Fresh installs run:
+
+```bash
+npm install
+```
+
+which also runs `playwright install chromium --no-shell`. If a teammate sees browser launch errors, have them pull the latest package, run `npm install` again, and restart `npm run web`.
+
+### Many pages time out
+
+Page navigation defaults to `30000` ms. On slow networks, VPNs, or heavy CMP/CDN pages, create a local `.env` file and add:
+
+```bash
+SWEEP_PAGE_GOTO_TIMEOUT_MS=45000
+```
+
+Then restart `npm run web`. The accepted range is `10000` to `120000` ms.
+
 ## Documentation
 
 - `docs/TEMPLATE.md`

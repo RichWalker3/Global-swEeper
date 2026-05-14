@@ -48,7 +48,7 @@ Use this before giving the repo to a small test group.
 
 - Confirm the branch contents are intentional and do not include local-only scratch files.
 - Confirm `npm install` works from a fresh clone.
-- Confirm `npx playwright install chromium` completes on a clean machine.
+- Confirm `npm run playwright:install` completes on a clean machine.
 - Confirm `npm run build` passes.
 - Confirm `npm test` passes.
 - Confirm the app launches with `npm run web`.

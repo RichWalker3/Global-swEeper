@@ -71,7 +71,7 @@ cd global-sweep
 
 ```bash
 npm install
-npx playwright install chromium
+npm run playwright:install
 ```
 
 4. **Environment file (optional):**  
@@ -139,7 +139,15 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
   Node.js isn’t installed or isn’t on your PATH. Reinstall Node from nodejs.org and restart Terminal/Command Prompt.
 
 - **“Cannot find module” or install errors**  
-  In the project folder run: `npm install` and `npx playwright install chromium`.
+  In the project folder run: `npm install` and `npm run playwright:install`.
+
+- **Playwright or Chromium errors**
+  Run `npm install` again from the project folder. The install downloads the full bundled Chromium browser that Sweep uses for crawling.
+
+- **Lots of pages time out**
+  Slow networks, VPNs, or heavy sites may need more navigation time. Create a local `.env` file in the project folder with:
+  `SWEEP_PAGE_GOTO_TIMEOUT_MS=45000`
+  Then restart Sweep with `npm run web`.
 
 - **Port 3847 already in use**  
   Another app is using that port. Close the other app or create a `.env` with `PORT=3848` and use http://localhost:3848.
@@ -159,7 +167,7 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
 
 1. Install Node.js and optionally a Git desktop app.
 2. Get the repo (ZIP or clone) from the Git URL your team provides.
-3. In the project folder: `npm install` and `npx playwright install chromium`.
+3. In the project folder: `npm install` and `npm run playwright:install`.
 4. **Optional:** copy `env.example` to `.env` only if you need proxy or a custom port.
 5. Open the project in Cursor and paste the setup prompt once.
 6. Use **“launch sweep”** and **“update sweep”** (and **/wa &lt;url&gt;** for assessments) in Cursor chat.

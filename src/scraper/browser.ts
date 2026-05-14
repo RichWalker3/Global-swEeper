@@ -3,6 +3,8 @@
  * Handles Playwright browser launch with anti-detection measures
  */
 
+import { existsSync, readdirSync } from 'node:fs';
+import { isAbsolute, join, resolve } from 'node:path';
 import { chromium, BrowserContext, Page, Frame } from 'playwright';
 import { getRandomUserAgent, getRandomViewport } from './helpers.js';
 
@@ -57,6 +59,7 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   // Build launch options
   const launchOptions: Parameters<typeof chromium.launch>[0] = {
     headless: true,
+    executablePath: resolveFullChromiumExecutablePath(),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -76,6 +79,10 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
     launchOptions.proxy = parseProxyUrl(proxyUrl);
   }
 
+  if (verbose && launchOptions.executablePath) {
+    console.log(`  ✓ Using bundled Chromium: ${launchOptions.executablePath}`);
+  }
+
   const browser = await chromium.launch(launchOptions);
   const { context } = await createStealthContext(browser, { verbose, config });
 
@@ -84,6 +91,34 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
     context,
     config,
   };
+}
+
+function resolveFullChromiumExecutablePath(): string | undefined {
+  const defaultPath = chromium.executablePath();
+  if (defaultPath && existsSync(defaultPath) && !/headless.?shell/i.test(defaultPath)) {
+    return defaultPath;
+  }
+
+  const browserRoot = process.env.PLAYWRIGHT_BROWSERS_PATH || '.playwright-browsers';
+  const resolvedBrowserRoot = isAbsolute(browserRoot) ? browserRoot : resolve(process.cwd(), browserRoot);
+  const candidates = fullChromiumExecutableCandidates(resolvedBrowserRoot);
+  return candidates.find((candidate) => existsSync(candidate)) || (existsSync(defaultPath) ? defaultPath : undefined);
+}
+
+function fullChromiumExecutableCandidates(browserRoot: string): string[] {
+  if (!existsSync(browserRoot)) return [];
+
+  return readdirSync(browserRoot)
+    .filter((entry) => /^chromium-\d+/.test(entry))
+    .flatMap((entry) => {
+      const chromiumRoot = join(browserRoot, entry);
+      return [
+        join(chromiumRoot, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+        join(chromiumRoot, 'chrome-mac-arm64', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
+        join(chromiumRoot, 'chrome-linux', 'chrome'),
+        join(chromiumRoot, 'chrome-win', 'chrome.exe'),
+      ];
+    });
 }
 
 export async function createStealthContext(

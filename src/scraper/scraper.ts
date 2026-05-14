@@ -153,9 +153,16 @@ async function closeBrowserWithTimeout(
   }
 }
 
+export function defaultPageGotoTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.SWEEP_PAGE_GOTO_TIMEOUT_MS;
+  const parsed = raw ? Number.parseInt(raw, 10) : 30000;
+  if (!Number.isFinite(parsed)) return 30000;
+  return Math.min(Math.max(parsed, 10000), 120000);
+}
+
 const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   maxPages: 50,
-  timeout: 15000,
+  timeout: defaultPageGotoTimeoutMs(),
   scrapeTimeout: 120000,
   takeScreenshots: true,
   verbose: false,

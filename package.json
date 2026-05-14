@@ -11,7 +11,7 @@
     "pilot:package": "tsx scripts/package-pilot-bundle.ts",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
-    "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium",
+    "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium --no-shell",
     "postinstall": "npm run playwright:install"
   },
   "keywords": [

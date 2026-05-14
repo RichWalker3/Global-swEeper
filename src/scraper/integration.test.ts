@@ -12,6 +12,7 @@ import { detectThirdParty, scanForDangerousGoods, detectB2B, extractProductLinks
 import { extractPolicyInfo } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectSubscriptions, detectPreOrders, detectBNPLWidgets } from './catalogDetector.js';
 import { tagPage } from '../prefilter/tagger.js';
+import { defaultPageGotoTimeoutMs } from './scraper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, '__fixtures__', 'shopify-store');
@@ -83,6 +84,18 @@ describe('Integration: Home Page', () => {
     const links = extractProductLinks(fixtures.homeHtml, 'https://example.com');
     expect(links.length).toBeGreaterThan(0);
     expect(links.some(l => l.includes('/products/'))).toBe(true);
+  });
+});
+
+describe('scraper configuration', () => {
+  it('defaults page navigation timeout to 30 seconds', () => {
+    expect(defaultPageGotoTimeoutMs({})).toBe(30000);
+  });
+
+  it('clamps configured page navigation timeout', () => {
+    expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '5000' })).toBe(10000);
+    expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '45000' })).toBe(45000);
+    expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '300000' })).toBe(120000);
   });
 });
 

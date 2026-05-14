@@ -1,6 +1,6 @@
 Set up Global-sweep from the repo URL my team gave me and launch it in Cursor's Simple Browser (inside the IDE), not in my default external browser. I have already opened the folder where I want the project (this folder) in Cursor. Do every step below in order. Do not ask for my confirmation; run all commands. Do not set up or ask for Confluence/Jira credentials — those will be configured separately.
 
-Repo: git@gitlab.com:global-e/solutions/global-sweep.git
+Repo: https://github.com/RichWalker3/Global-swEeper.git
 
 1. Ensure Git and Node.js 18+ are installed (verify with git --version and node -v).
    - macOS: If git is missing, install Homebrew from https://brew.sh if needed, then run "brew install git". If node is missing or older than v18, run "brew install node".

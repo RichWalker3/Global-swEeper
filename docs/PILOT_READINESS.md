@@ -57,7 +57,7 @@ Use this before giving the repo to a small test group.
 - Confirm README matches the actual WA prompt and BRD Workspace workflow in the current UI.
 - Confirm known limitations are written down plainly.
 - If you want a curated handoff folder instead of the full repo, run `npm run pilot:bundle`.
-- If you want a GitLab release artifact instead of a raw folder, run `npm run pilot:package`.
+- If you want a GitHub release artifact instead of a raw folder, run `npm run pilot:package`.
 
 ## Recommended Pilot Package
 
@@ -66,7 +66,7 @@ For an initial internal share, include:
 - source code
 - `README.md`
 - `docs/TEAM_SETUP.md`
-- `docs/GITLAB_SHARE.md`
+- `docs/GITHUB_SHARE.md`
 - `SETUP_PROMPT.txt`
 - `env.example`
 
@@ -99,4 +99,4 @@ For the first pilot, do not depend on:
 - Use a very small internal pilot group first.
 - Capture non-Shopify misses and hard merchants from real usage.
 - Start the next product branch around non-Shopify coverage.
-Use `docs/GITLAB_SHARE.md` for the maintainer workflow to distribute the clean share through GitLab.
+Use `docs/GITHUB_SHARE.md` for the maintainer workflow to distribute the clean share through GitHub.

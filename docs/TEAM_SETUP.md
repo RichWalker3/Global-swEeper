@@ -1,8 +1,8 @@
 # Global-sweep: Team Setup Guide
 
-**Repo:** `git@gitlab.com:global-e/solutions/global-sweep.git`
+**Repo:** `https://github.com/RichWalker3/Global-swEeper.git`
 
-This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. The team handoff is shared through GitLab, and you can use **Cursor** to run it with simple slash-style commands.
+This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. The team handoff is shared through GitHub, and you can use **Cursor** to run it with simple slash-style commands.
 
 **Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root (`@SETUP_PROMPT.txt` or paste it into Cursor chat).
 
@@ -35,8 +35,8 @@ Node.js is the runtime the tool needs.
 
 ### Option A: Download as ZIP (easiest, but updates are manual)
 
-1. Open the GitLab repo URL your team gives you.
-2. Click **Code** → **Download source code** or download the GitLab release archive if your lead shared one.
+1. Open the GitHub repo URL your team gives you.
+2. Click **Code** → **Download ZIP** or download the release archive if your lead shared one.
 3. Unzip the folder and remember where it is (e.g. `Desktop/global-sweep`).
 
 **To update later:** download the ZIP again and replace the folder (or merge the new files into your folder).
@@ -46,7 +46,7 @@ Node.js is the runtime the tool needs.
 1. Install a Git desktop app such as **GitHub Desktop**: https://desktop.github.com
 2. Sign in with your Git provider if needed.
 3. **File → Clone repository**.
-   - Choose **URL**, then paste `git@gitlab.com:global-e/solutions/global-sweep.git` or the HTTPS clone URL from GitLab.
+   - Choose **URL**, then paste `https://github.com/RichWalker3/Global-swEeper.git`.
    - Pick a folder (e.g. `Desktop/global-sweep`) and clone.
 4. **To update later:** open the repo in your Git app and pull the latest changes.
 

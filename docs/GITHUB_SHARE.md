@@ -1,16 +1,16 @@
-# GitLab Share Flow
+# GitHub Share Flow
 
-This is the maintainer workflow for handing Global-sweep to teammates through GitLab.
+This is the maintainer workflow for handing Global-sweep to teammates through GitHub.
 
-Current GitLab remote:
+Current GitHub remote:
 
 ```bash
-git@gitlab.com:global-e/solutions/global-sweep.git
+https://github.com/RichWalker3/Global-swEeper.git
 ```
 
 ## Two Supported Share Modes
 
-### Option 1: GitLab Repo Clone
+### Option 1: GitHub Repo Clone
 
 Best when teammates are comfortable pulling updates.
 
@@ -22,10 +22,10 @@ Use this when:
 
 Teammate flow:
 
-1. Clone the GitLab repo or pilot branch:
+1. Clone the GitHub repo or pilot branch:
 
    ```bash
-   git clone git@gitlab.com:global-e/solutions/global-sweep.git
+   git clone -b pilot/team-handoff https://github.com/RichWalker3/Global-swEeper.git global-sweep
    cd global-sweep
    ```
 
@@ -34,20 +34,20 @@ Teammate flow:
 4. Open `http://localhost:3847`.
 5. For BRD updates, connect Jira from the hamburger menu. Jira credentials are kept in local server memory only and are cleared when Sweep restarts or when credentials are cleared.
 
-### Option 2: GitLab Release Download
+### Option 2: GitHub Release Download
 
 Best when you want a more product-like handoff.
 
 Use this when:
 
-- you want to upload one packaged artifact to GitLab Releases
+- you want to upload one packaged artifact to GitHub Releases
 - you want a fixed snapshot instead of a moving branch
 - you want teammates to download a clean bundle instead of cloning the full working repo
 
 Maintainer flow:
 
 1. Run `npm run pilot:package`.
-2. Upload the generated `.tar.gz` from `tmp/pilot-release/` to a GitLab release.
+2. Upload the generated `.tar.gz` from `tmp/pilot-release/` to a GitHub release.
 3. Tell teammates to download and extract that archive.
 4. From the extracted folder, they run `npm install` and `npm run web`.
 5. They open `http://localhost:3847` and connect Jira from the hamburger menu only when they need BRD Jira updates.
@@ -60,7 +60,7 @@ Generate a clean bundle folder:
 npm run pilot:bundle
 ```
 
-Generate a GitLab-friendly packaged release:
+Generate a GitHub-friendly packaged release:
 
 ```bash
 npm run pilot:package
@@ -71,7 +71,7 @@ That creates:
 - a clean folder in `tmp/pilot-release/global-sweep-pilot-v<version>/`
 - a release archive in `tmp/pilot-release/global-sweep-pilot-v<version>.tar.gz`
 
-## Suggested GitLab Release
+## Suggested GitHub Release
 
 Title:
 
@@ -95,7 +95,7 @@ Jira credentials are entered in the web UI only when using BRD Workspace Jira up
 
 ## Recommendation
 
-For the first internal GitLab rollout:
+For the first internal GitHub rollout:
 
 - use a curated pilot branch for people who want updates
 - use the packaged release archive for people who just need a stable installable snapshot

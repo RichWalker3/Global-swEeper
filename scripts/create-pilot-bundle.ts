@@ -31,7 +31,7 @@ const sourcePaths = [
 
 const docFiles = [
   'docs/DOMAIN_KNOWLEDGE.md',
-  'docs/GITLAB_SHARE.md',
+  'docs/GITHUB_SHARE.md',
   'docs/PILOT_READINESS.md',
   'docs/TEAM_SETUP.md',
   'docs/TEMPLATE.md',

@@ -133,7 +133,7 @@ npm test
 - `docs/DOMAIN_KNOWLEDGE.md`
 - `docs/TEAM_SETUP.md`
 - `docs/PILOT_READINESS.md`
-- `docs/GITLAB_SHARE.md`
+- `docs/GITHUB_SHARE.md`
 
 ## Current Limitations
 
@@ -160,7 +160,7 @@ To generate a curated shareable copy without maintainer-only repo clutter, run:
 npm run pilot:bundle
 ```
 
-To package that clean share as a GitLab-friendly release archive, run:
+To package that clean share as a GitHub-friendly release archive, run:
 
 ```bash
 npm run pilot:package

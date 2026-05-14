@@ -3,6 +3,7 @@
  */
 
 import type { ScrapeResult, PageData } from '../scraper/types.js';
+import { BRD_REQUIREMENTS } from '../brd/requirements.js';
 
 export type PromptResponseFormat = 'markdown' | 'json';
 
@@ -209,7 +210,24 @@ Generate a complete Website Assessment following this EXACT structure:
 - **Cite evidence:** For ✅ items, include URL and brief quote.
 - **Keep quotes concise:** 1-2 sentences max.
 - **Use plain URLs:** So document can be copy-pasted into Jira/Confluence.
-- **Use bullet points (-):** Not numbered lists.`;
+- **Use bullet points (-):** Not numbered lists.
+
+## BRD Output for Sweep
+
+At the end of the Website Assessment, add a section named exactly:
+
+## BRD Output for Sweep
+
+This section is machine-read by Sweep. Include exactly one bullet for each BRD from BRD-001 through BRD-030 using this one-line format:
+
+- BRD-001 | Hub locations and entities | Status: Done | SE Output: [concise SE scoping note based only on WA evidence, or "No WA evidence found."]
+
+Use these rules:
+- Use **Status: Done** when the WA includes evidence, a useful finding, or a scoping note for that BRD.
+- Use **Status: Canceled** when the WA has no evidence for that BRD feature or the feature appears absent.
+- Keep each SE Output note concise but useful for a Jira field.
+- Do not invent merchant capabilities. If there is no evidence, say "No WA evidence found." and use Status: Canceled.
+- Keep the BRD output one line per BRD so Sweep can parse it.`;
 
 const HIGH_SIGNAL_CATEGORIES = new Set([
   'shipping',
@@ -316,6 +334,10 @@ Generate a complete Website Assessment following the EXACT template structure fr
 11. **Open Questions** - What needs merchant clarification
 12. **Next Steps** - Recommended actions
 13. **Legend** - Status indicator definitions
+14. **BRD Output for Sweep** - exactly one machine-readable line for each BRD below
+
+Use this BRD list and exact one-line format:
+${formatBrdPromptList()}
 
 **CRITICAL FORMAT RULES:**
 - Use **bullet points (-)** for ALL lists, never numbered lists (Jira renders them poorly)
@@ -325,12 +347,19 @@ Generate a complete Website Assessment following the EXACT template structure fr
 - Add **Takeaway:** summaries after major sections
 - Mark deductions with **[Inference]**
 - Make the scope note explicit about whether checkout was reached, skipped for speed, login-gated, or blocked
-- Prefer at least one concrete PDP example and one concrete shipping/returns proof URL when the evidence bundle supports them`;
+- Prefer at least one concrete PDP example and one concrete shipping/returns proof URL when the evidence bundle supports them
+- For BRD Output for Sweep, use **Status: Done** if there is relevant information and **Status: Canceled** if there is no evidence or the feature is absent`;
 
   return {
     system: SYSTEM_PROMPT,
     user: userPrompt,
   };
+}
+
+function formatBrdPromptList(): string {
+  return BRD_REQUIREMENTS
+    .map((requirement) => `- ${requirement.id} | ${requirement.requirement} | Status: Done or Canceled | SE Output: [one-line note]`)
+    .join('\n');
 }
 
 interface TieredPages {

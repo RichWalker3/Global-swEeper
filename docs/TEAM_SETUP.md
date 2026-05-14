@@ -1,8 +1,8 @@
 # Global-sweep: Team Setup Guide
 
-**Repo:** use the clone URL your team shares for this project.
+**Repo:** `git@gitlab.com:global-e/solutions/global-sweep.git`
 
-This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. You can get the tool from your team's Git host, including GitLab, and use **Cursor** to run it with simple slash-style commands.
+This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. The team handoff is shared through GitLab, and you can use **Cursor** to run it with simple slash-style commands.
 
 **Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root (`@SETUP_PROMPT.txt` or paste it into Cursor chat).
 
@@ -35,8 +35,8 @@ Node.js is the runtime the tool needs.
 
 ### Option A: Download as ZIP (easiest, but updates are manual)
 
-1. Open the repo URL your team gives you.
-2. Click the green **Code** button → **Download ZIP**.
+1. Open the GitLab repo URL your team gives you.
+2. Click **Code** → **Download source code** or download the GitLab release archive if your lead shared one.
 3. Unzip the folder and remember where it is (e.g. `Desktop/global-sweep`).
 
 **To update later:** download the ZIP again and replace the folder (or merge the new files into your folder).
@@ -45,8 +45,8 @@ Node.js is the runtime the tool needs.
 
 1. Install a Git desktop app such as **GitHub Desktop**: https://desktop.github.com
 2. Sign in with your Git provider if needed.
-3. **File → Clone repository**.  
-   - Choose **URL**, then paste the clone URL your team provides.  
+3. **File → Clone repository**.
+   - Choose **URL**, then paste `git@gitlab.com:global-e/solutions/global-sweep.git` or the HTTPS clone URL from GitLab.
    - Pick a folder (e.g. `Desktop/global-sweep`) and clone.
 4. **To update later:** open the repo in your Git app and pull the latest changes.
 
@@ -76,7 +76,9 @@ npx playwright install chromium
 
 4. **Environment file (optional):**  
    You do **not** need a `.env` file for the default web app and scraper — it runs with built-in defaults (including port **3847**).  
-   Create `.env` only if you need optional settings (custom port, proxy, Anthropic key, Atlassian/Jira). Copy `env.example` to `.env` and add values your team lead provides (open in Cursor or Notepad).
+   Create `.env` only if you need optional settings like a custom port or proxy. Copy `env.example` to `.env` and add values your team lead provides (open in Cursor or Notepad).
+
+**Jira note:** You do not need Jira credentials to launch Sweep. For BRD updates, open the hamburger menu in the web UI and enter your Jira email/API token there. Sweep keeps those credentials in local server memory only for the current running session. Enter them again after restarting Sweep or clearing credentials.
 
 ---
 
@@ -120,6 +122,17 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
 
 ---
 
+## Basic Sweep workflow
+
+1. Launch Sweep and open `http://localhost:3847`.
+2. Paste a merchant URL and run the assessment.
+3. Copy the **Website Assessment Prompt** into Cursor.
+4. Paste Cursor's completed WA back into the BRD Workspace.
+5. Connect Jira from the hamburger menu if you have not already done so in this running session.
+6. Enter the top-level SOPP key, process BRD, review the SE output and status rows, then send to Jira.
+
+---
+
 ## Troubleshooting
 
 - **“Command not found: npm”**  
@@ -147,7 +160,7 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
 1. Install Node.js and optionally a Git desktop app.
 2. Get the repo (ZIP or clone) from the Git URL your team provides.
 3. In the project folder: `npm install` and `npx playwright install chromium`.
-4. **Optional:** copy `env.example` to `.env` only if you need proxy, API keys, or a custom port.
+4. **Optional:** copy `env.example` to `.env` only if you need proxy or a custom port.
 5. Open the project in Cursor and paste the setup prompt once.
 6. Use **“launch sweep”** and **“update sweep”** (and **/wa &lt;url&gt;** for assessments) in Cursor chat.
 

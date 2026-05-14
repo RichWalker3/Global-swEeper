@@ -12,8 +12,25 @@ import { scrape } from '../scraper/scraper.js';
 import { buildPrompt } from '../extractor/prompt.js';
 import { extract } from '../extractor/extractor.js';
 import { generateDna } from '../dna/generator.js';
+import { generateBrdDraft } from '../brd/generator.js';
+import { composeBrdReview } from '../brd/composer.js';
+import { requireSoppKey } from '../brd/guard.js';
+import {
+  applyBrdTableUpdates,
+  applySeOutputUpdates,
+  loadBrdParent,
+  previewSeOutputUpdates,
+  validateJiraConfig,
+} from '../brd/jira.js';
+import {
+  clearJiraSession,
+  getActiveJiraConfig,
+  getJiraConnectionStatus,
+  setJiraSession,
+} from '../jira/session.js';
 import { formatMarkdown } from '../formatter/markdown.js';
 import type { ScrapeResult } from '../scraper/types.js';
+import type { BrdReviewResult } from '../brd/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -128,7 +145,7 @@ const server = createServer(async (req, res) => {
     : ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -246,6 +263,39 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/jira/status' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getJiraConnectionStatus()));
+    return;
+  }
+
+  if (url.pathname === '/api/jira/session' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const config = setJiraSession({
+        email: body.email,
+        apiToken: body.apiToken,
+        baseUrl: body.baseUrl,
+      });
+      await validateJiraConfig(config);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(getJiraConnectionStatus()));
+    } catch (error) {
+      clearJiraSession();
+      const statusCode = getJiraErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to connect Jira.' }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/jira/session' && req.method === 'DELETE') {
+    clearJiraSession();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(getJiraConnectionStatus()));
+    return;
+  }
+
   // API: Convert JSON to Markdown (no AI needed!)
   if (url.pathname === '/api/json-to-markdown' && req.method === 'POST') {
     try {
@@ -306,6 +356,161 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // API: Validate/load a top-level SOPP issue and return detailed BRD subtasks
+  if (url.pathname === '/api/brd/validate-parent' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+
+      const parent = await loadBrdParent(parentKey, getActiveJiraConfig());
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ parent }));
+    } catch (error) {
+      const statusCode = error instanceof Error && error.message.startsWith('Provide a top-level SOPP key') ? 400 : 500;
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/brd/load' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+      const parent = await loadBrdParent(parentKey, getActiveJiraConfig());
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ parent }));
+    } catch (error) {
+      const statusCode = getBrdErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/brd/compose' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+      const parent = await loadBrdParent(parentKey, getActiveJiraConfig());
+      const result = composeBrdReview({
+        merchantName: body.merchantName,
+        parent,
+        websiteAssessmentMarkdown: body.websiteAssessmentMarkdown,
+        websiteAssessmentJson: body.websiteAssessmentJson,
+        additionalNotes: body.additionalNotes,
+      });
+      const auditPath = writeBrdAuditLog(result, 'compose');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ...result, auditPath }));
+    } catch (error) {
+      const statusCode = getBrdErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/brd/process' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+      const parent = await loadBrdParent(parentKey, getActiveJiraConfig());
+      const result = composeBrdReview({
+        parent,
+        websiteAssessmentMarkdown: body.websiteAssessmentMarkdown,
+        websiteAssessmentJson: body.websiteAssessmentJson,
+        additionalNotes: body.additionalNotes,
+      });
+      const auditPath = writeBrdAuditLog(result, 'process');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ...result, auditPath }));
+    } catch (error) {
+      const statusCode = getBrdErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/brd/send' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+      const jiraConfig = getActiveJiraConfig();
+      const parent = await loadBrdParent(parentKey, jiraConfig);
+      const previews = await applyBrdTableUpdates(parent, body.rows || [], jiraConfig);
+      const auditPath = writeBrdAuditLog({ parent, previews }, 'send');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ parent, previews, auditPath }));
+    } catch (error) {
+      const statusCode = getBrdErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/brd/preview-updates' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+      const parent = await loadBrdParent(parentKey, getActiveJiraConfig());
+      const previews = previewSeOutputUpdates(parent, body.rows || []);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ parent, previews }));
+    } catch (error) {
+      const statusCode = getBrdErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/brd/apply-updates' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+      const jiraConfig = getActiveJiraConfig();
+      const parent = await loadBrdParent(parentKey, jiraConfig);
+      const previews = await applySeOutputUpdates(parent, body.rows || [], jiraConfig);
+      const auditPath = writeBrdAuditLog({ parent, previews }, 'apply');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ parent, previews, auditPath }));
+    } catch (error) {
+      const statusCode = getBrdErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  // API: Generate reviewable BRD outputs from WA evidence and a server-validated SOPP parent
+  if (url.pathname === '/api/brd/draft' && req.method === 'POST') {
+    try {
+      const body = JSON.parse(await parseBody(req));
+      const parentKey = requireSoppKey(body.parentKey);
+      const parent = await loadBrdParent(parentKey, getActiveJiraConfig());
+      const result = generateBrdDraft({
+        merchantName: body.merchantName,
+        parent,
+        websiteAssessmentMarkdown: body.websiteAssessmentMarkdown,
+        websiteAssessmentJson: body.websiteAssessmentJson,
+        dealLink: body.dealLink,
+        additionalNotes: body.additionalNotes,
+      });
+
+      const auditPath = writeBrdAuditLog(result, 'draft');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ...result, auditPath }));
+    } catch (error) {
+      const statusCode = getBrdErrorStatus(error);
+      res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
   // Health check endpoint (for container orchestration)
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -329,6 +534,12 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname.startsWith('/api/')) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: `API route not found: ${req.method || 'GET'} ${url.pathname}` }));
+    return;
+  }
+
   // Serve static files
   let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
   const fullPath = join(__dirname, 'public', filePath);
@@ -345,6 +556,43 @@ const server = createServer(async (req, res) => {
     res.end('Not found');
   }
 });
+
+function getBrdErrorStatus(error: unknown): number {
+  if (!(error instanceof Error)) return 500;
+  if (error.message.startsWith('Provide a top-level SOPP key')) return 400;
+  if (error.message.startsWith('Rejected Jira keys outside')) return 400;
+  if (error.message.startsWith('Missing Jira credentials')) return 401;
+  if (error.message.startsWith('Jira credential validation failed')) return 401;
+  if (error.message.startsWith('Jira SE output field was not found')) return 400;
+  return 500;
+}
+
+function getJiraErrorStatus(error: unknown): number {
+  if (!(error instanceof Error)) return 500;
+  if (error.message.endsWith('is required.')) return 400;
+  if (error.message.startsWith('Jira credential validation failed')) return 401;
+  if (error.message.startsWith('Jira SE output field was not found')) return 400;
+  return 500;
+}
+
+function writeBrdAuditLog(result: ReturnType<typeof generateBrdDraft> | BrdReviewResult | unknown, action: string): string {
+  const logsDir = join(dirname(__dirname), '..', 'logs', 'brd');
+  if (!existsSync(logsDir)) {
+    mkdirSync(logsDir, { recursive: true });
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const maybeResult = result as { merchantName?: unknown; parent?: { key?: unknown } };
+  const label = typeof maybeResult.merchantName === 'string'
+    ? maybeResult.merchantName
+    : typeof maybeResult.parent?.key === 'string'
+      ? maybeResult.parent.key
+      : 'merchant';
+  const merchant = label.replace(/[^a-zA-Z0-9-]/g, '_').slice(0, 60) || 'merchant';
+  const filePath = join(logsDir, `${timestamp}_${merchant}_brd_${action}.json`);
+  writeFileSync(filePath, JSON.stringify(result, null, 2));
+  return filePath;
+}
 
 async function runSweep(targetUrl: string, clientId: string, options: SweepRequestOptions) {
   try {

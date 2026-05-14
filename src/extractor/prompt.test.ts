@@ -62,4 +62,11 @@ describe('buildPrompt', () => {
     expect(prompt.user).toContain('- meta');
     expect(prompt.user).not.toContain('Respond with ONLY the Markdown');
   });
+
+  it('adds a machine-readable BRD output request to the WA prompt', () => {
+    const prompt = buildPrompt(makeScrapeResult());
+    expect(prompt.system).toContain('## BRD Output for Sweep');
+    expect(prompt.user).toContain('- BRD-001 | Hub locations and entities | Status: Done or Canceled | SE Output: [one-line note]');
+    expect(prompt.user).toContain('- BRD-030 | Returns Platform | Status: Done or Canceled | SE Output: [one-line note]');
+  });
 });

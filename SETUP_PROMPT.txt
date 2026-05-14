@@ -1,6 +1,6 @@
 Set up Global-sweep from the repo URL my team gave me and launch it in Cursor's Simple Browser (inside the IDE), not in my default external browser. I have already opened the folder where I want the project (this folder) in Cursor. Do every step below in order. Do not ask for my confirmation; run all commands. Do not set up or ask for Confluence/Jira credentials — those will be configured separately.
 
-Repo: <paste-repo-url-here>
+Repo: git@gitlab.com:global-e/solutions/global-sweep.git
 
 1. Ensure Git and Node.js 18+ are installed (verify with git --version and node -v).
    - macOS: If git is missing, install Homebrew from https://brew.sh if needed, then run "brew install git". If node is missing or older than v18, run "brew install node".
@@ -13,7 +13,7 @@ Repo: <paste-repo-url-here>
 
 4. Then run: npx playwright install chromium
 
-5. Optional: only if I need custom port, proxy, Anthropic, or Atlassian settings later, copy env.example to .env and fill values. Otherwise skip — .env is not required for the default app. Do not add or request Confluence/Jira/Atlassian credentials unless I already have them.
+5. Optional: only if I need custom port or proxy settings later, copy env.example to .env and fill values. Otherwise skip — .env is not required for the default app. Do not add or request Confluence/Jira/Atlassian credentials during setup. Jira email/API token are entered later in the Sweep web UI only when I need BRD Jira updates.
 
 6. Start the web app in the background with: npm run web
 

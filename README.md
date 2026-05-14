@@ -29,7 +29,8 @@ It is meant to support presales review, not replace judgment.
 
 1. Enter a merchant URL and run a quick scan or fuller WA-style assessment.
 2. Global-sweep crawls high-value pages like homepage, PDPs, cart, checkout, shipping, and returns.
-3. The UI summarizes the evidence and prepares output you can copy into Cursor or your downstream workflow.
+3. Copy the Website Assessment prompt into Cursor to produce the final WA plus the BRD Output for Sweep section.
+4. Paste the finished WA into the BRD Workspace, review the generated SE output rows, and send reviewed updates to Jira.
 
 ![Global-sweep running an assessment](docs/assets/sweep-run.png)
 
@@ -40,18 +41,19 @@ Global-sweep helps with the evidence-gathering part of a Website Assessment:
 - Crawl key site pages like homepage, PDPs, cart, checkout, shipping, and returns
 - Detect platform and common ecommerce integrations
 - Pull out policy and catalog signals that matter for scoping
-- Generate structured assessment data and markdown-friendly output
+- Generate a Cursor-ready WA prompt with BRD 1-30 instructions
+- Support BRD review rows that update Jira SE Scoping Output and Done/Canceled status
 - Support quick scans and fuller WA-style runs
 
 The tool is intended to document a merchant's current state and surface integration callouts before signature. It is not meant to auto-sell a solution or replace human review.
 
 ## Core Workflow
 
-- Run the merchant through the web UI
-- Review the summary, detected signals, and page evidence
-- Copy the generated prompt or structured output
-- Use Cursor to help draft the final WA
-- Review and finalize the writeup manually before sharing
+- Run the merchant through the web UI.
+- Review the summary, detected signals, and page evidence.
+- Copy the Website Assessment prompt into Cursor.
+- Paste Cursor's completed WA back into the BRD Workspace.
+- Review SE output notes and Done/Canceled status before sending Jira updates.
 
 ## Pilot Scope
 
@@ -62,11 +64,13 @@ The tool is intended to document a merchant's current state and surface integrat
 - US-based reachability checks
 - Evidence collection for WA drafting
 - Manual review and copy/paste workflow in the UI
+- BRD Workspace updates to Jira SE Scoping Output for validated SOPP child tickets
 
 ### Not Ready Yet
 
 - Broad non-Shopify coverage
-- Fully automated Jira or Confluence publishing
+- Fully automated Confluence publishing
+- Hosted/team-managed Jira credential storage
 - In-product direct LLM generation in the web UI
 - Multi-merchant batch workflow for regular team use
 - Hosted multi-user deployment with a locked-down security model
@@ -84,10 +88,11 @@ Clone the repo from your team's Git remote, then run:
 
 ```bash
 npm install
-npx playwright install chromium
 ```
 
-No `.env` file is required for the default local app. Create `.env` only if you need optional settings like a custom port, base URL, allowed origins, proxy, or future API integrations. Use `env.example` as the template.
+No `.env` file is required for the default local app. Create `.env` only if you need optional settings like a custom port, hosted base URL, allowed origins, or proxy. Use `env.example` as the template.
+
+For BRD Jira updates, use the Jira Credentials panel in the web UI. Credentials entered there are kept in local server memory only, are not written to disk or browser storage, and are cleared when Sweep restarts or when you clear them. `.env` Jira credentials are still supported for maintainer or automation workflows.
 
 ### Run
 
@@ -109,9 +114,10 @@ npm test
 1. Enter a merchant URL in the web UI.
 2. Run either a quick scan or a full WA-style pass.
 3. Review the collected evidence and summary fields.
-4. Copy the generated prompt or structured output.
-5. Use that output to draft the final WA.
-6. Review, edit, and paste the final markdown into the destination system manually.
+4. Copy the Website Assessment prompt into Cursor.
+5. Have Cursor produce the final WA, including the `BRD Output for Sweep` section.
+6. Paste the finished WA into BRD Workspace, enter the top-level SOPP key, and click `Process BRD`.
+7. Review the SE output notes and status dropdowns, then click `Send to Jira`.
 
 ## Common Commands
 
@@ -120,20 +126,6 @@ npm run web
 npm run build
 npm test
 ```
-
-## Environment Notes
-
-The repo is shareable without live credentials. Do not commit real secrets.
-
-Optional settings are documented in `env.example`, including:
-
-- `PORT`
-- `BASE_URL`
-- `ALLOWED_ORIGINS`
-- `ANTHROPIC_API_KEY`
-- `PROXY_URL`
-
-If Jira, Confluence, or other internal integrations are added for a given team setup, those credentials should be configured locally and documented outside the repo's committed defaults.
 
 ## Documentation
 
@@ -158,6 +150,7 @@ Before handing this to a wider team, verify:
 - `npm install` works from a fresh clone
 - `npm run build` passes
 - `npm test` passes
+- `npm run pilot:package` creates a release archive
 - `env.example` matches the current optional configuration
 - docs reflect the actual workflow and current limitations
 

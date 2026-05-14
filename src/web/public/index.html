@@ -51,6 +51,92 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
+    .hamburger-btn {
+      border: 1px solid var(--gray-200);
+      background: var(--white);
+      border-radius: 8px;
+      padding: 0.5rem 0.7rem;
+      cursor: pointer;
+      font-size: 1rem;
+      color: var(--black);
+    }
+
+    .side-menu-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 20;
+    }
+
+    .side-menu-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .side-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: min(390px, 90vw);
+      height: 100vh;
+      background: var(--white);
+      box-shadow: 4px 0 20px rgba(0, 0, 0, 0.12);
+      transform: translateX(-100%);
+      transition: transform 0.2s;
+      z-index: 21;
+      overflow: auto;
+      padding: 0;
+    }
+
+    .side-menu.open {
+      transform: translateX(0);
+    }
+
+    .side-menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.1rem 1.25rem;
+      border-bottom: 1px solid var(--gray-200);
+      background: var(--gray-100);
+    }
+
+    .side-menu-title {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .side-menu-title strong {
+      font-size: 1rem;
+      color: var(--black);
+    }
+
+    .side-menu-title span {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+    }
+
+    .side-menu-close {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 9999px;
+      border: 1px solid var(--gray-200);
+      background: var(--white);
+      color: var(--gray-400);
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .side-menu-content {
+      padding: 1rem;
+    }
+
     .logo {
       display: flex;
       align-items: center;
@@ -219,7 +305,7 @@
       margin: 0 auto;
       padding: 2rem;
       display: grid;
-      grid-template-columns: 400px 1fr;
+      grid-template-columns: 1fr;
       gap: 2rem;
       min-height: calc(100vh - 80px);
     }
@@ -967,11 +1053,228 @@
       color: var(--gray-400);
       margin-top: 0.25rem;
     }
+
+    .brd-review-grid {
+      display: grid;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .brd-review-card {
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 1rem;
+      background: var(--white);
+    }
+
+    .brd-review-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+      font-size: 0.8125rem;
+    }
+
+    .brd-review-title {
+      font-weight: 700;
+      color: var(--black);
+    }
+
+    .brd-review-meta {
+      color: var(--gray-400);
+      text-align: right;
+    }
+
+    .brd-review-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 1rem;
+    }
+
+    @media (max-width: 1024px) {
+      .brd-review-body {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .brd-review-textarea {
+      width: 100%;
+      min-height: 220px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      padding: 0.75rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      resize: vertical;
+    }
+
+    .brd-evidence-panel {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 0.75rem;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .brd-evidence-panel strong {
+      color: var(--black);
+      display: block;
+      margin-top: 0.5rem;
+    }
+
+    .brd-conflict {
+      color: var(--yellow);
+      font-weight: 600;
+    }
+
+    .brd-table-wrapper {
+      overflow-x: auto;
+      margin-top: 1rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+
+    .brd-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 0.8125rem;
+      background: var(--white);
+    }
+
+    .brd-table th,
+    .brd-table td {
+      border-bottom: 1px solid var(--gray-200);
+      padding: 0.9rem;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    .brd-table th {
+      background: var(--gray-100);
+      color: var(--black);
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .brd-table th:nth-child(1),
+    .brd-table td:nth-child(1) {
+      width: 18%;
+    }
+
+    .brd-table th:nth-child(2),
+    .brd-table td:nth-child(2) {
+      width: 24%;
+    }
+
+    .brd-table th:nth-child(3),
+    .brd-table td:nth-child(3) {
+      width: 44%;
+    }
+
+    .brd-table th:nth-child(4),
+    .brd-table td:nth-child(4) {
+      width: 14%;
+      min-width: 155px;
+    }
+
+    .brd-table tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .brd-table tbody tr:nth-child(even) {
+      background: #fafafa;
+    }
+
+    .brd-table tbody tr:hover {
+      background: #fff7ed;
+    }
+
+    .brd-title-cell strong {
+      color: var(--black);
+      display: block;
+      line-height: 1.35;
+    }
+
+    .brd-key-pill {
+      display: inline-flex;
+      margin-top: 0.5rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 9999px;
+      background: rgba(239, 83, 31, 0.1);
+      color: var(--orange);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .brd-current-status {
+      display: block;
+      margin-top: 0.35rem;
+      color: var(--gray-400);
+      font-size: 0.75rem;
+    }
+
+    .brd-description-cell {
+      color: var(--gray-400);
+      line-height: 1.5;
+      max-height: 180px;
+      overflow: auto;
+    }
+
+    .brd-table textarea {
+      width: 100%;
+      min-height: 190px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      padding: 0.75rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      resize: vertical;
+      background: var(--white);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+
+    .brd-table select {
+      width: 100%;
+      padding: 0.55rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 9999px;
+      background: var(--white);
+      font-weight: 600;
+      color: var(--black);
+    }
+
+    #outputPanel {
+      min-height: auto;
+    }
+
+    #rightPanel {
+      display: none;
+    }
+
+    #outputContent {
+      max-height: 260px;
+    }
+
+    .output-tabs {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="logo">
+      <button class="hamburger-btn" id="openMenuBtn" aria-label="Open menu">☰</button>
       <span class="logo-icon">🧹</span>
       <div>
         <div class="logo-text">Global-sw<span>E</span>ep</div>
@@ -979,13 +1282,71 @@
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 1rem;">
-      <button class="feedback-btn" onclick="openFeedback()">💬 Feedback</button>
       <div class="status-badge">
         <span class="status-dot" id="connectionDot"></span>
         <span id="connectionStatus">Connecting...</span>
       </div>
     </div>
   </header>
+
+  <div class="side-menu-overlay" id="sideMenuOverlay"></div>
+  <aside class="side-menu" id="sideMenu" aria-label="Sweep menu">
+    <div class="side-menu-header">
+      <div class="side-menu-title">
+        <strong>Sweep Menu</strong>
+        <span>Jira credentials and feedback</span>
+      </div>
+      <button class="side-menu-close" id="closeMenuBtn" type="button" aria-label="Close menu">&times;</button>
+    </div>
+
+    <div class="side-menu-content">
+      <button class="feedback-btn" onclick="openFeedback()" style="width: 100%; margin-bottom: 1rem;">💬 Feedback</button>
+
+      <!-- Jira Credentials -->
+      <div class="card" id="jiraCredentialsCard">
+        <div class="card-header">
+          <span>🔐</span>
+          <h2>Jira Credentials</h2>
+          <span id="jiraCredentialBadge" style="margin-left: auto; font-size: 0.75rem; background: var(--gray-200); padding: 0.25rem 0.5rem; border-radius: 4px; color: var(--gray-400);">Not connected</span>
+        </div>
+        <div class="card-body" style="padding: 1rem 1.5rem;">
+          <div class="alert alert-info" style="margin-bottom: 1rem;">
+            <span class="alert-icon">🔒</span>
+            <div class="alert-content">
+              Jira credentials stay in server memory only for this local Sweep session. They are cleared when Sweep restarts or when you click clear.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="jiraEmail">Jira email</label>
+            <input type="email" id="jiraEmail" placeholder="you@example.com" autocomplete="username" style="border: 1px solid var(--gray-200); border-radius: 8px; padding: 0.75rem; width: 100%; font-size: 0.9rem;">
+          </div>
+
+          <div class="form-group">
+            <label for="jiraApiToken">Jira API token</label>
+            <div class="api-key-input-wrapper" style="width: 100%;">
+              <input
+                type="password"
+                id="jiraApiToken"
+                class="api-key-input"
+                placeholder="Atlassian API token"
+                autocomplete="off"
+                style="width: 100%;"
+              >
+              <button type="button" class="api-key-toggle" id="jiraTokenToggle" title="Show/hide Jira token">👁️</button>
+            </div>
+          </div>
+
+          <div id="jiraCredentialStatus" style="font-size: 0.8125rem; color: var(--gray-400); margin-bottom: 0.75rem;"></div>
+
+          <div class="action-buttons">
+            <button class="btn" id="connectJiraBtn">Connect Jira</button>
+            <button class="btn btn-secondary" id="clearJiraBtn">Clear Jira Credentials</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
   
   <!-- Feedback Modal -->
   <div id="feedbackModal" class="modal-overlay" style="display: none;">
@@ -1038,21 +1399,21 @@
         </div>
         <div class="card-body" id="howItWorksBody" style="padding: 1rem 1.5rem;">
           <ol style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--black); line-height: 1.8;">
-            <li><strong>Enter URL:</strong> Paste the merchant's website URL below</li>
-            <li><strong>Run Assessment:</strong> Click the button to scrape the site (20-40 sec)</li>
-            <li><strong>Review Summary:</strong> Check platform, third-parties, red flags</li>
-            <li><strong>Copy Prompt:</strong> Click "📋 Copy Prompt for Cursor" in the Output panel</li>
-            <li><strong>Paste in Cursor:</strong> Start a new Cursor chat and paste</li>
-            <li><strong>Copy to Jira:</strong> Cursor generates the WA - copy to your ticket!</li>
+            <li><strong>Connect Jira:</strong> Open the hamburger menu, enter your Jira email/token, and connect for BRD updates. You only need to do this once per running Sweep session; enter it again after restarting Sweep or clearing credentials.</li>
+            <li><strong>Run a WA:</strong> Paste the merchant URL, choose quick or full checkout mode, then click <strong>Run Assessment</strong>.</li>
+            <li><strong>Copy the WA prompt:</strong> After Sweep crawls the site, copy the <strong>Website Assessment Prompt</strong>.</li>
+            <li><strong>Generate in Cursor:</strong> Paste the prompt into Cursor. Cursor returns the formatted WA plus a <strong>BRD Output for Sweep</strong> section.</li>
+            <li><strong>Process BRD:</strong> Paste the finished WA into the BRD Workspace, enter the top-level SOPP key, and click <strong>Process BRD</strong>.</li>
+            <li><strong>Review and send:</strong> Check the SE output notes and Status dropdowns, then click <strong>Send to Jira</strong>.</li>
           </ol>
           <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--gray-200); font-size: 0.75rem; color: var(--gray-400);">
-            <strong>What gets detected:</strong> Platform, checkout flow, express wallets, BNPL, 30+ third-party apps, return policies, loyalty programs, subscriptions, dangerous goods, B2B indicators, and red flags (Smile.io, Recharge, competitors).
+            <strong>What Sweep prepares:</strong> Website evidence, third-party and red-flag signals, a Cursor-ready WA prompt, and a BRD table that updates Jira SE Scoping Output plus Done/Canceled status.
           </div>
         </div>
       </div>
 
-      <!-- API Key Card (Coming Soon) -->
-      <div class="card" id="apiKeyCard" style="margin-bottom: 1rem; opacity: 0.6;">
+      <!-- API Key Card (hidden until direct API extraction is revived) -->
+      <div class="card" id="apiKeyCard" style="display: none;">
         <div class="card-header">
           <span>🔑</span>
           <h2>Anthropic API Key</h2>
@@ -1219,29 +1580,6 @@
         </div>
       </div>
 
-      <!-- Extraction Options (hidden initially) -->
-      <div class="card hidden" id="extractionCard" style="margin-top: 1rem;">
-        <div class="card-header">
-          <span>🤖</span>
-          <h2>Extract Assessment</h2>
-        </div>
-        <div class="card-body">
-          <div class="alert alert-info" id="noApiKeyAlert">
-            <span class="alert-icon">💡</span>
-            <div class="alert-content">
-              <strong>How to extract:</strong>
-              Copy the prompt and paste it into Cursor. Cursor will return JSON which you can convert to Markdown below.
-            </div>
-          </div>
-
-          <div class="action-buttons">
-            <button class="btn" id="copyEvidenceBtn">
-              📋 Copy Prompt for Cursor
-            </button>
-          </div>
-        </div>
-      </div>
-
       <!-- JSON to Markdown Converter (hidden initially) -->
       <div class="card hidden" id="jsonConverterCard" style="margin-top: 1rem;">
         <div class="card-header">
@@ -1264,6 +1602,55 @@
           </div>
         </div>
       </div>
+
+      <!-- BRD Workspace -->
+      <div class="card" id="brdWorkspaceCard" style="margin-top: 1rem;">
+        <div class="card-header">
+          <span>📌</span>
+          <h2>BRD Workspace</h2>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info" style="margin-bottom: 1rem;">
+            <span class="alert-icon">🧭</span>
+            <div class="alert-content">
+              <strong>BRD completion mode</strong>
+              Load one SOPP parent, review the Jira description for context, merge SE scoping output with WA evidence, then save only to the validated child subtasks' SE scoping output field.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="brdParentKey">Top-level SOPP key 🚀</label>
+            <input
+              type="text"
+              id="brdParentKey"
+              placeholder="SOPP-7431"
+              style="text-transform: uppercase;"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="brdWaMarkdown">WA Markdown or notes</label>
+            <textarea id="brdWaMarkdown" placeholder="Paste the finished WA here, or leave blank to use the current Markdown output." style="width: 100%; height: 140px; font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; padding: 0.75rem; border: 1px solid var(--gray-200); border-radius: 8px; resize: vertical;"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="brdAdditionalNotes">Additional scoping notes</label>
+            <textarea id="brdAdditionalNotes" placeholder="Optional: HubSpot notes, call notes, assumptions, or merchant answers." style="width: 100%; height: 90px; font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; padding: 0.75rem; border: 1px solid var(--gray-200); border-radius: 8px; resize: vertical;"></textarea>
+          </div>
+
+          <div id="brdValidationStatus" style="font-size: 0.8125rem; color: var(--gray-400); margin-bottom: 0.75rem;"></div>
+
+          <div class="action-buttons">
+            <button class="btn" id="processBrdBtn">Process BRD</button>
+          </div>
+
+          <div id="brdReviewGrid" class="brd-review-grid hidden"></div>
+
+          <div class="action-buttons hidden" id="brdSaveActions" style="margin-top: 1rem;">
+            <button class="btn" id="sendBrdUpdatesBtn">Send to Jira</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Right Panel -->
@@ -1272,28 +1659,20 @@
       <div class="output-panel card" id="outputPanel">
         <div class="card-header">
           <span>📄</span>
-          <h2>Output</h2>
-          <div class="output-tabs">
-            <button class="tab-btn" data-tab="markdown">Markdown</button>
-            <button class="tab-btn" data-tab="json">JSON</button>
-            <button class="tab-btn active" data-tab="prompt">Prompt</button>
-          </div>
+          <h2>Website Assessment Prompt</h2>
         </div>
         <div class="card-body" style="flex: 1; display: flex; flex-direction: column; padding: 1rem; min-height: 0; overflow: hidden;">
           <div class="output-toolbar" id="outputToolbar">
             <div class="output-action-meta">
               <div class="output-action-title">
                 <strong id="outputActionTitle">Prompt ready for Cursor</strong>
-                <span id="outputActionHint">Copy the prompt first, then paste it into Cursor to get JSON back.</span>
+                <span id="outputActionHint">Copy this prompt into Cursor to get the formatted Website Assessment.</span>
               </div>
               <span class="copy-status" id="copyStatus">Copied to clipboard</span>
             </div>
             <div class="action-buttons" id="outputActions">
               <button class="btn" id="copyOutputBtn">
-                📋 Copy Prompt for Cursor
-              </button>
-              <button class="btn btn-secondary" id="downloadBtn">
-                💾 Download Prompt
+                📋 Copy Website Assessment Prompt
               </button>
             </div>
           </div>
@@ -1392,6 +1771,9 @@
     let currentScrapeResult = null;
     let currentPrompt = null;
     let currentTab = 'prompt';  // Default to Prompt tab
+    let brdParentContext = null;
+    let brdReviewRows = [];
+    let jiraConnected = false;
     let outputs = {
       markdown: '',
       json: '',
@@ -1401,29 +1783,15 @@
 
     const tabMeta = {
       prompt: {
-        copyLabel: '📋 Copy Prompt for Cursor',
-        downloadLabel: '💾 Download Prompt',
-        title: 'Prompt ready for Cursor',
-        hint: 'Copy the prompt first, then paste it into Cursor to get JSON back.',
-      },
-      markdown: {
-        copyLabel: '📋 Copy Markdown for Jira',
-        downloadLabel: '💾 Download Markdown',
-        title: 'Markdown ready to paste',
-        hint: 'Use this when you want a reviewable Website Assessment draft for Jira or notes.',
-      },
-      json: {
-        copyLabel: '📋 Copy JSON Output',
-        downloadLabel: '💾 Download JSON',
-        title: 'Structured JSON output',
-        hint: 'Use this for validation, debugging, or converting back into Markdown.',
+        copyLabel: '📋 Copy Website Assessment Prompt',
+        title: 'Website Assessment Prompt',
+        hint: 'Copy this prompt into Cursor to get the formatted Website Assessment.',
       },
     };
 
     function refreshOutputActionLabels() {
-      const meta = tabMeta[currentTab];
+      const meta = tabMeta[currentTab] || tabMeta.prompt;
       document.getElementById('copyOutputBtn').innerHTML = meta.copyLabel;
-      document.getElementById('downloadBtn').innerHTML = meta.downloadLabel;
       document.getElementById('outputActionTitle').textContent = meta.title;
       document.getElementById('outputActionHint').textContent = meta.hint;
     }
@@ -1521,6 +1889,125 @@
       });
     }
 
+    function openSideMenu() {
+      document.getElementById('sideMenu').classList.add('open');
+      document.getElementById('sideMenuOverlay').classList.add('open');
+    }
+
+    function closeSideMenu() {
+      document.getElementById('sideMenu').classList.remove('open');
+      document.getElementById('sideMenuOverlay').classList.remove('open');
+    }
+
+    async function readJsonResponse(response) {
+      const text = await response.text();
+      if (!text) return {};
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error(`Sweep server returned a non-JSON response: ${text.slice(0, 120)}`);
+      }
+    }
+
+    function movePromptPanelAboveBrd() {
+      const outputPanel = document.getElementById('outputPanel');
+      const brdCard = document.getElementById('brdWorkspaceCard');
+      if (outputPanel && brdCard && outputPanel.parentElement !== brdCard.parentElement) {
+        brdCard.parentElement.insertBefore(outputPanel, brdCard);
+      }
+    }
+
+    function setJiraCredentialStatus(message, isError = false) {
+      const status = document.getElementById('jiraCredentialStatus');
+      if (!status) return;
+      status.textContent = message;
+      status.style.color = isError ? 'var(--red)' : 'var(--gray-400)';
+    }
+
+    function updateBrdCredentialState() {
+      ['processBrdBtn', 'sendBrdUpdatesBtn'].forEach(id => {
+        const button = document.getElementById(id);
+        if (button) button.disabled = !jiraConnected;
+      });
+    }
+
+    function renderJiraStatus(status) {
+      jiraConnected = Boolean(status.connected);
+      const badge = document.getElementById('jiraCredentialBadge');
+      if (badge) {
+        badge.textContent = jiraConnected
+          ? `Connected${status.source === 'env' ? ' via .env' : ''}`
+          : 'Not connected';
+        badge.style.background = jiraConnected ? 'rgba(34, 197, 94, 0.12)' : 'var(--gray-200)';
+        badge.style.color = jiraConnected ? 'var(--green)' : 'var(--gray-400)';
+      }
+
+      if (jiraConnected) {
+        const fieldLabel = status.hasSeOutputFieldId
+          ? 'using configured field ID'
+          : `field lookup: ${status.seOutputFieldName || 'SE Scoping Output'}`;
+        setJiraCredentialStatus(`Connected to ${status.baseUrl || 'Jira'} as ${status.emailHint || 'configured user'} (${fieldLabel}).`);
+      } else {
+        setJiraCredentialStatus('Connect Jira before loading BRD tickets.');
+      }
+      updateBrdCredentialState();
+    }
+
+    async function refreshJiraStatus() {
+      try {
+        const response = await fetch('/api/jira/status');
+        renderJiraStatus(await readJsonResponse(response));
+      } catch (error) {
+        jiraConnected = false;
+        setJiraCredentialStatus(`Unable to check Jira status: ${error.message}`, true);
+        updateBrdCredentialState();
+      }
+    }
+
+    async function connectJira() {
+      const btn = document.getElementById('connectJiraBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Connecting...';
+      setJiraCredentialStatus('Validating Jira credentials...');
+
+      try {
+        const response = await fetch('/api/jira/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('jiraEmail').value.trim(),
+            apiToken: document.getElementById('jiraApiToken').value.trim(),
+          }),
+        });
+        const data = await readJsonResponse(response);
+        if (!response.ok || data.error) {
+          throw new Error(data.error || 'Failed to connect Jira.');
+        }
+
+        document.getElementById('jiraApiToken').value = '';
+        renderJiraStatus(data);
+      } catch (error) {
+        jiraConnected = false;
+        setJiraCredentialStatus(error.message, true);
+        updateBrdCredentialState();
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Connect Jira';
+      }
+    }
+
+    async function clearJiraCredentials() {
+      const response = await fetch('/api/jira/session', { method: 'DELETE' });
+      renderJiraStatus(await readJsonResponse(response));
+      setBrdStatus('');
+    }
+
+    function ensureJiraConnectedForBrd() {
+      if (jiraConnected) return true;
+      setBrdStatus('Connect Jira before using the BRD Workspace.', true);
+      return false;
+    }
+
     // DOM elements
     const form = document.getElementById('sweepForm');
     const startBtn = document.getElementById('startBtn');
@@ -1533,20 +2020,15 @@
     const outputPanel = document.getElementById('outputPanel');
     const assessmentCard = document.getElementById('assessmentCard');
     const summaryCard = document.getElementById('summaryCard');
-    const extractionCard = document.getElementById('extractionCard');
     const outputContent = document.getElementById('outputContent');
     const outputActions = document.getElementById('outputActions');
     const connectionDot = document.getElementById('connectionDot');
     const connectionStatus = document.getElementById('connectionStatus');
 
     function placeAssessmentCard() {
-      if (!assessmentCard || !inputPanel || !rightPanel || !outputPanel || !summaryCard) return;
+      if (!assessmentCard || !inputPanel || !summaryCard) return;
 
-      if (window.matchMedia('(min-width: 1025px)').matches) {
-        if (assessmentCard.parentElement !== rightPanel || rightPanel.firstElementChild !== assessmentCard) {
-          rightPanel.insertBefore(assessmentCard, outputPanel);
-        }
-      } else if (assessmentCard.parentElement !== inputPanel || assessmentCard.nextElementSibling !== summaryCard) {
+      if (assessmentCard.parentElement !== inputPanel || assessmentCard.nextElementSibling !== summaryCard) {
         inputPanel.insertBefore(assessmentCard, summaryCard);
       }
     }
@@ -2026,9 +2508,6 @@
         marketplaceEl.classList.add('hidden');
       }
 
-      // Show extraction options
-      extractionCard.classList.remove('hidden');
-
       // Build summary text for Markdown tab
       let summaryText = `📋 NEXT STEP: Copy the Prompt and paste into Cursor!
 
@@ -2159,7 +2638,200 @@
 
     // Update output display
     function updateOutput() {
-      outputContent.textContent = outputs[currentTab] || 'No output yet';
+      currentTab = 'prompt';
+      outputContent.textContent = outputs.prompt || 'Run an assessment to generate the Website Assessment prompt.';
+    }
+
+    function setActiveOutputTab(tabName) {
+      currentTab = tabName;
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tabName);
+      });
+      updateOutput();
+      refreshOutputActionLabels();
+    }
+
+    function setBrdStatus(message, isError = false) {
+      const status = document.getElementById('brdValidationStatus');
+      status.textContent = message;
+      status.style.color = isError ? 'var(--red)' : 'var(--gray-400)';
+    }
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function normalizeBrdRowsForSave() {
+      return brdReviewRows.map(row => ({
+        jiraKey: row.jiraKey,
+        finalText: row.finalText,
+        statusAction: row.statusAction || 'unchanged',
+      }));
+    }
+
+    function initialStatusAction(row) {
+      const status = String(row.currentStatus || '').toLowerCase();
+      if (status === 'done') return 'done';
+      if (status === 'canceled' || status === 'cancelled') return 'canceled';
+      return 'unchanged';
+    }
+
+    function renderBrdReviewGrid(rows) {
+      brdReviewRows = rows;
+      const grid = document.getElementById('brdReviewGrid');
+      const actions = document.getElementById('brdSaveActions');
+
+      if (!rows || rows.length === 0) {
+        grid.classList.add('hidden');
+        actions.classList.add('hidden');
+        return;
+      }
+
+      brdReviewRows = rows.map(row => ({
+        ...row,
+        statusAction: row.statusAction || initialStatusAction(row),
+      }));
+
+      grid.innerHTML = `
+        <div class="brd-table-wrapper">
+          <table class="brd-table">
+            <thead>
+              <tr>
+                <th>BRD # &amp; Title</th>
+                <th>Description</th>
+                <th>Proposed SE Output</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${brdReviewRows.map((row, index) => `
+                <tr>
+                  <td class="brd-title-cell">
+                    <strong>${escapeHtml(row.requirementId || '')} ${escapeHtml(row.requirement || row.summary || '')}</strong>
+                    <span class="brd-key-pill">${escapeHtml(row.jiraKey)}</span>
+                    <span class="brd-current-status">${escapeHtml(row.currentStatus || 'No status')}</span>
+                  </td>
+                  <td class="brd-description-cell">${escapeHtml(row.jiraDescriptionText || 'No Jira description.')}</td>
+                  <td>
+                    <textarea data-brd-index="${index}">${escapeHtml(row.finalText || '')}</textarea>
+                  </td>
+                  <td>
+                    <select data-brd-status-index="${index}">
+                      <option value="unchanged" ${row.statusAction === 'unchanged' ? 'selected' : ''}>Leave unchanged</option>
+                      <option value="done" ${row.statusAction === 'done' ? 'selected' : ''}>Done</option>
+                      <option value="canceled" ${row.statusAction === 'canceled' ? 'selected' : ''}>Canceled</option>
+                    </select>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      grid.querySelectorAll('textarea[data-brd-index]').forEach(textarea => {
+        textarea.addEventListener('input', () => {
+          const index = Number(textarea.dataset.brdIndex);
+          brdReviewRows[index].finalText = textarea.value;
+        });
+      });
+
+      grid.querySelectorAll('select[data-brd-status-index]').forEach(select => {
+        select.addEventListener('change', () => {
+          const index = Number(select.dataset.brdStatusIndex);
+          brdReviewRows[index].statusAction = select.value;
+        });
+      });
+
+      grid.classList.remove('hidden');
+      actions.classList.remove('hidden');
+    }
+
+    async function validateBrdParent() {
+      if (!ensureJiraConnectedForBrd()) return null;
+      const parentKey = document.getElementById('brdParentKey').value.trim();
+      if (!parentKey) {
+        setBrdStatus('Enter a top-level SOPP key first.', true);
+        return null;
+      }
+
+      setBrdStatus('Validating SOPP parent...');
+      const response = await fetch('/api/brd/load', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentKey }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to validate SOPP parent.');
+      }
+
+      brdParentContext = data.parent;
+      document.getElementById('brdParentKey').value = data.parent.key;
+      setBrdStatus(`Validated ${data.parent.key}: ${data.parent.subtasks.length} subtasks available for BRD mapping.`);
+      return data.parent;
+    }
+
+    async function processBrd() {
+      if (!ensureJiraConnectedForBrd()) return;
+      const btn = document.getElementById('processBrdBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Processing...';
+
+      try {
+        const parentKey = document.getElementById('brdParentKey').value.trim();
+        const pastedWa = document.getElementById('brdWaMarkdown').value.trim();
+        const additionalNotes = document.getElementById('brdAdditionalNotes').value.trim();
+        const waMarkdown = pastedWa || outputs.markdown;
+
+        const response = await fetch('/api/brd/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            parentKey,
+            websiteAssessmentMarkdown: waMarkdown,
+            websiteAssessmentJson: currentScrapeResult,
+            additionalNotes,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.error) {
+          throw new Error(data.error || 'Failed to generate BRD outputs.');
+        }
+
+        brdParentContext = data.parent || brdParentContext;
+        renderBrdReviewGrid(data.rows || []);
+        setBrdStatus(`BRD table ready for ${data.rows?.length || 0} subtasks. Review rows, then send to Jira.`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Process BRD';
+        updateBrdCredentialState();
+      }
+    }
+
+    async function sendBrdUpdates() {
+      if (!ensureJiraConnectedForBrd()) return;
+      if (!confirm('Send these SE scoping outputs and Done/Canceled selections to Jira? Only validated child subtasks under this SOPP will be updated.')) {
+        return;
+      }
+
+      const parentKey = document.getElementById('brdParentKey').value.trim();
+      const response = await fetch('/api/brd/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentKey, rows: normalizeBrdRowsForSave() }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Failed to save Jira updates.');
+      }
+
+      setBrdStatus(`Sent ${data.previews.length} BRD updates to Jira. Audit log: ${data.auditPath || 'not written'}`);
     }
 
     // Form submit
@@ -2186,7 +2858,6 @@
       document.getElementById('scrapeErrors').classList.add('hidden');
       document.getElementById('scrapeErrorsList').innerHTML = '';
       summaryCard.classList.add('hidden');
-      extractionCard.classList.add('hidden');
       document.getElementById('jsonConverterCard').classList.add('hidden');
       outputContent.innerHTML = '<div class="output-placeholder"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div><p style="margin-top:1rem;">Scraping in progress...</p></div>';
 
@@ -2205,45 +2876,66 @@
     // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentTab = btn.dataset.tab;
-        updateOutput();
-        refreshOutputActionLabels();
+        setActiveOutputTab(btn.dataset.tab);
       });
     });
 
-    // Copy evidence button
-    document.getElementById('copyEvidenceBtn').addEventListener('click', () => {
-      const text = outputs.prompt;
-      navigator.clipboard.writeText(text);
-      const btn = document.getElementById('copyEvidenceBtn');
-      btn.innerHTML = '✅ Prompt Copied!';
-      showCopyStatus('Prompt copied to clipboard');
-      setTimeout(() => btn.innerHTML = '📋 Copy Prompt for Cursor', 2000);
+    document.getElementById('openMenuBtn').addEventListener('click', openSideMenu);
+    document.getElementById('closeMenuBtn').addEventListener('click', closeSideMenu);
+    document.getElementById('sideMenuOverlay').addEventListener('click', closeSideMenu);
+
+    document.getElementById('connectJiraBtn').addEventListener('click', async () => {
+      await connectJira();
+    });
+
+    document.getElementById('clearJiraBtn').addEventListener('click', async () => {
+      await clearJiraCredentials();
+    });
+
+    document.getElementById('jiraTokenToggle').addEventListener('click', () => {
+      const input = document.getElementById('jiraApiToken');
+      const toggle = document.getElementById('jiraTokenToggle');
+      if (input.type === 'password') {
+        input.type = 'text';
+        toggle.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        toggle.textContent = '👁️';
+      }
+    });
+
+    document.getElementById('processBrdBtn').addEventListener('click', async () => {
+      try {
+        await processBrd();
+      } catch (e) {
+        setBrdStatus(e.message, true);
+      }
+    });
+
+    document.getElementById('sendBrdUpdatesBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('sendBrdUpdatesBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...';
+      try {
+        await sendBrdUpdates();
+      } catch (e) {
+        setBrdStatus(e.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send to Jira';
+        updateBrdCredentialState();
+      }
     });
 
     // Copy output button
     document.getElementById('copyOutputBtn').addEventListener('click', () => {
-      navigator.clipboard.writeText(outputs[currentTab]);
+      navigator.clipboard.writeText(outputs.prompt);
       const btn = document.getElementById('copyOutputBtn');
       btn.innerHTML = '✅ Copied!';
-      showCopyStatus(`${currentTab === 'prompt' ? 'Prompt' : currentTab.toUpperCase()} copied to clipboard`);
+      showCopyStatus('Website Assessment prompt copied to clipboard');
       setTimeout(() => {
-        btn.innerHTML = tabMeta[currentTab].copyLabel;
+        btn.innerHTML = tabMeta.prompt.copyLabel;
       }, 2000);
-    });
-
-    // Download button
-    document.getElementById('downloadBtn').addEventListener('click', () => {
-      const ext = currentTab === 'json' ? 'json' : currentTab === 'prompt' ? 'txt' : 'md';
-      const blob = new Blob([outputs[currentTab]], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `website-assessment.${ext}`;
-      a.click();
-      URL.revokeObjectURL(url);
     });
 
     // Convert JSON to Markdown button
@@ -2356,8 +3048,10 @@
     refreshOutputActionLabels();
 
     // Initialize
+    movePromptPanelAboveBrd();
     connect();
     initApiKeyInput();
+    refreshJiraStatus();
     // checkApiStatus(); // No longer needed - we use client-side key
   </script>
 </body>

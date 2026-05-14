@@ -16,9 +16,11 @@ const sourcePaths = [
   '.vscode/tasks.json',
   '.cursor/rules/sweep-commands.mdc',
   '.cursor/rules/wa.mdc',
+  'src/brd',
   'src/dna',
   'src/extractor',
   'src/formatter',
+  'src/jira',
   'src/logger',
   'src/prefilter',
   'src/schema',
@@ -29,6 +31,8 @@ const sourcePaths = [
 
 const docFiles = [
   'docs/DOMAIN_KNOWLEDGE.md',
+  'docs/GITLAB_SHARE.md',
+  'docs/PILOT_READINESS.md',
   'docs/TEAM_SETUP.md',
   'docs/TEMPLATE.md',
 ];
@@ -109,8 +113,10 @@ async function writeBundledTsconfig(outputDir: string): Promise<void> {
 
   tsconfig.include = [
     'src/dna/**/*',
+    'src/brd/**/*',
     'src/extractor/**/*',
     'src/formatter/**/*',
+    'src/jira/**/*',
     'src/logger/**/*',
     'src/prefilter/**/*',
     'src/schema/**/*',
@@ -154,6 +160,7 @@ npm run web
 
 - Playwright browsers install automatically during \`npm install\`.
 - You do not need a committed \`.env\` for the default local run.
+- Jira credentials are entered in the web UI and stay in memory only for the running Sweep session.
 - This bundle intentionally excludes maintainer-only planning and admin utilities.
 - Final WA output is still human-reviewed.
 `;

@@ -8,21 +8,23 @@
 
 ## 0) Output Requirements
 
-**Always output the completed WA in chat** so the user can review and copy it directly. Additionally, save the assessment to `logs/assessments/` with the naming convention `YYYY-MM-DD_domain_WA.md`.
+**Always output the completed WA directly in chat** so the user can review and copy it directly. Do not only save the file or summarize that it was saved. Additionally, save the assessment to `logs/assessments/` with the naming convention `YYYY-MM-DD_domain_WA.md`.
 
 The chat output should be the complete, formatted assessment ready to copy-paste into Jira, Confluence, or Slack.
+
+**Line-item format:** Put the line item subject first and bold it, then put the status marker and label, then the finding/evidence. Preferred format: `• **Subject** - ✅ Verified - Evidence or finding here.` Use this subject-first format for every WA unless the user explicitly requests a different format. Do not use em dashes in WA output; use plain hyphen separators.
 
 **Writing perspective:** Write the WA from the perspective of a Global-e Presales Solutions Engineer documenting the merchant's current state and the future project scope the merchant may want in scope. Focus on what the merchant is doing today for cross-border, checkout, logistics, payments, localization, and related workflows. Do **not** explain where Global-e would fit, do **not** include "GE to provide" language, and do **not** turn the WA into a solution proposal. The purpose is to capture the merchant's current operating model, any future-state needs that should inform project scoping, and any integration callouts that should be identified before signature.
 
 ---
 
-## 1) Playbook — how to run a Website Assessment
+## 1) Playbook - how to run a Website Assessment
 
 ### Ground rules
 
-1. **Label every line item** as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**.
+1. **Label every line item** as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**. Put the bolded subject first, followed by the status and evidence/detail, e.g. `• **Platform** - ✅ Verified - Shopify checkout observed at /checkouts/cn/.`
 
-2. **Navigate, don't guess.** Always use the site's own navigation (header menus, footer links, buttons) to discover pages. **Never hardcode or guess URLs** — follow the actual links on the page. If a link doesn't exist in the navigation, mark it as ❌ Absent.
+2. **Navigate, don't guess.** Always use the site's own navigation (header menus, footer links, buttons) to discover pages. **Never hardcode or guess URLs** - follow the actual links on the page. If a link doesn't exist in the navigation, mark it as ❌ Absent.
 
 3. **Show receipts.** Add **explicit evidence links** that resolve to specific pages or screens. Avoid homepages unless truly needed. Use **plain URLs** (not markdown link syntax) so the document can be easily copy-pasted with styling intact into Jira, Confluence, or Slack.
 
@@ -80,45 +82,51 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 * Do prefer vendor or UI proof over guesses. Use **[Inference]** only when UI signals are strong (e.g., "Shop Pay" button implies Shopify Payments enabled, but mark [Inference]).
 
-* **Format for copy-paste:** Use plain URLs and emoji status indicators (✅❌❔⚠️) so the document renders correctly when pasted into Jira, Confluence, or Slack.
+* **Format for copy-paste:** Use plain URLs and emoji status indicators (✅❌❔⚠️). Each bullet should start with the bold subject, then the status, then the evidence/detail.
+
+* Do not use em dashes in WA output. Use plain hyphen separators, e.g. `• **Subject** - ✅ Verified - Evidence/detail.`
+
+* Do flag high-priority red-flag apps such as Smile.io or Recharge when they are detected.
+
+* Do not add default “Smile.io absent” or “Recharge absent” bullets. Only mention Smile.io or Recharge if present or directly relevant to a finding.
 
 ---
 
 ## 2) Fill‑in Template (copy this section into a merchant thread)
 
-> Use this single template for quick first‑pass reviews. Mark every line item as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**. Add **explicit evidence links as plain URLs** (not markdown links) so the doc can be copy-pasted with styling into Jira/Confluence. If something is **❔ Unconfirmed**, add brief context (e.g., *"Affiliate icon seen in footer; vendor unclear"*). If not seen, state that explicitly. Tag deductions as **[Inference]**.
+> Use this single template for quick first‑pass reviews. Mark every line item as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**. In the completed WA, every bullet should follow `• **Subject** - ✅ Verified - Evidence/detail.` Add **explicit evidence links as plain URLs** (not markdown links) so the doc can be copy-pasted with styling into Jira/Confluence. If something is **❔ Unconfirmed**, add brief context (e.g., *"Affiliate icon seen in footer; vendor unclear"*). If not seen, state that explicitly. Tag deductions as **[Inference]**.
 
 ### Merchant Overview
 
-* **Brand:**
+* **Brand** - Status: ___
 
-* **Primary URL:**
+* **Primary URL** - Status: ___
 
-* **Other Locales / Sites:**
+* **Other Locales / Sites** - Status: ___
 
-* **Notes / Scope of this pass:** (device, region, depth, no purchase)
+* **Notes / Scope of this pass** - Status: ___ (device, region, depth, no purchase)
 
 ### Evidence Log (Working Links)
 
-* **Home:**
+* **Home** - Status: ___
 
-* **PDP (example):**
+* **PDP example** - Status: ___
 
-* **Cart:**
+* **Cart** - Status: ___
 
-* **Checkout (as far as allowed):**
+* **Checkout as far as allowed** - Status: ___
 
-* **Shipping policy:**
+* **Shipping policy** - Status: ___
 
-* **Returns policy:**
+* **Returns policy** - Status: ___
 
-* **Payments or FAQ page:**
+* **Payments or FAQ page** - Status: ___
 
-* **Loyalty / Rewards page:**
+* **Loyalty / Rewards page** - Status: ___
 
-* **Subscriptions page:**
+* **Subscriptions page** - Status: ___
 
-* **Other key proof links:**
+* **Other key proof links** - Status: ___
 
 > **Method:** Step through to checkout for evidence (no purchases). Capture region, currency, language behavior, taxes, duties, shipping options, and express wallets.
 
@@ -126,27 +134,27 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Platform & Site Structure
 
-* **Platform & Version** — Status: ___
+* **Platform & Version** - Status: ___
 
   * **Evidence:**
 
-* **Headless / Frontend architecture** — Status: ___
+* **Headless / Frontend architecture** - Status: ___
 
   * **Evidence:**
 
-* **Domain and subdomain strategy** (store, help, blog, custom) — Status: ___
+* **Domain and subdomain strategy** (store, help, blog, custom) - Status: ___
 
   * **Evidence:**
 
-* **Geo / Country selector** — Status: ___
+* **Geo / Country selector** - Status: ___
 
   * **Evidence:**
 
-* **Languages / translation approach** — Status: ___
+* **Languages / translation approach** - Status: ___
 
   * **Evidence:**
 
-* **Mobile experience** (nav, PDP, PLP notes) — Status: ___
+* **Mobile experience** (nav, PDP, PLP notes) - Status: ___
 
   * **Evidence:**
 
@@ -154,31 +162,31 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Catalog & Products
 
-* **Product types and variants (Note any dangerous goods or things that would be difficult to ship at scale)** — Status: ___
+* **Product types and variants (Note any dangerous goods or things that would be difficult to ship at scale)** - Status: ___
 
   * **Evidence:**
 
-* **Bundles / kits** — Status: ___
+* **Bundles / kits** - Status: ___
 
   * **Evidence:**
 
-* **Customizable products / product configurator** (e.g., build-your-own, engravings, monograms) — Status: ___
+* **Customizable products / product configurator** (e.g., build-your-own, engravings, monograms) - Status: ___
 
   * **Evidence:**
 
-* **Virtual / Digital products** (e.g., e-gift cards, downloads, memberships; delivery method) — Status: ___
+* **Virtual / Digital products** (e.g., e-gift cards, downloads, memberships; delivery method) - Status: ___
 
   * **Evidence:**
 
-* **GWP / Free product promotions / Try & Buy** (trigger rules, where shown—PDP, cart, banner; auto-add vs code) — Status: ___
+* **GWP / Free product promotions / Try & Buy** (trigger rules, where shown - PDP, cart, banner; auto-add vs code) - Status: ___
 
   * **Evidence:**
 
-* **Pre‑orders** (note when shopper is charged; % of catalog if material) — Status: ___
+* **Pre‑orders** (note when shopper is charged; % of catalog if material) - Status: ___
 
   * **Evidence:**
 
-* **Subscriptions on PDP or cart** (note any recurring payment options) — Status: ___
+* **Subscriptions on PDP or cart** (note any recurring payment options) - Status: ___
 
   * **Evidence:**
 
@@ -189,35 +197,35 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Checkout & Payments
 
-* **Checkout flow type** (embedded, hosted, one‑page, multi‑step) — Status: ___
+* **Checkout flow type** (embedded, hosted, one‑page, multi‑step) - Status: ___
 
   * **Evidence:**
 
-* **Express wallets** (Shop Pay, PayPal, Apple Pay, Google Pay) — Status: ___
+* **Express wallets** (Shop Pay, PayPal, Apple Pay, Google Pay) - Status: ___
 
   * **Evidence:**
 
-* **Payment methods** (cards, BNPL, local methods) — Status: ___
+* **Payment methods** (cards, BNPL, local methods) - Status: ___
 
   * **Evidence:**
 
-* **Gift cards** (native or vendor, digital and/or physical) — Status: ___
+* **Gift cards** (native or vendor, digital and/or physical) - Status: ___
 
   * **Evidence:**
 
-* **Fraud / risk hints** (visible only - only mention if it is come acreoss. no need to search extensively) — Status: ___
+* **Fraud / risk hints** (visible only - only mention if it is come acreoss. no need to search extensively) - Status: ___
 
   * **Evidence:**
 
-* **Taxes display** (incl or excl, at cart or checkout) — Status: ___
+* **Taxes display** (incl or excl, at cart or checkout) - Status: ___
 
   * **Evidence:**
 
-* **Duties display** (estimated or prepaid option) — Status: ___
+* **Duties display** (estimated or prepaid option) - Status: ___
 
   * **Evidence:**
 
-* **Compliance and restricted items messaging** — Status: ___
+* **Compliance and restricted items messaging** - Status: ___
 
   * **Evidence:**
 
@@ -225,27 +233,27 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Shipping & Logistics
 
-* **Shipping tiers and SLAs** (domestic, international) — Status: ___
+* **Shipping tiers and SLAs** (domestic, international) - Status: ___
 
   * **Evidence:**
 
-* **Carriers** (visible labels or policy mention) — Status: ___
+* **Carriers** (visible labels or policy mention) - Status: ___
 
   * **Evidence:**
 
-* **Cross‑border approach** (same site with calc vs separate intl site) — Status: ___
+* **Cross‑border approach** (same site with calc vs separate intl site) - Status: ___
 
   * **Evidence:**
 
-* **Returns and exchanges** (policy summary, portal, vendor if visible) — Status: ___
+* **Returns and exchanges** (policy summary, portal, vendor if visible) - Status: ___
 
   * **Evidence:**
 
-* **Final Sale / non‑returnable items** (where labeled, policy coverage, PDP badges) — Status: ___
+* **Final Sale / non‑returnable items** (where labeled, policy coverage, PDP badges) - Status: ___
 
   * **Evidence:**
 
-* **Tracking and WISMO** (provider or pattern) — Status: ___
+* **Tracking and WISMO** (provider or pattern) - Status: ___
 
   * **Evidence:**
 
@@ -255,13 +263,15 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Loyalty, Subscriptions, and CRM
 
-* **Loyalty / rewards program** (vendor, earn/burn, high level rules) — Status: ___
+* **Loyalty / rewards program** (vendor, earn/burn, high level rules) - Status: ___
 
   * **Evidence:**
 
-* **Subscriptions provider** — Status: ___
+* **Subscriptions provider** - Status: ___
 
   * **Evidence:**
+
+> Only name specific providers such as Smile.io or Recharge if detected or directly relevant. Do not include provider-specific absent bullets by default.
 
 
 ---
@@ -311,7 +321,7 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 ## Legal and Compliance (surface‑level)
 
 
-* **Restricted products or disclaimers** — Status: ___
+* **Restricted products or disclaimers** - Status: ___
 
   * **Evidence:**
 
@@ -321,15 +331,15 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Business Restrictions (split)
 
-* **B2B / wholesale flows** — Status: ___
+* **B2B / wholesale flows** - Status: ___
 
   * **Evidence:**
 
-* **Marketplace presence** (Amazon, eBay, etc.) — Status: ___
+* **Marketplace presence** (Amazon, eBay, etc.) - Status: ___
 
   * **Evidence:**
 
-* **Dropshippers / 3P fulfillment** — Status: ___
+* **Dropshippers / 3P fulfillment** - Status: ___
 
   * **Evidence:**
 
@@ -339,9 +349,11 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ## Apps, Integrations, and Data Layer (visible only)
 
-* **Notable apps or widgets** — Status: ___
+* **Notable apps or widgets** - Status: ___
 
   * **Evidence:**
+
+> Call out visible apps and red-flag providers when present. Do not list Smile.io or Recharge as absent unless the user specifically asks for a support-matrix check.
 
 
 **Takeaway:**
@@ -366,7 +378,7 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ---
 
-## Appendix — Screens and Notes
+## Appendix - Screens and Notes
 
 * Add annotated screenshots or short notes that support tricky findings.
 
@@ -374,11 +386,11 @@ The chat output should be the complete, formatted assessment ready to copy-paste
 
 ### Legend
 
-* **✅ Verified** — Direct UI evidence or authoritative policy page.
+* **✅ Verified** - Direct UI evidence or authoritative policy page.
 
-* **❔ Unconfirmed** — Signal seen but vendor or behavior not fully proven.
+* **❔ Unconfirmed** - Signal seen but vendor or behavior not fully proven.
 
-* **❌ Absent** — Looked in reasonable places and did not find it.
+* **❌ Absent** - Looked in reasonable places and did not find it.
 
-* **[Inference]** — Clearly labeled deduction with best available evidence.
+* **[Inference]** - Clearly labeled deduction with best available evidence.
 

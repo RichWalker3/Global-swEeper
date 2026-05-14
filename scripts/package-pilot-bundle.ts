@@ -41,7 +41,13 @@ async function main(): Promise<void> {
   await execFileAsync(
     'tar',
     ['-czf', archivePath, '-C', releaseRoot, path.basename(bundleDir)],
-    { cwd: repoRoot }
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        COPYFILE_DISABLE: '1',
+      },
+    }
   );
 
   console.log(`Pilot release folder created at ${releaseRoot}`);

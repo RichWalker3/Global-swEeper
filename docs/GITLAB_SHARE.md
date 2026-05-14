@@ -2,6 +2,12 @@
 
 This is the maintainer workflow for handing Global-sweep to teammates through GitLab.
 
+Current GitLab remote:
+
+```bash
+git@gitlab.com:global-e/solutions/global-sweep.git
+```
+
 ## Two Supported Share Modes
 
 ### Option 1: GitLab Repo Clone
@@ -16,10 +22,17 @@ Use this when:
 
 Teammate flow:
 
-1. Clone the GitLab repo or pilot branch.
+1. Clone the GitLab repo or pilot branch:
+
+   ```bash
+   git clone git@gitlab.com:global-e/solutions/global-sweep.git
+   cd global-sweep
+   ```
+
 2. Run `npm install`.
 3. Run `npm run web`.
 4. Open `http://localhost:3847`.
+5. For BRD updates, connect Jira from the hamburger menu. Jira credentials are kept in local server memory only and are cleared when Sweep restarts or when credentials are cleared.
 
 ### Option 2: GitLab Release Download
 
@@ -37,6 +50,7 @@ Maintainer flow:
 2. Upload the generated `.tar.gz` from `tmp/pilot-release/` to a GitLab release.
 3. Tell teammates to download and extract that archive.
 4. From the extracted folder, they run `npm install` and `npm run web`.
+5. They open `http://localhost:3847` and connect Jira from the hamburger menu only when they need BRD Jira updates.
 
 ## Commands
 
@@ -56,6 +70,28 @@ That creates:
 
 - a clean folder in `tmp/pilot-release/global-sweep-pilot-v<version>/`
 - a release archive in `tmp/pilot-release/global-sweep-pilot-v<version>.tar.gz`
+
+## Suggested GitLab Release
+
+Title:
+
+```text
+Global-sweep Pilot v0.1.0
+```
+
+Description:
+
+```text
+Internal pilot release for running Sweep locally.
+
+Setup:
+1. Download and extract the archive.
+2. Run npm install.
+3. Run npm run web.
+4. Open http://localhost:3847.
+
+Jira credentials are entered in the web UI only when using BRD Workspace Jira updates. They are stored in memory for the running Sweep session and are not written to disk.
+```
 
 ## Recommendation
 

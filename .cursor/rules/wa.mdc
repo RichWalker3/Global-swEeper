@@ -14,17 +14,21 @@ When the user requests a WA (Website Assessment) using `/wa [URL]`, follow these
 2. **Read domain knowledge** at `docs/DOMAIN_KNOWLEDGE.md` for Global-e specific rules and app support matrix
 3. **Navigate to the provided URL** and systematically assess the site following the playbook workflow
 4. **Complete all sections** of the template with proper status labels (✅ Verified, ❔ Unconfirmed, ❌ Absent)
-5. **Output the completed WA in chat** (see Output Format below)
+5. **Always output the completed WA directly in chat** (see Output Format below). Do not only save it to a file or summarize that it was saved.
 6. **Save to file** at `logs/assessments/YYYY-MM-DD_domain_WA.md`
 
 ## Output Format (CRITICAL)
 
-**ALWAYS return the completed assessment directly in chat as PLAIN TEXT — not inside markdown code blocks, not as a file preview, not as markdown-formatted text.**
+**ALWAYS return the completed assessment directly in chat as PLAIN TEXT - not inside markdown code blocks and not only as a file preview.**
 
 Rules for output:
 - Do NOT wrap the assessment in triple backticks (```)
-- Do NOT use markdown link syntax like `[text](url)` — use plain URLs only
+- Do NOT use markdown link syntax like `[text](url)` - use plain URLs only
+- Do NOT use em dashes in WA output. Use a plain hyphen separator instead.
 - DO use emoji status indicators: ✅ ❔ ❌ ⚠️
+- DO put the line item subject first, bolded, then the status marker and label, then the evidence/detail.
+- Preferred bullet format: `• **Subject** - ✅ Verified - Evidence or finding here.`
+- DO keep this subject-first format for every WA unless the user explicitly asks for a different format.
 - DO use plain bullet points and line breaks
 - The user must be able to select all the text and copy it directly into Jira/Confluence with formatting intact
 
@@ -34,15 +38,15 @@ Example of CORRECT output format:
 
 Merchant Overview
 
-• Brand: Example Brand
-• Primary URL: https://example.com
-• Other Locales / Sites: https://example.co.uk, https://example.eu
+• **Brand** - ✅ Verified - Example Brand
+• **Primary URL** - ✅ Verified - https://example.com
+• **Other Locales / Sites** - ❔ Unconfirmed - https://example.co.uk, https://example.eu
 
 Evidence Log (Working Links)
 
-• Home: https://example.com
-• PDP (example): https://example.com/products/widget
-• Cart: https://example.com/cart
+• **Home** - ✅ Verified - https://example.com
+• **PDP example** - ✅ Verified - https://example.com/products/widget
+• **Cart** - ✅ Verified - https://example.com/cart
 ...
 ```
 
@@ -53,12 +57,13 @@ Example of WRONG output (do NOT do this):
 
 ## Key Requirements
 
-- **Navigate, don't guess:** Always use the site's own navigation (header menus, footer links, buttons) to discover pages. Never hardcode or guess URLs — follow the actual links on the page
+- **Navigate, don't guess:** Always use the site's own navigation (header menus, footer links, buttons) to discover pages. Never hardcode or guess URLs - follow the actual links on the page
 - Label every line as **✅ Verified**, **❔ Unconfirmed**, or **❌ Absent**
 - Use **plain URLs** (not markdown links) for easy Jira copy-paste
 - Mark deductions with **[Inference]**
-- Flag Global-e red flags: Smile.io ❌, Recharge ❌, DG products, etc.
-- Don't purchase — step through checkout as far as allowed
+- Flag Global-e red flags when present: Smile.io, Recharge, DG products, etc.
+- Do NOT add default “Smile.io absent” or “Recharge absent” bullets. Only mention Smile.io or Recharge if they are actually detected or directly relevant to a finding.
+- Don't purchase - step through checkout as far as allowed
 - Test 2-3 international markets if possible
 - Capture screenshots for key findings
 

@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -50,6 +50,47 @@ async function copyRelative(relativePath: string, outputDir: string): Promise<vo
   const destination = path.join(outputDir, relativePath);
   await ensureParentDirectory(destination);
   await cp(source, destination, { recursive: true });
+}
+
+async function pruneDevOnlyFiles(outputDir: string): Promise<void> {
+  const sourceRoot = path.join(outputDir, 'src');
+  if (!await exists(sourceRoot)) return;
+  await pruneDirectory(sourceRoot);
+}
+
+async function pruneDirectory(directory: string): Promise<void> {
+  const entries = await readdir(directory, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      if (entry.name === '__fixtures__') {
+        await rm(entryPath, { recursive: true, force: true });
+        continue;
+      }
+
+      await pruneDirectory(entryPath);
+      const remaining = await readdir(entryPath);
+      if (remaining.length === 0) {
+        await rm(entryPath, { recursive: true, force: true });
+      }
+      continue;
+    }
+
+    if (entry.name.endsWith('.test.ts')) {
+      await rm(entryPath, { force: true });
+    }
+  }
+}
+
+async function exists(targetPath: string): Promise<boolean> {
+  try {
+    await stat(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function writeBundledPackageJson(outputDir: string): Promise<void> {
@@ -160,7 +201,7 @@ npm run web
 
 - Playwright browsers install automatically during \`npm install\`.
 - You do not need a committed \`.env\` for the default local run.
-- Jira credentials are entered in the web UI and stay in memory only for the running Sweep session.
+- Jira credentials are entered in the web UI. They stay in memory by default, or can be remembered with the OS credential store.
 - This bundle intentionally excludes maintainer-only planning and admin utilities.
 - Final WA output is still human-reviewed.
 `;
@@ -213,6 +254,7 @@ async function main(): Promise<void> {
     await copyRelative(relativePath, outputDir);
   }
 
+  await pruneDevOnlyFiles(outputDir);
   await writeBundledPackageJson(outputDir);
   await writeBundledGitIgnore(outputDir);
   await writeBundledTsconfig(outputDir);

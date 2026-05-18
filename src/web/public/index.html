@@ -294,11 +294,6 @@
       font-family: 'JetBrains Mono', monospace;
     }
 
-    #creditsUsed {
-      color: var(--orange);
-      font-weight: 600;
-    }
-
     /* Main Layout */
     main {
       max-width: 1400px;
@@ -1422,7 +1417,7 @@
         </div>
         <div class="card-body" id="howItWorksBody" style="padding: 1rem 1.5rem;">
           <ol style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--black); line-height: 1.8;">
-            <li><strong>Connect Jira:</strong> Open the hamburger menu, enter your Jira email/token, and connect for BRD updates. You only need to do this once per running Sweep session; enter it again after restarting Sweep or clearing credentials.</li>
+            <li><strong>Connect Jira:</strong> Open the hamburger menu, enter your Jira email/token, and connect for BRD updates. Use <strong>Remember on this computer</strong> if you want Sweep to reconnect from the OS credential store after restart.</li>
             <li><strong>Run a WA:</strong> Paste the merchant URL, choose quick or full checkout mode, then click <strong>Run Assessment</strong>.</li>
             <li><strong>Copy the WA prompt:</strong> After Sweep crawls the site, copy the <strong>Website Assessment Prompt</strong>.</li>
             <li><strong>Generate in Cursor:</strong> Paste the prompt into Cursor. Cursor returns the formatted WA plus a <strong>BRD Output for Sweep</strong> section.</li>
@@ -1432,34 +1427,6 @@
           <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--gray-200); font-size: 0.75rem; color: var(--gray-400);">
             <strong>What Sweep prepares:</strong> Website evidence, third-party and red-flag signals, a Cursor-ready WA prompt, and a BRD table that updates Jira SE Scoping Output plus Done/Canceled status.
           </div>
-        </div>
-      </div>
-
-      <!-- API Key Card (hidden until direct API extraction is revived) -->
-      <div class="card" id="apiKeyCard" style="display: none;">
-        <div class="card-header">
-          <span>🔑</span>
-          <h2>Anthropic API Key</h2>
-          <span style="margin-left: auto; font-size: 0.75rem; background: var(--gray-200); padding: 0.25rem 0.5rem; border-radius: 4px; color: var(--gray-400);">Coming Soon</span>
-        </div>
-        <div class="card-body" style="padding: 1rem 1.5rem;">
-          <div class="api-key-row">
-            <div class="api-key-input-wrapper" style="flex: 1;">
-              <input 
-                type="password" 
-                id="apiKeyInput" 
-                class="api-key-input"
-                placeholder="sk-ant-api03-..."
-                autocomplete="off"
-                style="width: 100%; background: var(--gray-100); cursor: not-allowed;"
-                disabled
-              >
-              <button type="button" class="api-key-toggle" id="apiKeyToggle" title="Show/hide key" disabled style="cursor: not-allowed; opacity: 0.5;">👁️</button>
-            </div>
-          </div>
-          <p style="font-size: 0.75rem; color: var(--gray-400); margin-top: 0.5rem;">
-            Direct API integration coming soon. For now, use the "Copy Prompt for Cursor" workflow below.
-          </p>
         </div>
       </div>
 
@@ -1806,8 +1773,6 @@
       json: '',
       prompt: '',
     };
-    let totalTokensUsed = 0;
-
     const tabMeta = {
       prompt: {
         copyLabel: '📋 Copy Website Assessment Prompt',
@@ -1833,48 +1798,6 @@
       }, 2000);
     }
 
-    // Credits tracking
-    function updateCreditsDisplay(inputTokens, outputTokens) {
-      totalTokensUsed += (inputTokens || 0) + (outputTokens || 0);
-      document.getElementById('creditsUsed').textContent = totalTokensUsed.toLocaleString();
-    }
-
-    // API Key Management
-    const API_KEY_STORAGE_KEY = 'global-sweep-anthropic-key';
-
-    function getStoredApiKey() {
-      return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
-    }
-
-    function setStoredApiKey(key) {
-      if (key) {
-        localStorage.setItem(API_KEY_STORAGE_KEY, key);
-      } else {
-        localStorage.removeItem(API_KEY_STORAGE_KEY);
-      }
-      updateApiKeyStatus();
-    }
-
-    function updateApiKeyStatus() {
-      const key = getStoredApiKey();
-      const statusEl = document.getElementById('apiKeyStatus');
-      const statusText = document.getElementById('apiKeyStatusText');
-      const autoExtractBtn = document.getElementById('autoExtractBtn');
-      const noApiKeyAlert = document.getElementById('noApiKeyAlert');
-      
-      if (key && key.startsWith('sk-ant-')) {
-        if (statusEl) statusEl.classList.add('configured');
-        if (statusText) statusText.textContent = 'Key saved';
-        if (autoExtractBtn) autoExtractBtn.classList.remove('hidden');
-        if (noApiKeyAlert) noApiKeyAlert.classList.add('hidden');
-      } else {
-        if (statusEl) statusEl.classList.remove('configured');
-        if (statusText) statusText.textContent = key ? 'Invalid format' : 'No key';
-        if (autoExtractBtn) autoExtractBtn.classList.add('hidden');
-        if (noApiKeyAlert) noApiKeyAlert.classList.remove('hidden');
-      }
-    }
-
     // Toggle How It Works section
     function toggleHowItWorks() {
       const body = document.getElementById('howItWorksBody');
@@ -1882,38 +1805,6 @@
       const isHidden = body.style.display === 'none';
       body.style.display = isHidden ? 'block' : 'none';
       toggle.textContent = isHidden ? '▼' : '▶';
-    }
-
-    function initApiKeyInput() {
-      const input = document.getElementById('apiKeyInput');
-      const toggle = document.getElementById('apiKeyToggle');
-      
-      // Load stored key
-      const storedKey = getStoredApiKey();
-      if (storedKey) {
-        input.value = storedKey;
-      }
-      updateApiKeyStatus();
-
-      // Save on change (with debounce)
-      let saveTimeout;
-      input.addEventListener('input', () => {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-          setStoredApiKey(input.value.trim());
-        }, 500);
-      });
-
-      // Toggle visibility
-      toggle.addEventListener('click', () => {
-        if (input.type === 'password') {
-          input.type = 'text';
-          toggle.textContent = '🙈';
-        } else {
-          input.type = 'password';
-          toggle.textContent = '👁️';
-        }
-      });
     }
 
     function openSideMenu() {
@@ -2137,11 +2028,6 @@
       eventSource.addEventListener('scrapeErrors', (e) => {
         const data = JSON.parse(e.data);
         displayScrapeErrors(data.errors);
-      });
-
-      eventSource.addEventListener('complete', (e) => {
-        const data = JSON.parse(e.data);
-        onExtractionComplete(data);
       });
 
       eventSource.addEventListener('sweepError', (e) => {
@@ -2657,25 +2543,6 @@
       startBtn.innerHTML = '<span>🚀</span> Run Again';
     }
 
-    // On extraction complete (if using API key)
-    function onExtractionComplete(data) {
-      outputs.markdown = data.markdown;
-      outputs.json = JSON.stringify(data.assessment, null, 2);
-      updateOutput();
-      
-      // Update credits display
-      if (data.usage) {
-        updateCreditsDisplay(data.usage.input_tokens, data.usage.output_tokens);
-      }
-      
-      // Switch to markdown tab
-      currentTab = 'markdown';
-      document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.tab === 'markdown');
-      });
-      refreshOutputActionLabels();
-    }
-
     // Update output display
     function updateOutput() {
       currentTab = 'prompt';
@@ -3066,67 +2933,12 @@
       }
     });
 
-    // Auto-extract with Claude (disabled for now - API key coming soon)
-    const autoExtractBtn = document.getElementById('autoExtractBtn');
-    if (autoExtractBtn) {
-      autoExtractBtn.addEventListener('click', async () => {
-        const apiKey = getStoredApiKey();
-        if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-          alert('Please enter a valid Anthropic API key first.');
-          return;
-        }
-
-        if (!currentScrapeResult) {
-          alert('No scrape results available. Run an assessment first.');
-          return;
-        }
-
-        const btn = document.getElementById('autoExtractBtn');
-        btn.disabled = true;
-      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Extracting...';
-
-      try {
-        const res = await fetch('/api/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scrapeResult: currentScrapeResult,
-            clientId,
-            apiKey,
-          }),
-        });
-
-        const data = await res.json();
-        
-        if (data.error) {
-          alert('Extraction failed: ' + data.error);
-          btn.disabled = false;
-          btn.innerHTML = '⚡ Auto-Extract';
-          return;
-        }
-
-        btn.innerHTML = '✅ Done!';
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.innerHTML = '⚡ Auto-Extract';
-        }, 2000);
-
-      } catch (e) {
-        alert('Extraction failed: ' + e.message);
-        btn.disabled = false;
-        btn.innerHTML = '⚡ Auto-Extract';
-      }
-      });
-    }
-
     refreshOutputActionLabels();
 
     // Initialize
     movePromptPanelAboveBrd();
     connect();
-    initApiKeyInput();
     refreshJiraStatus();
-    // checkApiStatus(); // No longer needed - we use client-side key
   </script>
 </body>
 </html>

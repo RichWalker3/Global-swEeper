@@ -10,7 +10,6 @@ import { dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { scrape } from '../scraper/scraper.js';
 import { buildPrompt } from '../extractor/prompt.js';
-import { extract } from '../extractor/extractor.js';
 import { generateDna } from '../dna/generator.js';
 import { generateBrdDraft } from '../brd/generator.js';
 import { composeBrdReview } from '../brd/composer.js';
@@ -212,58 +211,6 @@ const server = createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(error) }));
     }
-    return;
-  }
-
-  // API: Extract with API key (from request or env)
-  if (url.pathname === '/api/extract' && req.method === 'POST') {
-    try {
-      const body = JSON.parse(await parseBody(req));
-      const { scrapeResult, clientId, apiKey } = body;
-
-      // Use API key from request, fall back to env var
-      const effectiveApiKey = apiKey || process.env.ANTHROPIC_API_KEY;
-
-      if (!effectiveApiKey) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'No API key provided. Enter your Anthropic API key in the header.' }));
-        return;
-      }
-
-      if (!effectiveApiKey.startsWith('sk-ant-')) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid API key format. Anthropic keys start with sk-ant-' }));
-        return;
-      }
-
-      sendToClient(clientId, 'status', { step: 'extracting', message: 'Sending to Claude...' });
-
-      const result = await extract(scrapeResult, { verbose: true, apiKey: effectiveApiKey });
-      const markdown = formatMarkdown(result.assessment);
-
-      sendToClient(clientId, 'complete', { 
-        assessment: result.assessment,
-        markdown,
-        usage: result.usage,
-      });
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ success: true }));
-
-    } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(error) }));
-    }
-    return;
-  }
-
-  // API: Check if API key is configured
-  if (url.pathname === '/api/status') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      hasApiKey: !!process.env.ANTHROPIC_API_KEY,
-      version: '0.1.0',
-    }));
     return;
   }
 

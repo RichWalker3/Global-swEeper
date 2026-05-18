@@ -15,6 +15,8 @@ import { generateDna } from '../dna/generator.js';
 import { generateBrdDraft } from '../brd/generator.js';
 import { composeBrdReview } from '../brd/composer.js';
 import { requireSoppKey } from '../brd/guard.js';
+import { BRD_REQUIREMENTS } from '../brd/requirements.js';
+import type { BrdParentContext } from '../brd/types.js';
 import {
   applyBrdTableUpdates,
   applySeOutputUpdates,
@@ -24,8 +26,10 @@ import {
 } from '../brd/jira.js';
 import {
   clearJiraSession,
+  clearStoredJiraCredentials,
   getActiveJiraConfig,
   getJiraConnectionStatus,
+  rememberJiraSession,
   setJiraSession,
 } from '../jira/session.js';
 import { formatMarkdown } from '../formatter/markdown.js';
@@ -278,6 +282,9 @@ const server = createServer(async (req, res) => {
         baseUrl: body.baseUrl,
       });
       await validateJiraConfig(config);
+      if (body.remember === true) {
+        rememberJiraSession(config);
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(getJiraConnectionStatus()));
     } catch (error) {
@@ -290,7 +297,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (url.pathname === '/api/jira/session' && req.method === 'DELETE') {
-    clearJiraSession();
+    clearStoredJiraCredentials();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(getJiraConnectionStatus()));
     return;
@@ -415,7 +422,9 @@ const server = createServer(async (req, res) => {
     try {
       const body = JSON.parse(await parseBody(req));
       const parentKey = requireSoppKey(body.parentKey);
-      const parent = await loadBrdParent(parentKey, getActiveJiraConfig());
+      const parent = isManualBrdRequest(body)
+        ? await loadBrdParentIfAvailable(parentKey)
+        : await loadBrdParent(parentKey, getActiveJiraConfig());
       const result = composeBrdReview({
         parent,
         websiteAssessmentMarkdown: body.websiteAssessmentMarkdown,
@@ -424,7 +433,7 @@ const server = createServer(async (req, res) => {
       });
       const auditPath = writeBrdAuditLog(result, 'process');
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ...result, auditPath }));
+      res.end(JSON.stringify({ ...result, manualOnly: isManualOnlyParent(parent), auditPath }));
     } catch (error) {
       const statusCode = getBrdErrorStatus(error);
       res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -573,6 +582,44 @@ function getJiraErrorStatus(error: unknown): number {
   if (error.message.startsWith('Jira credential validation failed')) return 401;
   if (error.message.startsWith('Jira SE output field was not found')) return 400;
   return 500;
+}
+
+async function loadBrdParentIfAvailable(parentKey: string): Promise<BrdParentContext> {
+  try {
+    return await loadBrdParent(parentKey, getActiveJiraConfig());
+  } catch (error) {
+    if (getBrdErrorStatus(error) !== 401) throw error;
+    return createManualBrdParent(parentKey);
+  }
+}
+
+function createManualBrdParent(parentKey: string): BrdParentContext {
+  return {
+    key: parentKey,
+    summary: `${parentKey} manual BRD workspace`,
+    status: 'Manual',
+    subtasks: BRD_REQUIREMENTS.map((requirement) => ({
+      key: `MANUAL-${requirement.id}`,
+      summary: `${requirement.id}: ${requirement.requirement}`,
+      status: 'Manual',
+      descriptionText: '',
+      seOutputText: '',
+    })),
+  };
+}
+
+function isManualOnlyParent(parent: BrdParentContext): boolean {
+  return parent.subtasks.every((subtask) => subtask.key.startsWith('MANUAL-'));
+}
+
+function isManualBrdRequest(body: { websiteAssessmentMarkdown?: unknown; additionalNotes?: unknown; websiteAssessmentJson?: unknown }): boolean {
+  return !hasBodyText(body.websiteAssessmentMarkdown)
+    && !hasBodyText(body.additionalNotes)
+    && !body.websiteAssessmentJson;
+}
+
+function hasBodyText(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function writeBrdAuditLog(result: ReturnType<typeof generateBrdDraft> | BrdReviewResult | unknown, action: string): string {

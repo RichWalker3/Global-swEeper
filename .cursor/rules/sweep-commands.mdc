@@ -17,10 +17,17 @@ When the user says any of the following in chat, perform the corresponding actio
 ## /update sweep (or "update sweep")
 
 - Run in the project root, in order:
-  1. `git pull` (to get latest code; if they don't use git, tell them to re-download the repo from GitHub and then run the next step).
-  2. `npm install`
-  3. Optionally: `npm run playwright:install` (only if release notes or errors mention Playwright/browser changes).
-- Then say: "Sweep is updated. Use **launch sweep** when you're ready to run the app."
+  1. Stop any currently running Sweep server on port 3847.
+  2. If the repo has `npm run update:github`, run `npm run update:github`.
+  3. If that script is unavailable, run:
+     - `git fetch origin pilot/team-handoff`
+     - `git checkout pilot/team-handoff`
+     - `git reset --hard origin/pilot/team-handoff`
+     - `npm install`
+     - `npm run playwright:install`
+  4. Start Sweep with `npm run web`.
+- Then say: "Sweep is updated and running at **http://localhost:3847**. Open it in Cursor’s Simple Browser."
+- If the folder is not a Git clone, tell them to use `UPDATE_SWEEP_PROMPT.txt` or clone the GitHub repo branch `pilot/team-handoff` into a fresh `global-sweep` folder.
 
 ## /wa &lt;url&gt;
 

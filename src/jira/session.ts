@@ -1,4 +1,9 @@
 import { SE_SCOPING_OUTPUT_FIELD_ID, type JiraConfig } from '../brd/jira.js';
+import {
+  clearJiraCredentialStoreConfig,
+  readJiraCredentialStoreConfig,
+  saveJiraCredentialStoreConfig,
+} from './credentialStore.js';
 
 const DEFAULT_JIRA_BASE_URL = 'https://global-e.atlassian.net';
 const SE_OUTPUT_FIELD_NAME = 'SE Scoping Output';
@@ -11,7 +16,7 @@ export interface JiraSessionInput {
 
 export interface JiraConnectionStatus {
   connected: boolean;
-  source: 'session' | 'env' | 'none';
+  source: 'session' | 'secure-store' | 'env' | 'none';
   baseUrl?: string;
   emailHint?: string;
   hasSeOutputFieldId: boolean;
@@ -39,17 +44,31 @@ export function clearJiraSession(): void {
   sessionConfig = undefined;
 }
 
+export function rememberJiraSession(config: JiraConfig): void {
+  saveJiraCredentialStoreConfig(config);
+}
+
+export function clearStoredJiraCredentials(): void {
+  clearJiraSession();
+  clearJiraCredentialStoreConfig();
+}
+
 export function getActiveJiraConfig(env: NodeJS.ProcessEnv = process.env): JiraConfig {
-  return sessionConfig || getEnvJiraConfig(env);
+  return sessionConfig || readJiraCredentialStoreConfig() || getEnvJiraConfig(env);
 }
 
 export function hasActiveJiraConfig(env: NodeJS.ProcessEnv = process.env): boolean {
-  return Boolean(sessionConfig || readEnvJiraConfig(env));
+  return Boolean(sessionConfig || readJiraCredentialStoreConfig() || readEnvJiraConfig(env));
 }
 
 export function getJiraConnectionStatus(env: NodeJS.ProcessEnv = process.env): JiraConnectionStatus {
   if (sessionConfig) {
     return statusFromConfig(sessionConfig, 'session');
+  }
+
+  const storedConfig = readJiraCredentialStoreConfig();
+  if (storedConfig) {
+    return statusFromConfig(storedConfig, 'secure-store');
   }
 
   const envConfig = readEnvJiraConfig(env);

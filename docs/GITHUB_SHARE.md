@@ -32,7 +32,13 @@ Teammate flow:
 2. Run `npm install`.
 3. Run `npm run web`.
 4. Open `http://localhost:3847`.
-5. For BRD updates, connect Jira from the hamburger menu. Jira credentials are kept in local server memory only and are cleared when Sweep restarts or when credentials are cleared.
+5. For BRD updates, connect Jira from the hamburger menu. Jira credentials stay in local server memory by default; selecting **Remember on this computer** stores them in the OS credential store, using macOS Keychain on Mac or Windows Credential Locker on PC. Clearing credentials removes both.
+
+Update flow for teammates:
+
+- Open the `global-sweep` folder in Cursor.
+- Say **update sweep** in Cursor chat, or paste `UPDATE_SWEEP_PROMPT.txt`.
+- Cursor should stop the current server, replace the local copy with `origin/pilot/team-handoff`, run `npm install`, run `npm run playwright:install`, and relaunch Sweep.
 
 ### Option 2: GitHub Release Download
 
@@ -90,7 +96,7 @@ Setup:
 3. Run npm run web.
 4. Open http://localhost:3847.
 
-Jira credentials are entered in the web UI only when using BRD Workspace Jira updates. They are stored in memory for the running Sweep session and are not written to disk.
+Jira credentials are entered in the web UI only when using BRD Workspace Jira updates. They stay in memory by default and are only persisted if you select **Remember on this computer**, which saves them to the OS credential store.
 ```
 
 ## Recommendation

@@ -1,0 +1,34 @@
+Update my local Global-sweep from GitHub and relaunch it. I am a non-developer, so run the commands for me and only stop if something fails.
+
+Repo: https://github.com/RichWalker3/Global-swEeper.git
+Branch: pilot/team-handoff
+App URL: http://localhost:3847
+
+Do these steps in order:
+
+1. Make sure I have opened the `global-sweep` project folder in Cursor.
+
+2. Stop any currently running Sweep server on port 3847.
+   - Mac/Linux: find processes on port 3847 and terminate them.
+   - Windows: use PowerShell to stop the process that owns local port 3847.
+
+3. If this folder is a Git clone:
+   - Run `git fetch origin pilot/team-handoff`.
+   - Run `git checkout pilot/team-handoff`.
+   - Run `git reset --hard origin/pilot/team-handoff` because I want my local Sweep replaced with the latest GitHub Sweep.
+
+4. If this folder is not a Git clone:
+   - Tell me this copy cannot self-update.
+   - Clone `https://github.com/RichWalker3/Global-swEeper.git` branch `pilot/team-handoff` into a fresh `global-sweep` folder.
+   - Then continue from that new folder.
+
+5. Install everything:
+   - Run `npm install`.
+   - Run `npm run playwright:install`.
+
+6. Start Sweep:
+   - Run `npm run web`.
+
+7. Open `http://localhost:3847` in Cursor's Simple Browser if possible. If you cannot open it for me, tell me to use Command Palette -> Simple Browser: Show -> `http://localhost:3847`.
+
+When finished, tell me: "Sweep is updated and running at http://localhost:3847."

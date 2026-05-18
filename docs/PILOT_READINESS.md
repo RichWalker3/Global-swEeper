@@ -20,7 +20,7 @@ without relying on tribal knowledge or local one-off setup.
 
 - Local web UI exists and can run with `npm run web`
 - Default local run does not require a committed `.env`
-- Jira BRD updates use session-only credentials entered in the web UI
+- Jira BRD updates use credentials entered in the web UI, with memory-only default storage and optional OS credential-store persistence for local pilots
 - Build and test commands are available
 - Team setup docs and Cursor setup prompts exist
 - WA evidence gathering is materially stronger than the early MVP
@@ -31,6 +31,19 @@ without relying on tribal knowledge or local one-off setup.
 - Checkout automation is improved but not universal
 - Final WA drafting still depends on Cursor plus a human reviewer
 - Hosted deployment and security posture are not formalized
+
+## Hosted Credential Direction
+
+For the local pilot, Jira API tokens can be remembered on a user's computer through the OS credential store: macOS Keychain on Mac or Windows Credential Locker on PC. This is acceptable for a local tool, but it should not be carried directly into a hosted deployment.
+
+For hosted Sweep, plan for:
+
+- Okta SSO for app authentication and user identity.
+- Server-side authorization checks before BRD/Jira actions.
+- Encrypted server-side secret storage for any retained Jira tokens or service credentials.
+- Secret access auditing, credential deletion, and rotation support.
+- No Jira API tokens in browser `localStorage`, plain files, logs, or client-side state.
+- A possible future move from user-pasted Atlassian API tokens to OAuth or an approved Atlassian app flow, if available for the deployment model.
 
 ## Latest Validation Snapshot
 

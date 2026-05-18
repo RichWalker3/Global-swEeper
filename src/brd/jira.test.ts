@@ -39,11 +39,24 @@ describe('BRD Jira guards', () => {
     expect(previews[0].afterText).toContain('Old loyalty script found, but no loyalty UI found.');
   });
 
-  it('updates hard-coded SE scoping output field and transitions selected status', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({}),
-    } as Response);
+  it('updates SE scoping output field and transitions selected status', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          transitions: [
+            { id: '31', name: 'Done', to: { name: 'Done' } },
+          ],
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      } as Response);
 
     await applyBrdTableUpdates(parent, [
       {
@@ -61,14 +74,32 @@ describe('BRD Jira guards', () => {
       'https://global-e.atlassian.net/rest/api/3/issue/SOPP-7448',
       expect.objectContaining({
         method: 'PUT',
-        body: JSON.stringify({ fields: { [SE_SCOPING_OUTPUT_FIELD_ID]: 'Reviewed SE output.' } }),
+        body: JSON.stringify({
+          fields: {
+            [SE_SCOPING_OUTPUT_FIELD_ID]: {
+              type: 'doc',
+              version: 1,
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Reviewed SE output.' }] },
+              ],
+            },
+          },
+        }),
+      })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://global-e.atlassian.net/rest/api/3/issue/SOPP-7448/transitions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Accept: 'application/json',
+        }),
       })
     );
     expect(fetchMock).toHaveBeenCalledWith(
       'https://global-e.atlassian.net/rest/api/3/issue/SOPP-7448/transitions',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ transition: { id: '3' } }),
+        body: JSON.stringify({ transition: { id: '31' } }),
       })
     );
   });

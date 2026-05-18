@@ -2,6 +2,7 @@ import { buildBrdRows } from './mapper.js';
 import type { BrdDraftInput, BrdMatrixRow, BrdParentContext, BrdReviewResult } from './types.js';
 
 export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentContext }): BrdReviewResult {
+  const manualMode = isManualBrdMode(input);
   const matrixRows = buildBrdRows(input);
   const subtaskByKey = new Map(input.parent.subtasks.map((subtask) => [subtask.key, subtask]));
   const rows = matrixRows
@@ -11,9 +12,9 @@ export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentConte
       const existingText = subtask?.seOutputText || '';
       const jiraDescriptionText = subtask?.descriptionText || '';
       const currentStatus = subtask?.status || '';
-      const conflictNote = buildConflictNote(existingText, row);
-      const finalText = buildFinalText(existingText, row, conflictNote);
-      const statusAction = row.recommendedStatusAction;
+      const conflictNote = manualMode ? undefined : buildConflictNote(existingText, row);
+      const finalText = manualMode ? existingText : buildFinalText(existingText, row, conflictNote);
+      const statusAction = manualMode ? undefined : row.recommendedStatusAction;
 
       return {
         ...row,
@@ -32,6 +33,16 @@ export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentConte
     parent: input.parent,
     rows,
   };
+}
+
+function isManualBrdMode(input: BrdDraftInput): boolean {
+  return !hasText(input.websiteAssessmentMarkdown)
+    && !hasText(input.additionalNotes)
+    && !input.websiteAssessmentJson;
+}
+
+function hasText(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function buildFinalText(existingText: string, row: BrdMatrixRow, conflictNote?: string): string {

@@ -78,7 +78,7 @@ npm run playwright:install
    You do **not** need a `.env` file for the default web app and scraper — it runs with built-in defaults (including port **3847**).  
    Create `.env` only if you need optional settings like a custom port or proxy. Copy `env.example` to `.env` and add values your team lead provides (open in Cursor or Notepad).
 
-**Jira note:** You do not need Jira credentials to launch Sweep. For BRD updates, open the hamburger menu in the web UI and enter your Jira email/API token there. Sweep keeps those credentials in local server memory only for the current running session. Enter them again after restarting Sweep or clearing credentials.
+**Jira note:** You do not need Jira credentials to launch Sweep. For BRD updates, open the hamburger menu in the web UI and enter your Jira email/API token there. Sweep keeps those credentials in local server memory by default. If you choose **Remember on this computer**, Sweep stores them in the OS credential store, using macOS Keychain on Mac or Windows Credential Locker on PC, so they survive Sweep restarts. Clearing Jira credentials removes both the session and any saved credential-store entry.
 
 ---
 
@@ -105,7 +105,7 @@ You don’t need to remember terminal commands. In **Cursor chat**, you can say:
 | You say (in Cursor)      | What happens |
 |--------------------------|--------------|
 | **Launch sweep** or **/launch sweep** | Start the web app. You’ll get the command to run and the URL (e.g. http://localhost:3847). Open in **Cursor’s Simple Browser** or your external browser. |
-| **Update sweep** or **/update sweep** | Get the latest code and reinstall dependencies so you’re up to date. |
+| **Update sweep** or **/update sweep** | Stop the current Sweep server, replace local Sweep with the latest GitHub pilot branch, reinstall dependencies, reinstall Playwright, and relaunch the app. |
 | **/wa https://example.com**          | Run a Website Assessment for that URL (see main README for the full workflow). |
 
 The project’s Cursor rules (in `.cursor/rules/`) define these behaviors so the AI knows what to do when you use these phrases.
@@ -117,6 +117,7 @@ The project’s Cursor rules (in `.cursor/rules/`) define these behaviors so the
 - **If you use a Git desktop app:** Open the repo, pull the latest changes, then in the project folder run: `npm install` (or ask Cursor: “update sweep”).
 - **If you use Git in terminal:** `cd` into the project folder and run `git pull`, then `npm install`.
 - **If you use ZIP:** Download the latest ZIP from the repo and replace (or merge) your project folder, then run `npm install` in that folder.
+- **If you want Cursor to do the whole update:** open the `global-sweep` folder in Cursor and paste the contents of `UPDATE_SWEEP_PROMPT.txt` into Cursor chat, or just say **update sweep**.
 
 After any update, you can say **“launch sweep”** in Cursor to start the app again.
 

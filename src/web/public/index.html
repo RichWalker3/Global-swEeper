@@ -1130,6 +1130,24 @@
       font-weight: 600;
     }
 
+    .brd-status-success {
+      color: var(--green) !important;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      font-weight: 700;
+    }
+
+    .brd-status-error {
+      color: var(--red) !important;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      padding: 0.65rem 0.75rem;
+      font-weight: 700;
+    }
+
     .brd-table-wrapper {
       overflow-x: auto;
       margin-top: 1rem;
@@ -1313,7 +1331,7 @@
           <div class="alert alert-info" style="margin-bottom: 1rem;">
             <span class="alert-icon">🔒</span>
             <div class="alert-content">
-              Jira credentials stay in server memory only for this local Sweep session. They are cleared when Sweep restarts or when you click clear.
+              Jira credentials stay in server memory by default. Use “Remember on this computer” to save them in your OS credential store across Sweep restarts.
             </div>
           </div>
 
@@ -1336,6 +1354,11 @@
               <button type="button" class="api-key-toggle" id="jiraTokenToggle" title="Show/hide Jira token">👁️</button>
             </div>
           </div>
+
+          <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; color: var(--gray-400); margin-bottom: 0.75rem;">
+            <input type="checkbox" id="rememberJiraCredentials" style="margin-top: 0.15rem;">
+            <span>Remember on this computer using the OS credential store</span>
+          </label>
 
           <div id="jiraCredentialStatus" style="font-size: 0.8125rem; color: var(--gray-400); margin-bottom: 0.75rem;"></div>
 
@@ -1630,7 +1653,7 @@
 
           <div class="form-group">
             <label for="brdWaMarkdown">WA Markdown or notes</label>
-            <textarea id="brdWaMarkdown" placeholder="Paste the finished WA here, or leave blank to use the current Markdown output." style="width: 100%; height: 140px; font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; padding: 0.75rem; border: 1px solid var(--gray-200); border-radius: 8px; resize: vertical;"></textarea>
+            <textarea id="brdWaMarkdown" placeholder="Optional: paste the finished WA here. Leave WA and notes blank to build a manual BRD table from the SOPP subtasks." style="width: 100%; height: 140px; font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; padding: 0.75rem; border: 1px solid var(--gray-200); border-radius: 8px; resize: vertical;"></textarea>
           </div>
 
           <div class="form-group">
@@ -1646,8 +1669,11 @@
 
           <div id="brdReviewGrid" class="brd-review-grid hidden"></div>
 
-          <div class="action-buttons hidden" id="brdSaveActions" style="margin-top: 1rem;">
-            <button class="btn" id="sendBrdUpdatesBtn">Send to Jira</button>
+          <div class="hidden" id="brdSaveActions" style="margin-top: 1rem;">
+            <div id="brdSendStatus" style="font-size: 0.8125rem; color: var(--gray-400); margin-bottom: 0.75rem;"></div>
+            <div class="action-buttons">
+              <button class="btn" id="sendBrdUpdatesBtn">Send to Jira</button>
+            </div>
           </div>
         </div>
       </div>
@@ -1773,6 +1799,7 @@
     let currentTab = 'prompt';  // Default to Prompt tab
     let brdParentContext = null;
     let brdReviewRows = [];
+    let brdManualOnly = false;
     let jiraConnected = false;
     let outputs = {
       markdown: '',
@@ -1925,28 +1952,39 @@
     }
 
     function updateBrdCredentialState() {
-      ['processBrdBtn', 'sendBrdUpdatesBtn'].forEach(id => {
-        const button = document.getElementById(id);
-        if (button) button.disabled = !jiraConnected;
-      });
+      const processButton = document.getElementById('processBrdBtn');
+      if (processButton) processButton.disabled = false;
+
+      const sendButton = document.getElementById('sendBrdUpdatesBtn');
+      if (sendButton) sendButton.disabled = !jiraConnected || brdManualOnly;
     }
 
     function renderJiraStatus(status) {
       jiraConnected = Boolean(status.connected);
       const badge = document.getElementById('jiraCredentialBadge');
       if (badge) {
+        const sourceLabel = status.source === 'env'
+          ? ' via .env'
+          : status.source === 'secure-store'
+            ? ' via secure store'
+            : '';
         badge.textContent = jiraConnected
-          ? `Connected${status.source === 'env' ? ' via .env' : ''}`
+          ? `Connected${sourceLabel}`
           : 'Not connected';
         badge.style.background = jiraConnected ? 'rgba(34, 197, 94, 0.12)' : 'var(--gray-200)';
         badge.style.color = jiraConnected ? 'var(--green)' : 'var(--gray-400)';
       }
 
       if (jiraConnected) {
+        const sourceLabel = status.source === 'secure-store'
+          ? ' from the OS credential store'
+          : status.source === 'env'
+            ? ' from .env'
+            : '';
         const fieldLabel = status.hasSeOutputFieldId
           ? 'using configured field ID'
           : `field lookup: ${status.seOutputFieldName || 'SE Scoping Output'}`;
-        setJiraCredentialStatus(`Connected to ${status.baseUrl || 'Jira'} as ${status.emailHint || 'configured user'} (${fieldLabel}).`);
+        setJiraCredentialStatus(`Connected${sourceLabel} to ${status.baseUrl || 'Jira'} as ${status.emailHint || 'configured user'} (${fieldLabel}).`);
       } else {
         setJiraCredentialStatus('Connect Jira before loading BRD tickets.');
       }
@@ -1977,6 +2015,7 @@
           body: JSON.stringify({
             email: document.getElementById('jiraEmail').value.trim(),
             apiToken: document.getElementById('jiraApiToken').value.trim(),
+            remember: document.getElementById('rememberJiraCredentials').checked,
           }),
         });
         const data = await readJsonResponse(response);
@@ -1999,6 +2038,7 @@
     async function clearJiraCredentials() {
       const response = await fetch('/api/jira/session', { method: 'DELETE' });
       renderJiraStatus(await readJsonResponse(response));
+      document.getElementById('rememberJiraCredentials').checked = false;
       setBrdStatus('');
     }
 
@@ -2651,10 +2691,28 @@
       refreshOutputActionLabels();
     }
 
-    function setBrdStatus(message, isError = false) {
+    function setBrdStatus(message, isError = false, isSuccess = false) {
       const status = document.getElementById('brdValidationStatus');
       status.textContent = message;
-      status.style.color = isError ? 'var(--red)' : 'var(--gray-400)';
+      status.classList.toggle('brd-status-error', isError);
+      status.classList.toggle('brd-status-success', isSuccess);
+      status.style.color = isError ? 'var(--red)' : isSuccess ? 'var(--green)' : 'var(--gray-400)';
+    }
+
+    function setBrdSendStatus(message, isError = false, isSuccess = false) {
+      const status = document.getElementById('brdSendStatus');
+      status.textContent = message;
+      status.classList.toggle('brd-status-error', isError);
+      status.classList.toggle('brd-status-success', isSuccess);
+      status.style.color = isError ? 'var(--red)' : isSuccess ? 'var(--green)' : 'var(--gray-400)';
+    }
+
+    function summarizeBrdSendResult(previews) {
+      const rows = previews || [];
+      const doneCount = rows.filter(row => row.statusAction === 'done').length;
+      const canceledCount = rows.filter(row => row.statusAction === 'canceled').length;
+      const unchangedCount = rows.length - doneCount - canceledCount;
+      return `${rows.length} SE Scoping Output fields updated in Jira. Status selections: ${doneCount} Done, ${canceledCount} Canceled, ${unchangedCount} unchanged.`;
     }
 
     function escapeHtml(value) {
@@ -2689,6 +2747,7 @@
       if (!rows || rows.length === 0) {
         grid.classList.add('hidden');
         actions.classList.add('hidden');
+        setBrdSendStatus('');
         return;
       }
 
@@ -2750,6 +2809,7 @@
 
       grid.classList.remove('hidden');
       actions.classList.remove('hidden');
+      setBrdSendStatus('');
     }
 
     async function validateBrdParent() {
@@ -2778,7 +2838,6 @@
     }
 
     async function processBrd() {
-      if (!ensureJiraConnectedForBrd()) return;
       const btn = document.getElementById('processBrdBtn');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Processing...';
@@ -2787,7 +2846,7 @@
         const parentKey = document.getElementById('brdParentKey').value.trim();
         const pastedWa = document.getElementById('brdWaMarkdown').value.trim();
         const additionalNotes = document.getElementById('brdAdditionalNotes').value.trim();
-        const waMarkdown = pastedWa || outputs.markdown;
+        const waMarkdown = pastedWa;
 
         const response = await fetch('/api/brd/process', {
           method: 'POST',
@@ -2795,7 +2854,7 @@
           body: JSON.stringify({
             parentKey,
             websiteAssessmentMarkdown: waMarkdown,
-            websiteAssessmentJson: currentScrapeResult,
+            websiteAssessmentJson: waMarkdown ? currentScrapeResult : undefined,
             additionalNotes,
           }),
         });
@@ -2805,8 +2864,15 @@
         }
 
         brdParentContext = data.parent || brdParentContext;
+        brdManualOnly = Boolean(data.manualOnly);
         renderBrdReviewGrid(data.rows || []);
-        setBrdStatus(`BRD table ready for ${data.rows?.length || 0} subtasks. Review rows, then send to Jira.`);
+        const manualMode = !waMarkdown && !additionalNotes;
+        setBrdStatus(manualMode
+          ? brdManualOnly
+            ? `Manual BRD table ready for ${data.rows?.length || 0} rows. Connect Jira and process again before sending updates to Jira.`
+            : `Manual BRD table ready for ${data.rows?.length || 0} subtasks. Fill in SE output rows, then send to Jira.`
+          : `BRD table ready for ${data.rows?.length || 0} subtasks. Review rows, then send to Jira.`);
+        setBrdSendStatus('');
       } finally {
         btn.disabled = false;
         btn.innerHTML = 'Process BRD';
@@ -2815,12 +2881,20 @@
     }
 
     async function sendBrdUpdates() {
-      if (!ensureJiraConnectedForBrd()) return;
+      if (!jiraConnected) {
+        setBrdSendStatus('Connect Jira before sending BRD updates.', true);
+        return;
+      }
+      if (brdManualOnly) {
+        setBrdSendStatus('This is a local manual table without Jira subtask keys. Connect Jira, click Process BRD again, then send to Jira.', true);
+        return;
+      }
       if (!confirm('Send these SE scoping outputs and Done/Canceled selections to Jira? Only validated child subtasks under this SOPP will be updated.')) {
         return;
       }
 
       const parentKey = document.getElementById('brdParentKey').value.trim();
+      setBrdSendStatus('Sending BRD updates to Jira. Please wait for confirmation...');
       const response = await fetch('/api/brd/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2831,7 +2905,7 @@
         throw new Error(data.error || 'Failed to save Jira updates.');
       }
 
-      setBrdStatus(`Sent ${data.previews.length} BRD updates to Jira. Audit log: ${data.auditPath || 'not written'}`);
+      setBrdSendStatus(`Jira update confirmed. ${summarizeBrdSendResult(data.previews)} Audit log: ${data.auditPath || 'not written'}`, false, true);
     }
 
     // Form submit
@@ -2915,11 +2989,11 @@
     document.getElementById('sendBrdUpdatesBtn').addEventListener('click', async () => {
       const btn = document.getElementById('sendBrdUpdatesBtn');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Saving...';
+      btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Sending to Jira...';
       try {
         await sendBrdUpdates();
       } catch (e) {
-        setBrdStatus(e.message, true);
+        setBrdSendStatus(e.message, true);
       } finally {
         btn.disabled = false;
         btn.innerHTML = 'Send to Jira';

@@ -2,8 +2,6 @@ import type { BrdParentContext, BrdTableUpdateInputRow, BrdUpdateInputRow, BrdUp
 import { adfToPlainText } from './description.js';
 
 export const SE_SCOPING_OUTPUT_FIELD_ID = 'customfield_21538';
-const DONE_TRANSITION_ID = '3';
-const CANCELED_TRANSITION_ID = '4';
 
 export interface JiraConfig {
   baseUrl: string;
@@ -23,6 +21,12 @@ interface JiraIssueResponse {
     description?: unknown;
     [fieldId: string]: unknown;
   };
+}
+
+interface JiraTransition {
+  id: string;
+  name: string;
+  to?: { name?: string };
 }
 
 export function getJiraConfig(env: NodeJS.ProcessEnv = process.env): JiraConfig {
@@ -114,7 +118,7 @@ export async function applyBrdTableUpdates(
   for (const row of rows) {
     await updateJiraField(row.jiraKey, SE_SCOPING_OUTPUT_FIELD_ID, row.finalText, config);
     const currentStatus = subtaskByKey.get(row.jiraKey)?.status?.toLowerCase();
-    const transitionId = transitionIdForAction(row.statusAction, currentStatus);
+    const transitionId = await transitionIdForAction(row.jiraKey, row.statusAction, currentStatus, config);
     if (transitionId) {
       await transitionJiraIssue(row.jiraKey, transitionId, config);
     }
@@ -164,11 +168,11 @@ async function updateJiraField(issueKey: string, fieldId: string, value: string,
       ...jiraHeaders(config),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ fields: { [fieldId]: value } }),
+    body: JSON.stringify({ fields: { [fieldId]: plainTextToAdf(value) } }),
   });
 
   if (!response.ok) {
-    throw new Error(`Jira update failed for ${issueKey}: ${response.status} ${response.statusText}`);
+    throw new Error(`Jira update failed for ${issueKey}: ${response.status} ${response.statusText}${await readJiraErrorDetail(response)}`);
   }
 }
 
@@ -184,14 +188,70 @@ async function transitionJiraIssue(issueKey: string, transitionId: string, confi
   });
 
   if (!response.ok) {
-    throw new Error(`Jira transition failed for ${issueKey}: ${response.status} ${response.statusText}`);
+    throw new Error(`Jira transition failed for ${issueKey}: ${response.status} ${response.statusText}${await readJiraErrorDetail(response)}`);
   }
 }
 
-function transitionIdForAction(action: BrdTableUpdateInputRow['statusAction'], currentStatus?: string): string | undefined {
-  if (action === 'done' && currentStatus !== 'done') return DONE_TRANSITION_ID;
-  if (action === 'canceled' && currentStatus !== 'canceled') return CANCELED_TRANSITION_ID;
-  return undefined;
+async function transitionIdForAction(
+  issueKey: string,
+  action: BrdTableUpdateInputRow['statusAction'],
+  currentStatus: string | undefined,
+  config: JiraConfig
+): Promise<string | undefined> {
+  if (!action || action === 'unchanged') return undefined;
+  if (action === 'done' && currentStatus === 'done') return undefined;
+  if (action === 'canceled' && (currentStatus === 'canceled' || currentStatus === 'cancelled')) return undefined;
+
+  const transitions = await fetchJiraTransitions(issueKey, config);
+  const targetNames = action === 'done' ? ['done'] : ['canceled', 'cancelled'];
+  const transition = transitions.find((item) => {
+    const name = item.name.toLowerCase();
+    const toName = item.to?.name?.toLowerCase();
+    return targetNames.includes(name) || (toName ? targetNames.includes(toName) : false);
+  });
+
+  if (!transition) {
+    throw new Error(`Jira transition failed for ${issueKey}: no ${action} transition is available from ${currentStatus || 'current status'}.`);
+  }
+
+  return transition.id;
+}
+
+async function fetchJiraTransitions(issueKey: string, config: JiraConfig): Promise<JiraTransition[]> {
+  const transitionUrl = `${config.baseUrl.replace(/\/$/, '')}/rest/api/3/issue/${issueKey}/transitions`;
+  const response = await fetch(transitionUrl, {
+    headers: jiraHeaders(config),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Jira transition lookup failed for ${issueKey}: ${response.status} ${response.statusText}${await readJiraErrorDetail(response)}`);
+  }
+
+  const data = await response.json() as { transitions?: JiraTransition[] };
+  return data.transitions || [];
+}
+
+function plainTextToAdf(value: string): unknown {
+  const content = value
+    .split(/\n{2,}/)
+    .map((paragraphText) => {
+      const text = paragraphText.trim();
+      return text
+        ? { type: 'paragraph', content: [{ type: 'text', text }] }
+        : { type: 'paragraph' };
+    });
+
+  return {
+    type: 'doc',
+    version: 1,
+    content: content.length > 0 ? content : [{ type: 'paragraph' }],
+  };
+}
+
+async function readJiraErrorDetail(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  if (!text) return '';
+  return ` - ${text.slice(0, 500)}`;
 }
 
 function jiraFieldValueToPlainText(value: unknown): string {

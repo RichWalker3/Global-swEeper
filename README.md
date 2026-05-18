@@ -92,7 +92,7 @@ npm install
 
 No `.env` file is required for the default local app. Create `.env` only if you need optional settings like a custom port, hosted base URL, allowed origins, or proxy. Use `env.example` as the template.
 
-For BRD Jira updates, use the Jira Credentials panel in the web UI. Credentials entered there are kept in local server memory only, are not written to disk or browser storage, and are cleared when Sweep restarts or when you clear them. `.env` Jira credentials are still supported for maintainer or automation workflows.
+For BRD Jira updates, use the Jira Credentials panel in the web UI. Credentials stay in local server memory by default and are not written to browser storage. If you choose **Remember on this computer**, Sweep stores the Jira credentials in the OS credential store, using macOS Keychain on Mac or Windows Credential Locker on PC, so they survive Sweep restarts. Clearing Jira credentials removes both the in-memory session and any saved credential-store entry. `.env` Jira credentials are still supported for maintainer or automation workflows.
 
 ### Run
 

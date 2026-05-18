@@ -66,4 +66,40 @@ describe('BRD composer', () => {
     expect(giftCards?.finalText).toBe('No WA evidence found.');
     expect(giftCards?.statusAction).toBe('canceled');
   });
+
+  it('builds manual editable rows when WA and notes are blank', () => {
+    const parent: BrdParentContext = {
+      key: 'SOPP-7431',
+      summary: 'BRD Parent',
+      subtasks: [
+        {
+          key: 'SOPP-7448',
+          summary: 'BRD-014 - Loyalty & Reward',
+          status: 'New',
+          descriptionText: 'Capture loyalty scope here.',
+        },
+        {
+          key: 'SOPP-7449',
+          summary: 'BRD-015 - Gift Cards',
+          status: 'New',
+          seOutputText: 'Existing gift card note.',
+        },
+      ],
+    };
+
+    const result = composeBrdReview({
+      parent,
+      websiteAssessmentMarkdown: '',
+      additionalNotes: '',
+    });
+
+    const loyalty = result.rows.find((row) => row.requirementId === 'BRD-014');
+    const giftCards = result.rows.find((row) => row.requirementId === 'BRD-015');
+
+    expect(result.rows).toHaveLength(2);
+    expect(loyalty?.finalText).toBe('');
+    expect(loyalty?.statusAction).toBeUndefined();
+    expect(loyalty?.jiraDescriptionText).toBe('Capture loyalty scope here.');
+    expect(giftCards?.finalText).toBe('Existing gift card note.');
+  });
 });

@@ -19,7 +19,7 @@ async function readPackageVersion(): Promise<string> {
     await readFile(path.join(repoRoot, 'package.json'), 'utf8')
   ) as { version?: string };
 
-  return packageJson.version || '0.2.0';
+  return packageJson.version || '0.3.0';
 }
 
 async function main(): Promise<void> {

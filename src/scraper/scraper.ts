@@ -3,17 +3,18 @@
  * Coordinates browser, crawling, extraction, and analysis
  */
 
-import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence } from './types.js';
+import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence, CrawlTarget } from './types.js';
 import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, detectDropshipFulfillment, extractProductLinks } from './detectors.js';
 import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
 import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
 import { logAssessment, type DebugInfo } from '../logger/index.js';
-import { gotoWithRetry, classifyError, randomDelay } from './helpers.js';
+import { gotoWithRetry, classifyError, randomDelay, type GotoResult } from './helpers.js';
 import { launchStealthBrowser, createStealthContext, dismissCookieConsent, slowScroll } from './browser.js';
-import { discoverCrawlTargets, getFallbackTargets, type CrawlTarget } from './crawler.js';
+import { discoverCrawlTargets, discoverIndexedCrawlTargets, getFallbackTargets, mergeCrawlTargets } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
+import { getPlatformProfile } from './platforms/index.js';
 import type { Browser, BrowserContext } from 'playwright';
 
 // ============ State Management (declared early for scrape snapshot typing) ============
@@ -167,6 +168,10 @@ const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   takeScreenshots: true,
   verbose: false,
   skipCheckout: false,
+  platform: 'unknown',
+  browserMode: 'headless',
+  persistentProfile: false,
+  profileName: 'default',
   onProgress: () => {},
 };
 
@@ -181,6 +186,7 @@ let lastScrapeSnapshot: {
   startedAt: string;
   state: ScrapeState;
   debugInfo: Partial<DebugInfo>;
+  platform: Required<ScrapeOptions>['platform'];
 } | null = null;
 
 function describeIncompletePhase(phase: string): string {
@@ -243,7 +249,7 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
     };
   }
 
-  const result = buildResult(snap.seedUrl, snap.startedAt, snap.state, snap.debugInfo, { skipLog: false });
+  const result = buildResult(snap.seedUrl, snap.startedAt, snap.state, snap.debugInfo, { skipLog: false, platform: snap.platform });
   const warning =
     `Timed out after ${opts.scrapeTimeout / 1000}s during "${scrapeProgress.phase}" phase. ` +
     `Collected ${result.pages.length} page(s) and ${result.summary.productPagesScraped} product page(s). ` +
@@ -362,12 +368,17 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
   if (opts.verbose && wappalyzerReady) console.log('  ✓ Wappalyzer initialized');
 
   // Launch browser with stealth config
-  const { browser, context, config } = await launchStealthBrowser(opts.verbose);
+  const { browser, context, config } = await launchStealthBrowser({
+    verbose: opts.verbose,
+    browserMode: opts.browserMode,
+    persistentProfile: opts.persistentProfile,
+    profileName: opts.profileName,
+  });
 
   // Initialize accumulators
   const state = createInitialState(seedUrl, config);
   const debugInfo = createDebugInfo(config);
-  lastScrapeSnapshot = { seedUrl, startedAt, state, debugInfo };
+  lastScrapeSnapshot = { seedUrl, startedAt, state, debugInfo, platform: opts.platform };
 
   try {
     // Phase 0: Discover pages
@@ -390,7 +401,7 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     }
 
     // Build result before browser teardown so the UI always receives data even if Chromium hangs on close.
-    return buildResult(seedUrl, startedAt, state, debugInfo, { skipLog: scrapeRaceResolvedWithTimeout });
+    return buildResult(seedUrl, startedAt, state, debugInfo, { skipLog: scrapeRaceResolvedWithTimeout, platform: opts.platform });
   } finally {
     scrapeProgress.phase = 'analyzing';
     scrapeProgress.currentUrl = '';
@@ -411,6 +422,14 @@ async function discoverPages(
   opts.onProgress({ phase: 'init', message: 'Discovering site structure...' });
   if (opts.verbose) console.log('  Discovering site structure...');
 
+  const indexedTargets = await discoverIndexedCrawlTargets(seedUrl, opts.verbose, opts.platform);
+  if (indexedTargets.length > 0) {
+    opts.onProgress({
+      phase: 'init',
+      message: `Found ${indexedTargets.length} sitemap/search-index URL(s).`,
+    });
+  }
+
   const discoveryPage = await context.newPage();
   let navResult = await gotoWithRetry(discoveryPage, seedUrl, {
     timeout: opts.timeout,
@@ -418,6 +437,7 @@ async function discoverPages(
     verbose: opts.verbose,
     waitForNetworkIdle: true,
   });
+  navResult = await retryAfterAssistedPause(discoveryPage, { url: seedUrl, type: 'home' }, navResult, opts);
   let activeContext: BrowserContext | undefined;
 
   if (navResult.blocked) {
@@ -434,20 +454,22 @@ async function discoverPages(
       verbose: opts.verbose,
       waitForNetworkIdle: true,
     });
+    navResult = await retryAfterAssistedPause(retryPage, { url: seedUrl, type: 'home' }, navResult, opts);
     if (!navResult.error && !navResult.blocked && (!navResult.response || navResult.response.status() < 400)) {
       await dismissCookieConsent(retryPage, opts.verbose);
       try {
-        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose);
+        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose, opts.platform);
         const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
           setTimeout(() => reject(new Error('Discovery timeout')), 10000)
         );
         const targets = await Promise.race([discoveryPromise, timeoutPromise]);
         await retryPage.close().catch(() => {});
         await activeContext.close().catch(() => {});
-        if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl`);
-        return targets;
+        const mergedTargets = mergeCrawlTargets(targets, indexedTargets);
+        if (opts.verbose) console.log(`  Found ${mergedTargets.length} pages to crawl`);
+        return mergedTargets;
       } catch (discoveryError) {
-        if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError}), using fallback targets`);
+        if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError})`);
       }
     }
     await retryPage.close().catch(() => {});
@@ -457,17 +479,22 @@ async function discoverPages(
     handleNavigationError({ url: seedUrl, type: 'home' }, navResult, state, opts);
     await activeContext?.close().catch(() => {});
     await discoveryPage.close().catch(() => {});
-    if (opts.verbose) console.log('  ⚠ Discovery seed failed, using fallback targets');
-    return getFallbackTargets(seedUrl);
+    if (indexedTargets.length > 0) {
+      if (opts.verbose) console.log('  ⚠ Discovery seed failed, using sitemap/search-index targets');
+      return indexedTargets;
+    }
+    if (opts.verbose) console.log('  ⚠ Discovery seed failed and no indexed URLs were found, using fallback targets');
+    return getFallbackTargets(seedUrl, opts.platform);
   }
 
   const seedStatus = navResult.response?.status();
   if (seedStatus && seedStatus >= 400) {
     state.errors.push({ url: seedUrl, error: `HTTP ${seedStatus}`, type: classifyError('', seedStatus) });
-    if (opts.verbose) console.log(`  ⚠ Seed URL HTTP ${seedStatus}, using fallback targets`);
+    if (opts.verbose) console.log(`  ⚠ Seed URL HTTP ${seedStatus}, using ${indexedTargets.length > 0 ? 'sitemap/search-index' : 'fallback'} targets`);
     await activeContext?.close().catch(() => {});
     await discoveryPage.close().catch(() => {});
-    return getFallbackTargets(seedUrl);
+    if (indexedTargets.length > 0) return indexedTargets;
+    return getFallbackTargets(seedUrl, opts.platform);
   }
 
   // Dismiss cookie consent banner if present
@@ -475,20 +502,50 @@ async function discoverPages(
 
   let targets: CrawlTarget[];
   try {
-    const discoveryPromise = discoverCrawlTargets(discoveryPage, seedUrl, opts.verbose);
+    const discoveryPromise = discoverCrawlTargets(discoveryPage, seedUrl, opts.verbose, opts.platform);
     const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
       setTimeout(() => reject(new Error('Discovery timeout')), 10000)
     );
     targets = await Promise.race([discoveryPromise, timeoutPromise]);
   } catch (discoveryError) {
-    if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError}), using fallback targets`);
-    targets = getFallbackTargets(seedUrl);
+    if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError})`);
+    targets = indexedTargets.length > 0 ? indexedTargets : getFallbackTargets(seedUrl, opts.platform);
   }
 
   await activeContext?.close().catch(() => {});
   await discoveryPage.close().catch(() => {});
-  if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl`);
-  return targets;
+  const mergedTargets = mergeCrawlTargets(targets, indexedTargets);
+  if (opts.verbose) console.log(`  Found ${mergedTargets.length} pages to crawl`);
+  return mergedTargets;
+}
+
+async function retryAfterAssistedPause(
+  page: Awaited<ReturnType<BrowserContext['newPage']>>,
+  target: CrawlTarget,
+  navResult: GotoResult,
+  opts: Required<ScrapeOptions>
+): Promise<GotoResult> {
+  if (!navResult.blocked || opts.browserMode !== 'visible') return navResult;
+
+  const blocker = navResult.blockType || 'bot protection';
+  opts.onProgress({
+    phase: 'scraping',
+    message: `Visible browser needs attention: ${blocker} challenge on ${new URL(target.url).hostname}. Complete it in the browser window; Sweep will retry shortly.`,
+    url: new URL(target.url).pathname,
+  });
+
+  if (opts.verbose) {
+    console.log(`  ⏸ Assisted mode: waiting for manual ${blocker} challenge handling on ${target.url}`);
+  }
+
+  await page.waitForTimeout(45_000);
+
+  return gotoWithRetry(page, target.url, {
+    timeout: opts.timeout,
+    maxRetries: 0,
+    verbose: opts.verbose,
+    waitForNetworkIdle: true,
+  });
 }
 
 async function scrapeTargetAttempt(
@@ -514,16 +571,18 @@ async function scrapeTargetAttempt(
       waitForNetworkIdle: true,
     });
 
-    if (navResult.error) {
-      handleNavigationError(target, navResult, state, opts);
+    const assistedNavResult = await retryAfterAssistedPause(page, target, navResult, opts);
+
+    if (assistedNavResult.error) {
+      handleNavigationError(target, assistedNavResult, state, opts);
       return { success: false };
     }
 
-    if (navResult.blocked) {
-      return { success: false, blockedNav: { blocked: true, blockType: navResult.blockType } };
+    if (assistedNavResult.blocked) {
+      return { success: false, blockedNav: { blocked: true, blockType: assistedNavResult.blockType } };
     }
 
-    const statusCode = navResult.response?.status();
+    const statusCode = assistedNavResult.response?.status();
     if (statusCode && statusCode >= 400) {
       state.errors.push({ url: target.url, error: `HTTP ${statusCode}`, type: classifyError('', statusCode) });
       if (opts.verbose) console.log(`  ✗ ${target.type}: ${target.url} - HTTP ${statusCode}`);
@@ -551,7 +610,7 @@ async function scrapeTargetAttempt(
       state.checkoutStoppedAt = page.url();
     }
 
-    const pageData = await extractPageData(page, navResult.response, networkRequests, opts);
+    const pageData = await extractPageData(page, assistedNavResult.response, networkRequests, opts);
     state.pages.push(pageData);
     scrapeProgress.pagesScraped = state.pages.length;
 
@@ -584,7 +643,7 @@ async function scrapeDiscoveredPages(
   let lastVisitedUrl: string | undefined;
 
   for (const target of targets) {
-    if (state.visited.size >= opts.maxPages) break;
+    if (pageIndex >= totalTargets || state.visited.size >= opts.maxPages) break;
     if (state.visited.has(target.url)) continue;
 
     pageIndex++;
@@ -797,7 +856,7 @@ async function processPageContent(
 
   // Product link extraction
   if (target.type === 'collection' && pageData.rawHtml) {
-    const productUrls = extractProductLinks(pageData.rawHtml, pageData.url);
+    const productUrls = extractProductLinks(pageData.rawHtml, pageData.url, opts.platform);
     for (const url of productUrls) {
       if (!state.discoveredProductUrls.includes(url)) {
         state.discoveredProductUrls.push(url);
@@ -893,9 +952,10 @@ async function scrapeProductPages(
   startedAt: string
 ): Promise<void> {
   scrapeProgress.phase = 'product-pages';
+  const profile = getPlatformProfile(opts.platform);
   const remainingBudget = Math.max(0, opts.maxPages - state.visited.size);
   const hasDedicatedPdpEvidence = state.pages.some(page =>
-    page.matchedCategories.includes('pdp') || /\/products?\//i.test(page.url)
+    page.matchedCategories.includes('pdp') || profile.productUrlScorePatterns.some(({ pattern }) => pattern.test(page.url))
   );
   const desiredProducts = hasDedicatedPdpEvidence ? 6 : 8;
   const maxProducts = Math.min(desiredProducts, remainingBudget);
@@ -916,8 +976,7 @@ async function scrapeProductPages(
   // Use last collection URL as referer for product pages
   const collectionPage = state.pages.find(page =>
     page.matchedCategories.includes('collection') ||
-    /\/collections?\b/i.test(page.url) ||
-    /\/shop\b/i.test(page.url)
+    profile.productDiscoveryPaths.some((path) => path !== '/' && page.url.includes(path.replace(/^\//, '')))
   );
   let lastProductUrl = collectionPage?.url;
 
@@ -1079,7 +1138,7 @@ async function testCheckout(
   startedAt: string
 ): Promise<void> {
   const checkoutUrl = new URL('/checkout', seedUrl).toString();
-  const checkoutProductCandidates = collectCheckoutProductCandidates(state);
+  const checkoutProductCandidates = collectCheckoutProductCandidates(state, opts);
   const checkoutDebug: {
     stage?: string;
     stoppedAt?: string;
@@ -1107,6 +1166,7 @@ async function testCheckout(
       timeout: opts.timeout,
       verbose: opts.verbose,
       preferredProductUrls: checkoutProductCandidates,
+      platform: opts.platform,
       abortSignal: abortController.signal,
       onDebugUpdate: (update) => Object.assign(checkoutDebug, update),
     });
@@ -1115,7 +1175,7 @@ async function testCheckout(
       checkoutTimer = setTimeout(() => {
         abortController.abort();
         resolve(null);
-      }, 45000);
+      }, 90000);
     });
     let checkoutResult = await Promise.race([checkoutPromise, checkoutTimeoutPromise]);
     if (checkoutTimer !== undefined) clearTimeout(checkoutTimer);
@@ -1130,6 +1190,7 @@ async function testCheckout(
           timeout: opts.timeout,
           verbose: opts.verbose,
           preferredProductUrls: checkoutProductCandidates,
+          platform: opts.platform,
         });
       } finally {
         await rotated.context.close().catch(() => {});
@@ -1208,11 +1269,12 @@ function formatCheckoutDebugStop(debug: {
   return parts.length > 0 ? parts.join(' | ') : undefined;
 }
 
-function collectCheckoutProductCandidates(state: ScrapeState): string[] {
+function collectCheckoutProductCandidates(state: ScrapeState, opts: Required<ScrapeOptions>): string[] {
+  const profile = getPlatformProfile(opts.platform);
   return Array.from(
     new Set([
       ...state.pages
-        .filter((page) => page.matchedCategories.includes('pdp') || /\/products\/[^/?#]+/i.test(page.url))
+        .filter((page) => page.matchedCategories.includes('pdp') || profile.productUrlScorePatterns.some(({ pattern }) => pattern.test(page.url)))
         .map((page) => page.url),
       ...state.discoveredProductUrls,
     ])
@@ -1233,14 +1295,33 @@ function mergeDerivedThirdParties(state: ScrapeState): void {
   }
 }
 
+function buildBotDetectionWarning(state: ScrapeState): string | undefined {
+  const blocked = state.errors.filter((error) => error.type === 'blocked');
+  if (blocked.length === 0) return undefined;
+
+  const blockers = Array.from(new Set(blocked.map((error) => error.blockType || 'bot protection')));
+  const blockerText = blockers.join(', ');
+  if (state.pages.length === 0) {
+    return `Automated crawl was blocked by ${blockerText}. Sweep could not collect page evidence; use sitemap/search-index results, manual WA inputs, or a proxy-supported run.`;
+  }
+
+  return `Some crawl targets were blocked by ${blockerText}. Treat the assessment as partial and manually verify blocked areas.`;
+}
+
 function buildResult(
   seedUrl: string,
   startedAt: string,
   state: ScrapeState,
   debugInfo: Partial<DebugInfo>,
-  options?: { skipLog?: boolean }
+  options?: { skipLog?: boolean; platform?: Required<ScrapeOptions>['platform'] }
 ): ScrapeResult {
   const completedAt = new Date().toISOString();
+  const profile = getPlatformProfile(options?.platform);
+  const selectedLabel = profile.label.toLowerCase();
+  const detectedLabel = state.platformDetected?.toLowerCase();
+  const platformConflict = detectedLabel && profile.id !== 'unknown' && detectedLabel !== selectedLabel
+    ? `User selected ${profile.label}, but crawler evidence detected ${state.platformDetected}.`
+    : undefined;
 
   mergeDerivedThirdParties(state);
 
@@ -1286,7 +1367,10 @@ function buildResult(
       checkoutReached: state.checkoutReached,
       checkoutSkipped: state.checkoutSkipped,
       checkoutStoppedAt: state.checkoutStoppedAt,
+      selectedPlatform: { id: profile.id, label: profile.label },
       platformDetected: state.platformDetected,
+      platformConflict,
+      botDetectionWarning: buildBotDetectionWarning(state),
       headlessDetected: detectHeadless(state.pages),
       globalEDetected: state.globalEDetected,
       returngoDetected: state.returngoDetected,

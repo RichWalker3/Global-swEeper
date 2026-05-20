@@ -1,0 +1,68 @@
+import type { PlatformProfile } from './shared.js';
+import {
+  SHARED_ADD_TO_CART_SELECTORS,
+  SHARED_CHECKOUT_BUTTON_SELECTORS,
+  SHARED_CHECKOUT_CONTENT_PATTERNS,
+  SHARED_LINK_CLASSIFIERS,
+} from './shared.js';
+
+export const shopifyProfile: PlatformProfile = {
+  id: 'shopify',
+  label: 'Shopify',
+  fallbackPaths: [
+    { path: '/collections/all', type: 'collection' },
+    { path: '/collections', type: 'collection' },
+    { path: '/shop', type: 'collection' },
+    { path: '/products', type: 'collection' },
+    { path: '/policies/shipping-policy', type: 'policy' },
+    { path: '/policies/refund-policy', type: 'policy' },
+    { path: '/pages/shipping', type: 'policy' },
+    { path: '/pages/returns', type: 'policy' },
+    { path: '/pages/shipping-returns', type: 'policy' },
+    { path: '/pages/faq', type: 'other' },
+    { path: '/help', type: 'other' },
+    { path: '/cart', type: 'cart' },
+  ],
+  linkClassifiers: [
+    ...SHARED_LINK_CLASSIFIERS,
+    { pattern: /\/(collections?|shop|category|categories|products?)$/i, type: 'collection', priority: 8 },
+    { pattern: /\/collections\/[^/]+$/i, type: 'collection', priority: 7 },
+    { pattern: /\/(mens?|womens?|kids?|sale|new|best-sellers?|all)/i, type: 'collection', priority: 6 },
+    { pattern: /\/shop\/(all|mens?|womens?|new)/i, type: 'collection', priority: 7 },
+    { pattern: /\/products\/[^/]+$/i, type: 'pdp', priority: 3 },
+  ],
+  productUrlPatterns: [
+    /href=["']([^"']*\/products\/[^"'#?]+)/gi,
+    /href=["']([^"']*\/p\/[^"'#?]+)/gi,
+  ],
+  productUrlScorePatterns: [
+    { pattern: /\/products\/[^/?#]+/i, score: 10 },
+    { pattern: /\/p\/[^/?#]+/i, score: 9 },
+  ],
+  productDiscoveryPaths: ['/', '/collections/all', '/collections', '/products', '/shop'],
+  addToCartSelectors: [
+    'button[name="add"]',
+    'button[type="submit"][form*="product"]',
+    '.product-form__submit',
+    '[data-add-to-cart]',
+    '[data-action="add-to-cart"]',
+    '.product-form__buttons button[type="submit"]',
+    '.shopify-payment-button button',
+    '#AddToCart',
+    '#addToCart',
+    '[id*="AddToCart"]',
+    '[id*="add-to-cart"]',
+    ...SHARED_ADD_TO_CART_SELECTORS,
+  ],
+  checkoutButtonSelectors: [
+    'button[name="checkout"]',
+    'button[type="submit"][name="checkout"]',
+    'input[name="checkout"]',
+    ...SHARED_CHECKOUT_BUTTON_SELECTORS,
+  ],
+  cartPaths: ['/cart'],
+  checkoutPaths: ['/checkout', '/checkouts'],
+  checkoutUrlPatterns: [/\/checkout(?:[/?#]|$)/i, /\/checkouts(?:[/?#]|$)/i, /shopify\.com\/authentication/i],
+  checkoutContentPatterns: [...SHARED_CHECKOUT_CONTENT_PATTERNS, /name=["']checkout\[/i, /shopify[-\s]?checkout/i],
+  notes: 'Shopify profile uses Shopify collection, product, cart, and hosted checkout conventions.',
+};

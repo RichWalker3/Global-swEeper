@@ -17,7 +17,6 @@ const sourcePaths = [
   '.cursor/rules/sweep-commands.mdc',
   '.cursor/rules/wa.mdc',
   'src/brd',
-  'src/dna',
   'src/extractor',
   'src/formatter',
   'src/jira',
@@ -153,7 +152,6 @@ async function writeBundledTsconfig(outputDir: string): Promise<void> {
   };
 
   tsconfig.include = [
-    'src/dna/**/*',
     'src/brd/**/*',
     'src/extractor/**/*',
     'src/formatter/**/*',

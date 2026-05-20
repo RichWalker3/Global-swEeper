@@ -10,11 +10,12 @@ import { dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { scrape } from '../scraper/scraper.js';
 import { buildPrompt } from '../extractor/prompt.js';
-import { generateDna } from '../dna/generator.js';
 import { generateBrdDraft } from '../brd/generator.js';
 import { composeBrdReview } from '../brd/composer.js';
 import { requireSoppKey } from '../brd/guard.js';
 import { BRD_REQUIREMENTS } from '../brd/requirements.js';
+import { normalizePlatform } from '../scraper/platforms/index.js';
+import type { KnownPlatform } from '../scraper/types.js';
 import type { BrdParentContext } from '../brd/types.js';
 import {
   applyBrdTableUpdates,
@@ -118,6 +119,9 @@ const clients = new Map<string, (data: string) => void>();
 interface SweepRequestOptions {
   screenshots?: boolean;
   skipCheckout?: boolean;
+  platform?: KnownPlatform;
+  browserMode?: 'headless' | 'visible';
+  persistentProfile?: boolean;
 }
 
 // Broadcast to a specific client
@@ -205,7 +209,12 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ status: 'started', clientId }));
 
       // Run the sweep in background
-      runSweep(targetUrl, clientId, options);
+      runSweep(targetUrl, clientId, {
+        ...options,
+        platform: normalizePlatform(options.platform),
+        browserMode: options.browserMode === 'visible' ? 'visible' : 'headless',
+        persistentProfile: options.persistentProfile === true,
+      });
 
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -265,47 +274,6 @@ const server = createServer(async (req, res) => {
         error: 'Invalid JSON. Make sure you paste the complete assessment JSON.',
         details: error instanceof Error ? error.message : 'Unknown error'
       }));
-    }
-    return;
-  }
-
-  // API: Generate DNA markdown from WA + context
-  if (url.pathname === '/api/dna' && req.method === 'POST') {
-    try {
-      const body = JSON.parse(await parseBody(req));
-      const {
-        merchantName,
-        websiteAssessmentMarkdown,
-        websiteAssessmentJson,
-        jiraContext,
-        confluenceContext,
-        additionalNotes,
-        apiKey,
-      } = body;
-
-      if (!websiteAssessmentMarkdown && !websiteAssessmentJson) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          error: 'Provide websiteAssessmentMarkdown or websiteAssessmentJson.',
-        }));
-        return;
-      }
-
-      const result = await generateDna({
-        merchantName,
-        websiteAssessmentMarkdown,
-        websiteAssessmentJson,
-        jiraContext,
-        confluenceContext,
-        additionalNotes,
-        apiKey,
-      });
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
-    } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: String(error) }));
     }
     return;
   }
@@ -467,7 +435,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Health check endpoint (for container orchestration)
+  // Health check endpoint
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }));
@@ -600,7 +568,9 @@ async function runSweep(targetUrl: string, clientId: string, options: SweepReque
     const scrapeResult = await scrapeWithProgress(targetUrl, clientId, options);
 
     // Build prompt for Claude (or for manual copy)
-    const { system, user } = buildPrompt(scrapeResult);
+    const { system, user } = buildPrompt(scrapeResult, {
+      selectedPlatform: options.platform,
+    });
 
     const partialNote = scrapeResult.summary.scrapingCompletionWarning;
     sendToClient(clientId, 'scraped', { 
@@ -634,6 +604,9 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
     scrapeTimeout: options.skipCheckout === true ? 300000 : 420000,
     // Full WA runs include checkout unless the user explicitly chooses a faster quick scan.
     skipCheckout: options.skipCheckout === true,
+    platform: options.platform,
+    browserMode: options.browserMode,
+    persistentProfile: options.persistentProfile,
     onProgress: (progress) => {
       // Map scraper phases to UI progress
       let progressPercent = 10;

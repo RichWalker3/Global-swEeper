@@ -3,7 +3,7 @@
  * Handles Playwright browser launch with anti-detection measures
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { chromium, BrowserContext, Page, Frame } from 'playwright';
 import { getRandomUserAgent, getRandomViewport } from './helpers.js';
@@ -23,6 +23,9 @@ export interface LaunchResult {
 export interface LaunchOptions {
   verbose?: boolean;
   proxyUrl?: string;
+  browserMode?: 'headless' | 'visible';
+  persistentProfile?: boolean;
+  profileName?: string;
 }
 
 export interface ContextOptions {
@@ -45,12 +48,15 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   const opts: LaunchOptions = typeof options === 'boolean' ? { verbose: options } : options;
   const verbose = opts.verbose ?? false;
   const proxyUrl = opts.proxyUrl || process.env.PROXY_URL;
+  const browserMode = opts.browserMode || 'headless';
+  const persistentProfile = opts.persistentProfile === true;
 
   const config = createBrowserConfig();
   const { viewport } = config;
 
   if (verbose) {
     console.log(`  ✓ Using viewport ${viewport.width}x${viewport.height}`);
+    console.log(`  ✓ Browser mode: ${browserMode}${persistentProfile ? ' with persistent profile' : ''}`);
     if (proxyUrl) {
       console.log(`  ✓ Using proxy: ${proxyUrl.replace(/:[^:@]+@/, ':****@')}`);
     }
@@ -58,7 +64,7 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
 
   // Build launch options
   const launchOptions: Parameters<typeof chromium.launch>[0] = {
-    headless: true,
+    headless: browserMode !== 'visible',
     executablePath: resolveFullChromiumExecutablePath(),
     args: [
       '--no-sandbox',
@@ -83,6 +89,21 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
     console.log(`  ✓ Using bundled Chromium: ${launchOptions.executablePath}`);
   }
 
+  if (persistentProfile) {
+    const profileDir = resolvePersistentProfileDir(opts.profileName);
+    mkdirSync(profileDir, { recursive: true });
+    const context = await chromium.launchPersistentContext(profileDir, {
+      ...launchOptions,
+      ...buildContextOptions(config),
+    });
+    await addStealthScripts(context);
+    const browser = context.browser();
+    if (!browser) {
+      throw new Error('Persistent browser profile launched without a browser handle.');
+    }
+    return { browser, context, config };
+  }
+
   const browser = await chromium.launch(launchOptions);
   const { context } = await createStealthContext(browser, { verbose, config });
 
@@ -91,6 +112,11 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
     context,
     config,
   };
+}
+
+function resolvePersistentProfileDir(profileName = 'default'): string {
+  const safeProfileName = profileName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) || 'default';
+  return resolve(process.cwd(), 'tmp', 'browser-profiles', safeProfileName);
 }
 
 function resolveFullChromiumExecutablePath(): string | undefined {
@@ -127,14 +153,25 @@ export async function createStealthContext(
 ): Promise<{ context: BrowserContext; config: BrowserConfig }> {
   const verbose = options.verbose ?? false;
   const config = options.config ?? createBrowserConfig();
-  const { userAgent, viewport, chromeVersion } = config;
-  const isChrome = userAgent.includes('Chrome');
+  const { viewport } = config;
 
   if (verbose) {
     console.log(`  ✓ Using viewport ${viewport.width}x${viewport.height}`);
   }
 
-  const context = await browser.newContext({
+  const context = await browser.newContext(buildContextOptions(config));
+
+  await addStealthScripts(context);
+  return { context, config };
+}
+
+type SharedContextOptions = Parameters<typeof chromium.launchPersistentContext>[1] & Parameters<Awaited<ReturnType<typeof chromium.launch>>['newContext']>[0];
+
+function buildContextOptions(config: BrowserConfig): SharedContextOptions {
+  const { userAgent, viewport, chromeVersion } = config;
+  const isChrome = userAgent.includes('Chrome');
+
+  return {
     userAgent,
     viewport,
     extraHTTPHeaders: buildHeaders(userAgent, chromeVersion, isChrome),
@@ -142,10 +179,7 @@ export async function createStealthContext(
     timezoneId: 'America/New_York',
     geolocation: { latitude: 40.7128, longitude: -74.0060 },
     permissions: ['geolocation'],
-  });
-
-  await addStealthScripts(context);
-  return { context, config };
+  };
 }
 
 /**

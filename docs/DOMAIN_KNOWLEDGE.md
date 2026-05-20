@@ -11,7 +11,7 @@ A Website Assessment (WA) is a structured review of a merchant's e-commerce site
 1. **Understand** the merchant's current tech stack and checkout flow
 2. **Identify** potential integration challenges and OoS (Out of Scope) items
 3. **Document** findings for the delivery team
-4. **Feed** the DNA (Discovery Notes & Analysis) in Confluence
+4. **Feed** the BRD Workspace review flow for scoped Jira updates
 
 ---
 

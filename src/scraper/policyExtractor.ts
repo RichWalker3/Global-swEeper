@@ -224,7 +224,7 @@ export function extractPolicyInfo(text: string, _url?: string): ExtractedPolicy 
 /**
  * Extract checkout information from checkout page
  */
-export function extractCheckoutInfo(html: string, text: string): CheckoutInfo {
+export function extractCheckoutInfo(html: string, text: string, checkoutTypeHint?: string): CheckoutInfo {
   const result: CheckoutInfo = {
     expressWallets: [],
     paymentMethods: [],
@@ -290,7 +290,9 @@ export function extractCheckoutInfo(html: string, text: string): CheckoutInfo {
   }
 
   // Checkout type detection
-  if (/shopify/i.test(html)) {
+  if (checkoutTypeHint) {
+    result.checkoutType = checkoutTypeHint;
+  } else if (/shopify/i.test(html)) {
     result.checkoutType = 'Shopify Checkout';
   }
 

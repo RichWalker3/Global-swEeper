@@ -1,6 +1,6 @@
 # Website Assessment (WA)
 
-**Purpose:** A single template for quick first‑pass reviews that pairs the site assessment with Discovery Notes & Analysis (DNA). This doc includes 1) a short playbook and 2) a fill‑in template you can paste into any merchant thread.
+**Purpose:** A single template for quick first-pass Website Assessments (WA) that can feed the BRD Workspace review flow. This doc includes 1) a short playbook and 2) a fill-in template you can paste into any merchant thread.
 
 > **Terminology:** "WA" = Website Assessment. When the user says "WA", they mean Website Assessment.
 

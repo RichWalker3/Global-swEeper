@@ -82,7 +82,7 @@ That creates:
 Title:
 
 ```text
-Global-sweep Pilot v0.2.0
+Global-sweep Pilot v0.3.0
 ```
 
 Description:

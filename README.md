@@ -2,7 +2,7 @@
 
 Global-sweep is a local Website Assessment assistant for Global-e presales work. It crawls a merchant site, collects high-signal evidence, and produces structured output that helps turn a storefront review into a WA and BRD update workflow.
 
-Current pilot version: `v0.2.0`
+Current pilot version: `v0.3.0`
 
 ![Global-sweep home screen](docs/assets/sweep-home.png)
 
@@ -13,6 +13,7 @@ Global-sweep is in internal pilot. It is strongest on Shopify and Shopify-adjace
 The current pilot supports:
 
 - Local web UI for single-merchant Website Assessment runs
+- Required platform selection before each sweep: Shopify, SFCC, GEM / Custom, or Unknown
 - Quick scans and fuller WA-style assessments
 - Homepage, PDP, cart, checkout, shipping, and returns evidence collection
 - Platform, catalog, policy, and integration signal detection

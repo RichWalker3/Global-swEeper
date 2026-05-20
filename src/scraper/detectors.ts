@@ -1,3 +1,6 @@
+import type { KnownPlatform } from './types.js';
+import { getPlatformProfile } from './platforms/index.js';
+
 /**
  * Third-party detection from network requests and page content
  * Focused on WA-critical apps only: red flags, loyalty, subscriptions, returns, payments
@@ -405,17 +408,13 @@ export function detectDropshipFulfillment(text: string, url: string): { detected
 /**
  * Extract product URLs from page content (for PDP discovery)
  */
-export function extractProductLinks(html: string, baseUrl: string): string[] {
+export function extractProductLinks(html: string, baseUrl: string, platform?: KnownPlatform): string[] {
   const productLinks: string[] = [];
   const domain = new URL(baseUrl).origin;
+  const profile = getPlatformProfile(platform);
   
-  // Common Shopify product URL patterns
-  const patterns = [
-    /href=["']([^"']*\/products\/[^"'#?]+)/gi,
-    /href=["']([^"']*\/p\/[^"'#?]+)/gi,
-  ];
-  
-  for (const pattern of patterns) {
+  for (const pattern of profile.productUrlPatterns) {
+    pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(html)) !== null) {
       let url = match[1];

@@ -2,13 +2,15 @@
  * Prompt builder for Claude extraction
  */
 
-import type { ScrapeResult, PageData } from '../scraper/types.js';
+import type { ScrapeResult, PageData, KnownPlatform } from '../scraper/types.js';
 import { BRD_REQUIREMENTS } from '../brd/requirements.js';
+import { getPlatformProfile } from '../scraper/platforms/index.js';
 
 export type PromptResponseFormat = 'markdown' | 'json';
 
 interface BuildPromptOptions {
   responseFormat?: PromptResponseFormat;
+  selectedPlatform?: KnownPlatform;
 }
 
 const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce website. Your task is to produce a Website Assessment (WA) using only the provided evidence bundle.
@@ -259,6 +261,7 @@ export function buildPrompt(
 ): { system: string; user: string } {
   const { summary, pages } = scrapeResult;
   const responseFormat = options.responseFormat || 'markdown';
+  const selectedPlatform = getPlatformProfile(options.selectedPlatform || summary.selectedPlatform?.id);
 
   // Group pages by tier for token optimization
   const { tierOne, tierTwo, tierThree } = groupPagesByTier(pages);
@@ -296,6 +299,11 @@ Keep crawlSummary aligned to the provided summary.`
 
 Respond with ONLY the Markdown Website Assessment. No preamble, no explanation after.`;
 
+  const scrapeErrorCount = summary.errors?.length || 0;
+  const scrapeHealthLine = scrapeErrorCount === 0 && !summary.scrapingCompletionWarning && !summary.botDetectionWarning
+    ? '- **Scrape health guidance:** Evidence collection completed cleanly (no blocked pages/errors). Do not describe this run as a failed sweep; treat checkout gaps as isolated checkout limitations only.'
+    : '- **Scrape health guidance:** Treat scraping warnings/errors as scoped limitations. Distinguish partial coverage from total crawl failure.';
+
   // Build the user prompt with evidence
   const userPrompt = `# Website Assessment Request
 
@@ -303,6 +311,13 @@ Respond with ONLY the Markdown Website Assessment. No preamble, no explanation a
 \`\`\`json
 ${JSON.stringify(summary, null, 2)}
 \`\`\`
+
+## Merchant-Provided Context
+
+- **Known ecommerce platform:** ${selectedPlatform.label}
+- Treat the selected platform as the expected implementation path for this run. Reconcile it with crawl evidence; if site evidence conflicts with the selected platform, call out the conflict as ❔ Unconfirmed or [Inference] instead of silently overriding it.
+- For GEM / Custom, assume a manual Global-e Module style implementation path unless direct evidence proves a packaged platform/plugin path.
+${scrapeHealthLine}
 
 ## Evidence by Category
 

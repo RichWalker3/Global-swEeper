@@ -13,6 +13,7 @@ dist/
 .idea/
 .vscode/*
 !.vscode/tasks.json
+.cursor/rules/mcp-atlassian-default.mdc
 *.swp
 *.swo
 .DS_Store

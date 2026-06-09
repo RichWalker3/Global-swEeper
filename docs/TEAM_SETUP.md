@@ -142,8 +142,21 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
 - **“Cannot find module” or install errors**  
   In the project folder run: `npm install` and `npm run playwright:install`.
 
-- **Playwright or Chromium errors**
-  Run `npm install` again from the project folder. The install downloads the full bundled Chromium browser that Sweep uses for crawling.
+- **Playwright or Chromium errors**  
+  Sweep installs Chromium inside the **same project folder** you run it from (`.playwright-browsers`). Use one copy of `global-sweep` — not separate Desktop and Downloads folders.
+
+  In Cursor, say: run `npm install` and `npm run playwright:install` in my global-sweep folder, then restart with **launch sweep**.
+
+  **Windows (PowerShell)** — run these in the folder where you open Sweep (check the path in the error message):
+
+  ```powershell
+  cd "C:\Users\YOURNAME\Desktop\global-sweep"
+  Remove-Item -Recurse -Force ".\.playwright-browsers\__dirlock" -ErrorAction SilentlyContinue
+  npm run playwright:install
+  npm run web
+  ```
+
+  Do **not** run `npx playwright install chromium` without `npm run playwright:install` — that can install the wrong browser type or into the wrong folder.
 
 - **Lots of pages time out**
   Slow networks, VPNs, or heavy sites may need more navigation time. Create a local `.env` file in the project folder with:

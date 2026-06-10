@@ -1297,7 +1297,7 @@
       <span class="logo-icon">🧹</span>
       <div>
         <div class="logo-text">Global-sw<span>E</span>ep</div>
-        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.2.0</span></div>
+        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.2.1</span></div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 1rem;">
@@ -1693,6 +1693,16 @@
   <script>
     // Feedback form access key (get free at https://web3forms.com)
     const FEEDBACK_ACCESS_KEY = '0416d606-88fc-40bd-bd85-45a3129dd47f';
+
+    const APP_BASE_PATH = (() => {
+      const firstPathSegment = window.location.pathname.split('/').filter(Boolean)[0];
+      return firstPathSegment ? `/${firstPathSegment}` : '';
+    })();
+
+    function appUrl(path) {
+      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+      return `${APP_BASE_PATH}${normalizedPath}`;
+    }
     
     // Feedback functions
     async function openFeedback() {
@@ -1704,7 +1714,7 @@
       
       // Fetch remaining credits and add to form (will appear in email)
       try {
-        const response = await fetch('/api/feedback/status');
+        const response = await fetch(appUrl('/api/feedback/status'));
         const data = await response.json();
         document.getElementById('feedbackRemaining').value = 
           data.warning 
@@ -1745,7 +1755,7 @@
           
           if (response.ok) {
             // Increment server-side counter
-            fetch('/api/feedback/increment', { method: 'POST' });
+            fetch(appUrl('/api/feedback/increment'), { method: 'POST' });
             status.style.display = 'block';
             status.style.color = 'var(--green)';
             status.textContent = '✓ Thanks for your feedback!';
@@ -1890,7 +1900,7 @@
 
     async function refreshJiraStatus() {
       try {
-        const response = await fetch('/api/jira/status');
+        const response = await fetch(appUrl('/api/jira/status'));
         renderJiraStatus(await readJsonResponse(response));
       } catch (error) {
         jiraConnected = false;
@@ -1906,7 +1916,7 @@
       setJiraCredentialStatus('Validating Jira credentials...');
 
       try {
-        const response = await fetch('/api/jira/session', {
+        const response = await fetch(appUrl('/api/jira/session'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1933,7 +1943,7 @@
     }
 
     async function clearJiraCredentials() {
-      const response = await fetch('/api/jira/session', { method: 'DELETE' });
+      const response = await fetch(appUrl('/api/jira/session'), { method: 'DELETE' });
       renderJiraStatus(await readJsonResponse(response));
       document.getElementById('rememberJiraCredentials').checked = false;
       setBrdStatus('');
@@ -1982,7 +1992,7 @@
       if (!clientId) {
         clientId = crypto.randomUUID();
       }
-      eventSource = new EventSource(`/events?clientId=${clientId}`);
+      eventSource = new EventSource(appUrl(`/events?clientId=${clientId}`));
 
       eventSource.addEventListener('connected', (e) => {
         const data = JSON.parse(e.data);
@@ -2694,7 +2704,7 @@
       }
 
       setBrdStatus('Validating SOPP parent...');
-      const response = await fetch('/api/brd/load', {
+      const response = await fetch(appUrl('/api/brd/load'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentKey }),
@@ -2721,7 +2731,7 @@
         const additionalNotes = document.getElementById('brdAdditionalNotes').value.trim();
         const waMarkdown = pastedWa;
 
-        const response = await fetch('/api/brd/process', {
+        const response = await fetch(appUrl('/api/brd/process'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2768,7 +2778,7 @@
 
       const parentKey = document.getElementById('brdParentKey').value.trim();
       setBrdSendStatus('Sending BRD updates to Jira. Please wait for confirmation...');
-      const response = await fetch('/api/brd/send', {
+      const response = await fetch(appUrl('/api/brd/send'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentKey, rows: normalizeBrdRowsForSave() }),
@@ -2809,7 +2819,7 @@
       outputContent.innerHTML = '<div class="output-placeholder"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div><p style="margin-top:1rem;">Scraping in progress...</p></div>';
 
       try {
-        await fetch('/api/sweep', {
+        await fetch(appUrl('/api/sweep'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url, clientId, options }),
@@ -2900,7 +2910,7 @@
       btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span> Converting...';
 
       try {
-        const res = await fetch('/api/json-to-markdown', {
+        const res = await fetch(appUrl('/api/json-to-markdown'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: jsonText,

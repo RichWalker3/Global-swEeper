@@ -2,6 +2,18 @@
 
 Global-sweep uses `major.minor.patch` style versioning during the internal pilot.
 
+## v0.2.1 - 2026-06-10
+
+Hosted Product Forge deployment fix.
+
+### Fixed
+
+- Routed frontend API and SSE calls through the current app base path so `/sweep` deployments connect to `/sweep/events` and `/sweep/api/*`.
+
+### Added
+
+- Regression coverage for hosted base-path routing.
+
 ## v0.2.0 - 2026-05-18
 
 First serious internal pilot baseline.

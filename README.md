@@ -2,7 +2,7 @@
 
 Global-sweep is a local Website Assessment assistant for Global-e presales work. It crawls a merchant site, collects high-signal evidence, and produces structured output that helps turn a storefront review into a WA and BRD update workflow.
 
-Current pilot version: `v0.2.0`
+Current pilot version: `v0.2.1`
 
 ![Global-sweep home screen](docs/assets/sweep-home.png)
 

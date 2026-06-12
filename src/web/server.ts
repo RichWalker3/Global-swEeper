@@ -32,6 +32,7 @@ import {
   setJiraSession,
 } from '../jira/session.js';
 import { formatMarkdown } from '../formatter/markdown.js';
+import { loadReleaseNotes } from './releaseNotes.js';
 import type { ScrapeResult } from '../scraper/types.js';
 import type { BrdReviewResult } from '../brd/types.js';
 
@@ -210,6 +211,18 @@ const server = createServer(async (req, res) => {
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: String(error) }));
+    }
+    return;
+  }
+
+  // API: Release notes for the "What's new" menu (parsed from CHANGELOG.md)
+  if (url.pathname === '/api/release-notes' && req.method === 'GET') {
+    try {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ releases: loadReleaseNotes() }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to load release notes.' }));
     }
     return;
   }

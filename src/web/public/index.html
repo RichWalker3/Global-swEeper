@@ -629,6 +629,124 @@
       resize: vertical;
     }
 
+    /* What's new (release notes) */
+    .whats-new-btn {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 9999px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      color: var(--gray-400);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .whats-new-btn:hover {
+      background: var(--gray-100);
+      border-color: var(--gray-300);
+      color: var(--black);
+    }
+
+    .release-modal-content {
+      max-width: 560px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .release-list {
+      overflow-y: auto;
+      margin: 0 -0.5rem;
+      padding: 0 0.5rem;
+    }
+
+    .release-entry {
+      padding: 1rem 0 1.25rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .release-entry:first-child {
+      padding-top: 0;
+    }
+
+    .release-entry:last-child {
+      border-bottom: none;
+    }
+
+    .release-entry-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .release-version {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--black);
+    }
+
+    .release-latest-pill {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--white);
+      background: var(--orange);
+      padding: 0.1rem 0.5rem;
+      border-radius: 9999px;
+    }
+
+    .release-date {
+      font-size: 0.8125rem;
+      color: var(--gray-400);
+      margin-left: auto;
+    }
+
+    .release-summary {
+      font-size: 0.875rem;
+      color: var(--gray-400);
+      margin-top: 0.25rem;
+    }
+
+    .release-section-title {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.1rem 0.5rem;
+      border-radius: 4px;
+      margin-top: 0.85rem;
+      background: var(--gray-100);
+      color: var(--gray-400);
+      border: 1px solid var(--gray-200);
+    }
+
+    .release-section-title.added { color: #15803d; background: #f0fdf4; border-color: #bbf7d0; }
+    .release-section-title.changed { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+    .release-section-title.fixed { color: var(--orange-dark); background: #fff7ed; border-color: #fed7aa; }
+
+    .release-items {
+      margin: 0.4rem 0 0 1.1rem;
+      font-size: 0.8125rem;
+      color: var(--black-light);
+    }
+
+    .release-items li {
+      margin-bottom: 0.25rem;
+    }
+
+    .release-loading {
+      padding: 2rem 0;
+      text-align: center;
+      color: var(--gray-400);
+      font-size: 0.875rem;
+    }
+
     /* Progress */
     .progress-section {
       margin-top: 1.5rem;
@@ -1297,10 +1415,14 @@
       <span class="logo-icon">🧹</span>
       <div>
         <div class="logo-text">Global-sw<span>E</span>ep</div>
-        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.2.1</span></div>
+        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.2.2</span></div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 1rem;">
+      <button class="whats-new-btn" id="whatsNewBtn" type="button" title="What's new in Sweep" onclick="openReleaseNotes()">
+        <span>🎁</span>
+        <span>What's new</span>
+      </button>
       <div class="status-badge">
         <span class="status-dot" id="connectionDot"></span>
         <span id="connectionStatus">Connecting...</span>
@@ -1408,6 +1530,19 @@
         <button type="submit" class="btn" style="width: 100%;">Send Feedback</button>
       </form>
       <p id="feedbackStatus" style="text-align: center; margin-top: 1rem; display: none;"></p>
+    </div>
+  </div>
+
+  <!-- Release Notes Modal -->
+  <div id="releaseNotesModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content release-modal-content">
+      <div class="modal-header">
+        <h3>🎁 What's new in Sweep</h3>
+        <button class="modal-close" onclick="closeReleaseNotes()">&times;</button>
+      </div>
+      <div class="release-list" id="releaseNotesContent">
+        <div class="release-loading">Loading release notes...</div>
+      </div>
     </div>
   </div>
 
@@ -1729,6 +1864,92 @@
       document.getElementById('feedbackModal').style.display = 'none';
     }
 
+    // Release notes ("What's new")
+    const LAST_SEEN_VERSION_KEY = 'sweepLastSeenVersion';
+    let releaseNotesCache = null;
+
+    async function fetchReleaseNotes() {
+      if (releaseNotesCache) return releaseNotesCache;
+      const response = await fetch(appUrl('/api/release-notes'));
+      if (!response.ok) throw new Error('Failed to load release notes');
+      const data = await response.json();
+      releaseNotesCache = data.releases || [];
+      return releaseNotesCache;
+    }
+
+    function formatReleaseDate(isoDate) {
+      if (!isoDate) return '';
+      const date = new Date(`${isoDate}T00:00:00`);
+      return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function renderReleaseNotes(releases) {
+      const container = document.getElementById('releaseNotesContent');
+      if (!releases.length) {
+        container.innerHTML = '<div class="release-loading">No release notes yet.</div>';
+        return;
+      }
+      container.innerHTML = releases.map((release, index) => {
+        const sections = release.sections
+          .filter(section => section.items.length > 0)
+          .map(section => `
+            <span class="release-section-title ${escapeHtml(section.title.toLowerCase())}">${escapeHtml(section.title)}</span>
+            <ul class="release-items">
+              ${section.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+            </ul>
+          `).join('');
+        return `
+          <div class="release-entry">
+            <div class="release-entry-header">
+              <span class="release-version">${escapeHtml(release.version)}</span>
+              ${index === 0 ? '<span class="release-latest-pill">Latest</span>' : ''}
+              <span class="release-date">${escapeHtml(formatReleaseDate(release.date))}</span>
+            </div>
+            ${release.summary ? `<div class="release-summary">${escapeHtml(release.summary)}</div>` : ''}
+            ${sections}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function openReleaseNotes() {
+      document.getElementById('releaseNotesModal').style.display = 'flex';
+      try {
+        const releases = await fetchReleaseNotes();
+        renderReleaseNotes(releases);
+        if (releases.length > 0) {
+          localStorage.setItem(LAST_SEEN_VERSION_KEY, releases[0].version);
+        }
+      } catch {
+        document.getElementById('releaseNotesContent').innerHTML =
+          '<div class="release-loading">Could not load release notes. Try again later.</div>';
+      }
+    }
+
+    function closeReleaseNotes() {
+      document.getElementById('releaseNotesModal').style.display = 'none';
+    }
+
+    async function checkUnseenReleaseNotes() {
+      try {
+        const releases = await fetchReleaseNotes();
+        if (!releases.length) return;
+        const latestVersion = releases[0].version;
+        const lastSeen = localStorage.getItem(LAST_SEEN_VERSION_KEY);
+        if (lastSeen === latestVersion) return;
+        if (!lastSeen) {
+          // First-ever visit: mark current version seen without popping anything.
+          localStorage.setItem(LAST_SEEN_VERSION_KEY, latestVersion);
+          return;
+        }
+        // New release since last visit: show the notes once. openReleaseNotes()
+        // records the version as seen, so the popup never repeats for this release.
+        openReleaseNotes();
+      } catch {
+        // Skip the popup when notes can't load.
+      }
+    }
+
     // Close modal on outside click
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('feedbackModal').addEventListener('click', (e) => {
@@ -1736,6 +1957,14 @@
           closeFeedback();
         }
       });
+
+      document.getElementById('releaseNotesModal').addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-overlay')) {
+          closeReleaseNotes();
+        }
+      });
+
+      checkUnseenReleaseNotes();
 
       // Handle feedback form submission
       document.getElementById('feedbackForm').addEventListener('submit', async (e) => {

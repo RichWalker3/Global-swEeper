@@ -4,12 +4,27 @@
  * a friendly, date-ordered history without duplicating the changelog.
  */
 
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CHANGELOG_PATH = join(__dirname, '..', '..', 'CHANGELOG.md');
+
+/**
+ * The changelog lives at the repo root in dev, but container images ship only
+ * `dist/` (see Dockerfile), where the build copies it to `dist/CHANGELOG.md`.
+ */
+const FALLBACK_CHANGELOG_PATHS = [
+  join(__dirname, '..', '..', 'CHANGELOG.md'), // repo root (tsx dev / npm start from a checkout)
+  join(__dirname, '..', 'CHANGELOG.md'), // dist/CHANGELOG.md (dist-only container runtime)
+];
+
+export function resolveChangelogPath(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.SWEEP_CHANGELOG_PATH) return env.SWEEP_CHANGELOG_PATH;
+  const found = FALLBACK_CHANGELOG_PATHS.find((path) => existsSync(path));
+  // Fall through to the first candidate so readFileSync reports a clear ENOENT.
+  return found ?? FALLBACK_CHANGELOG_PATHS[0];
+}
 
 export interface ReleaseSection {
   /** Heading like "Added", "Changed", "Fixed", "Verified". */
@@ -72,5 +87,5 @@ export function parseChangelog(markdown: string): ReleaseNote[] {
 
 /** Read and parse the project changelog. Throws if the file is missing. */
 export function loadReleaseNotes(): ReleaseNote[] {
-  return parseChangelog(readFileSync(CHANGELOG_PATH, 'utf-8'));
+  return parseChangelog(readFileSync(resolveChangelogPath(), 'utf-8'));
 }

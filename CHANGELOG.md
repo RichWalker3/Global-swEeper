@@ -2,6 +2,20 @@
 
 Global-sweep uses `major.minor.patch` style versioning during the internal pilot.
 
+## v0.2.3 - 2026-06-12
+
+Emergency fix for the hosted Sweep outage caused by v0.2.2.
+
+### Fixed
+
+- Hosted Sweep crashed on every page visit after v0.2.2: the release notes file (CHANGELOG.md) was missing from the deployed bundle, and the failed request brought down the whole server. The build now ships the file, and the server survives even if it's missing.
+- A bug in any single request can no longer crash the app — errors now return a normal error response instead of taking Sweep down for everyone.
+
+### Added
+
+- A pre-deploy check (`npm run verify:dist`) that runs the app exactly the way the hosted container does and fails if any core page or API breaks — this would have caught the v0.2.2 outage before it shipped.
+- Automated tests that exercise the live HTTP server, including the exact failure that caused the outage.
+
 ## v0.2.2 - 2026-06-12
 
 Sweep now handles slow office networks and VPNs much better, and you can see what changed in each update right from the app.

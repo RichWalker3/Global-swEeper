@@ -7,7 +7,7 @@ import 'dotenv/config';
 import { createServer } from 'http';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname, extname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { scrape } from '../scraper/scraper.js';
 import { buildPrompt } from '../extractor/prompt.js';
 import { generateDna } from '../dna/generator.js';
@@ -138,9 +138,30 @@ async function parseBody(req: import('http').IncomingMessage): Promise<string> {
   });
 }
 
-// Main server
+// Main server. The handler is wrapped so an exception in any route produces a
+// single 500 response instead of an unhandled rejection that kills the process
+// (which puts the hosted container into a crash loop).
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url || '/', BASE_URL);
+  try {
+    await handleRequest(req, res);
+  } catch (error) {
+    console.error(`Unhandled error handling ${req.method || 'GET'} ${req.url || '/'}:`, error);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Internal server error' }));
+    } else {
+      res.end();
+    }
+  }
+});
+
+async function handleRequest(
+  req: import('http').IncomingMessage,
+  res: import('http').ServerResponse
+): Promise<void> {
+  // Only pathname/searchParams are used; a fixed base keeps parsing independent
+  // of BASE_URL (which can be a bare path like "/" under some environments).
+  const url = new URL(req.url || '/', 'http://localhost');
   
   // CORS headers - check origin against allowed list
   const origin = req.headers.origin || '';
@@ -217,13 +238,18 @@ const server = createServer(async (req, res) => {
 
   // API: Release notes for the "What's new" menu (parsed from CHANGELOG.md)
   if (url.pathname === '/api/release-notes' && req.method === 'GET') {
+    // Build the full payload before touching the response: writing headers first
+    // and then throwing caused a double-writeHead crash loop in v0.2.2.
+    let status = 200;
+    let payload: string;
     try {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ releases: loadReleaseNotes() }));
+      payload = JSON.stringify({ releases: loadReleaseNotes() });
     } catch (error) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to load release notes.' }));
+      status = 500;
+      payload = JSON.stringify({ error: error instanceof Error ? error.message : 'Failed to load release notes.' });
     }
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(payload);
     return;
   }
 
@@ -524,7 +550,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
   }
-});
+}
 
 function getBrdErrorStatus(error: unknown): number {
   if (!(error instanceof Error)) return 500;
@@ -717,9 +743,14 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
   return result;
 }
 
-server.listen(PORT, () => {
-  const displayUrl = BASE_URL.includes('localhost') ? `http://localhost:${PORT}` : BASE_URL;
-  console.log(`
+// Listen only when launched directly (npm start / npm run web), so tests can
+// import the server and bind it to an ephemeral port instead.
+const isDirectRun = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
+
+if (isDirectRun) {
+  server.listen(PORT, () => {
+    const displayUrl = BASE_URL.includes('localhost') ? `http://localhost:${PORT}` : BASE_URL;
+    console.log(`
   ╔══════════════════════════════════════════════════════════╗
   ║                                                          ║
   ║   🧹 Global-swEep is running!                            ║
@@ -730,7 +761,8 @@ server.listen(PORT, () => {
   ║                                                          ║
   ╚══════════════════════════════════════════════════════════╝
   `);
-});
+  });
+}
 
 export { server };
 

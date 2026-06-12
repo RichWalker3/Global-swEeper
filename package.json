@@ -1,10 +1,11 @@
 {
   "name": "global-sweep",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Automated Website Assessment tool for Global-e merchant onboarding",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && node scripts/copy-web-public.mjs",
+    "verify:dist": "npm run build && node scripts/verify-dist.mjs",
     "typecheck": "tsc",
     "web": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts",
     "start": "node dist/web/server.js",

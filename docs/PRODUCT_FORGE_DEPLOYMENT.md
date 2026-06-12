@@ -86,6 +86,34 @@ The remaining size is primarily Playwright Chromium plus Linux browser system de
 - Investigate whether the full Chromium dependency set is required for Product Forge workloads.
 - Move browser execution to a remote browser service if image size becomes a hard constraint. This would be an architectural change.
 
+## Pre-Deploy Checklist (required before pushing a release to main)
+
+Every push to `main` can trigger a production rebuild, so run all of these locally first:
+
+```bash
+npm run typecheck
+npm test -- --run
+npm run verify:dist
+```
+
+`verify:dist` is the critical one: it builds `dist` and runs the compiled server from a
+staged directory containing **only** `package.json`, `node_modules`, and `dist` — the same
+filesystem the container has. It then exercises `/health`, `/`, `/api/release-notes`, and
+`/api/feedback/status` and fails if the server crashes or any route breaks.
+
+Context: the v0.2.2 outage happened because the app worked from a full checkout but
+crashed in the dist-only container (`CHANGELOG.md` wasn't shipped in `dist`, and the
+failing route killed the Node process on every visit). `verify:dist` reproduces the
+container conditions and would have caught it before deploy.
+
+Rules that keep this class of bug out:
+
+- Any runtime data file the server reads must be copied into `dist` by
+  `scripts/copy-web-public.mjs` (the container ships only `dist`).
+- Never call `res.writeHead()` before the work that can throw; build the payload first.
+- The request handler is wrapped in a top-level catch (`src/web/server.ts`) so a bug in
+  one route returns a 500 instead of crashing the process — don't bypass it.
+
 ## Product Forge Handoff Details
 
 - Repository: `https://gitlab.com/global-e/solutions/global-sweep.git`

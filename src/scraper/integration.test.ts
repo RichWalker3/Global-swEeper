@@ -12,7 +12,7 @@ import { detectThirdParty, scanForDangerousGoods, detectB2B, extractProductLinks
 import { extractPolicyInfo } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectSubscriptions, detectPreOrders, detectBNPLWidgets } from './catalogDetector.js';
 import { tagPage } from '../prefilter/tagger.js';
-import { defaultPageGotoTimeoutMs } from './scraper.js';
+import { defaultPageGotoTimeoutMs, adaptTimeoutsForLatency } from './scraper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, '__fixtures__', 'shopify-store');
@@ -96,6 +96,45 @@ describe('scraper configuration', () => {
     expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '5000' })).toBe(10000);
     expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '45000' })).toBe(45000);
     expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '300000' })).toBe(120000);
+  });
+});
+
+describe('adaptive timeouts for slow networks', () => {
+  const base = { timeout: 30000, scrapeTimeout: 300000 };
+
+  it('keeps configured timeouts when latency is normal', () => {
+    expect(adaptTimeoutsForLatency(300, base)).toEqual({ ...base, adapted: false });
+    expect(adaptTimeoutsForLatency(800, base)).toEqual({ ...base, adapted: false });
+  });
+
+  it('keeps configured timeouts when the probe failed', () => {
+    expect(adaptTimeoutsForLatency(null, base)).toEqual({ ...base, adapted: false });
+  });
+
+  it('scales timeouts proportionally to latency', () => {
+    // 1600ms TTFB = 2x baseline → 2x page timeout and 2x overall budget
+    const result = adaptTimeoutsForLatency(1600, base);
+    expect(result.adapted).toBe(true);
+    expect(result.timeout).toBe(60000);
+    expect(result.scrapeTimeout).toBe(600000);
+  });
+
+  it('caps the page timeout multiplier at 4x and 120s', () => {
+    const result = adaptTimeoutsForLatency(10000, base);
+    expect(result.timeout).toBe(120000);
+  });
+
+  it('caps the overall budget multiplier at 2x and 15 minutes', () => {
+    const result = adaptTimeoutsForLatency(10000, { timeout: 30000, scrapeTimeout: 420000 });
+    expect(result.scrapeTimeout).toBe(840000);
+    const capped = adaptTimeoutsForLatency(10000, { timeout: 30000, scrapeTimeout: 600000 });
+    expect(capped.scrapeTimeout).toBe(900000);
+  });
+
+  it('never shrinks an explicitly larger configured timeout', () => {
+    const result = adaptTimeoutsForLatency(900, { timeout: 120000, scrapeTimeout: 420000 });
+    expect(result.timeout).toBe(120000);
+    expect(result.scrapeTimeout).toBeGreaterThanOrEqual(420000);
   });
 });
 

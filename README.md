@@ -133,13 +133,15 @@ npm run web
 
 ### Slow or blocked pages
 
-Some merchants block or degrade automated browsing. On slow networks, VPNs, or heavy CMP/CDN pages, create a local `.env` file and add:
+Some merchants block or degrade automated browsing. Sweep measures your connection speed to the target site at the start of each run and automatically extends its timeouts on slow networks or VPNs (a "Slow connection detected" message appears in the progress feed).
+
+If pages still time out, you can force a higher baseline by creating a local `.env` file with:
 
 ```bash
-SWEEP_PAGE_GOTO_TIMEOUT_MS=45000
+SWEEP_PAGE_GOTO_TIMEOUT_MS=60000
 ```
 
-Then restart Sweep. The accepted range is `10000` to `120000` ms.
+Then restart Sweep. The accepted range is `10000` to `120000` ms. Note: corporate VPNs routed through another region can also be flagged as bot traffic by some sites — if you see `blocked` errors rather than timeouts, disconnect the VPN.
 
 ## Useful Docs
 

@@ -146,9 +146,9 @@ After any update, you can say **“launch sweep”** in Cursor to start the app 
   Run `npm install` again from the project folder. The install downloads the full bundled Chromium browser that Sweep uses for crawling.
 
 - **Lots of pages time out**
-  Slow networks, VPNs, or heavy sites may need more navigation time. Create a local `.env` file in the project folder with:
-  `SWEEP_PAGE_GOTO_TIMEOUT_MS=45000`
-  Then restart Sweep with `npm run web`.
+  Sweep checks your connection speed to the site at the start of each run and automatically extends its timeouts on slow networks/VPNs (you'll see a "Slow connection detected" message). If pages still time out:
+  - **On a corporate VPN:** disconnect the VPN if you can — VPNs routed through another region also get flagged as bots by some sites, which timeouts can't fix.
+  - Or force a higher baseline by creating a local `.env` file with `SWEEP_PAGE_GOTO_TIMEOUT_MS=60000` and restarting Sweep with `npm run web`.
 
 - **Port 3847 already in use**  
   Another app is using that port. Close the other app or create a `.env` with `PORT=3848` and use http://localhost:3848.

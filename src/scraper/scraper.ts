@@ -9,7 +9,7 @@ import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from '
 import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
 import { logAssessment, type DebugInfo } from '../logger/index.js';
-import { gotoWithRetry, classifyError, randomDelay } from './helpers.js';
+import { gotoWithRetry, classifyError, randomDelay, USER_AGENTS } from './helpers.js';
 import { launchStealthBrowser, createStealthContext, dismissCookieConsent, slowScroll } from './browser.js';
 import { discoverCrawlTargets, getFallbackTargets, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
@@ -158,6 +158,71 @@ export function defaultPageGotoTimeoutMs(env: NodeJS.ProcessEnv = process.env): 
   const parsed = raw ? Number.parseInt(raw, 10) : 30000;
   if (!Number.isFinite(parsed)) return 30000;
   return Math.min(Math.max(parsed, 10000), 120000);
+}
+
+// ============ Adaptive Timeouts (slow networks / VPNs) ============
+
+/** Each probe request is abandoned after this long; a failed probe just skips adaptation. */
+const LATENCY_PROBE_TIMEOUT_MS = 8000;
+/** Time-to-first-byte above this is considered a slow connection (e.g. VPN routed through another continent). */
+const LATENCY_BASELINE_MS = 800;
+/** Same ceiling as the SWEEP_PAGE_GOTO_TIMEOUT_MS clamp. */
+const MAX_PAGE_TIMEOUT_MS = 120000;
+const MAX_SCRAPE_TIMEOUT_MS = 900000;
+
+/**
+ * Measure time-to-first-byte to the seed URL. Runs two probes and takes the fastest
+ * (the first one pays DNS + TLS setup). Returns null when the site can't be probed —
+ * callers then keep the configured timeouts unchanged.
+ */
+export async function measureSeedLatencyMs(seedUrl: string): Promise<number | null> {
+  const probe = async (): Promise<number | null> => {
+    const controller = new AbortController();
+    const cap = setTimeout(() => controller.abort(), LATENCY_PROBE_TIMEOUT_MS);
+    const started = Date.now();
+    try {
+      const res = await fetch(seedUrl, {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: { 'User-Agent': USER_AGENTS[0], 'Accept': 'text/html' },
+      });
+      const elapsed = Date.now() - started;
+      // Headers are enough for a latency estimate; don't download the body.
+      await res.body?.cancel().catch(() => {});
+      return elapsed;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(cap);
+    }
+  };
+
+  const first = await probe();
+  if (first === null) return null;
+  const second = await probe();
+  return second === null ? first : Math.min(first, second);
+}
+
+/**
+ * Scale timeouts to match measured latency. A page load is dozens of sequential round trips,
+ * so high latency multiplies total load time — we scale the per-page timeout proportionally
+ * (capped at 4x / 120s) and give the overall budget up to 2x so the longer pages still fit.
+ * Never shrinks the configured values.
+ */
+export function adaptTimeoutsForLatency(
+  latencyMs: number | null,
+  base: { timeout: number; scrapeTimeout: number }
+): { timeout: number; scrapeTimeout: number; adapted: boolean } {
+  if (latencyMs === null || latencyMs <= LATENCY_BASELINE_MS) {
+    return { timeout: base.timeout, scrapeTimeout: base.scrapeTimeout, adapted: false };
+  }
+  const multiplier = Math.min(latencyMs / LATENCY_BASELINE_MS, 4);
+  const timeout = Math.min(Math.max(Math.round(base.timeout * multiplier), base.timeout), MAX_PAGE_TIMEOUT_MS);
+  const scrapeTimeout = Math.min(
+    Math.max(Math.round(base.scrapeTimeout * Math.min(multiplier, 2)), base.scrapeTimeout),
+    MAX_SCRAPE_TIMEOUT_MS
+  );
+  return { timeout, scrapeTimeout, adapted: true };
 }
 
 const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
@@ -321,6 +386,21 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
   scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: seedUrl };
   scrapeRaceResolvedWithTimeout = false;
   lastScrapeSnapshot = null;
+
+  // Slow connections (e.g. office VPNs routed through another region) need longer
+  // timeouts or every page "times out". Probe once and extend budgets before starting.
+  opts.onProgress({ phase: 'init', message: 'Checking connection speed to the site...' });
+  const latencyMs = await measureSeedLatencyMs(seedUrl);
+  const adaptedTimeouts = adaptTimeoutsForLatency(latencyMs, opts);
+  if (adaptedTimeouts.adapted) {
+    opts.timeout = adaptedTimeouts.timeout;
+    opts.scrapeTimeout = adaptedTimeouts.scrapeTimeout;
+    const message =
+      `Slow connection detected (${((latencyMs ?? 0) / 1000).toFixed(1)}s to reach the site — VPN?). ` +
+      `Extending page timeout to ${Math.round(opts.timeout / 1000)}s and overall budget to ${Math.round(opts.scrapeTimeout / 1000)}s.`;
+    opts.onProgress({ phase: 'init', message });
+    if (opts.verbose) console.log(`  ⚠ ${message}`);
+  }
 
   const scrapeStartedAt = Date.now();
   let heartbeat: ReturnType<typeof setInterval> | undefined;

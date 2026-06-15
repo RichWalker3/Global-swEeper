@@ -16,10 +16,15 @@ FROM node:22-bookworm-slim AS runtime
 
 WORKDIR /app
 
+# Resource defaults for hosted Chromium scraping.
+# Product Forge can override these in the deployment environment.
+# Pair SWEEP_CHROMIUM_USE_DEV_SHM=1 with a large container /dev/shm (see docker-compose.yml).
 ENV NODE_ENV=production \
     PORT=3000 \
     PLAYWRIGHT_BROWSERS_PATH=/app/.playwright-browsers \
-    SWEEP_MAX_CONCURRENT_ASSESSMENTS=1
+    SWEEP_MAX_CONCURRENT_ASSESSMENTS=1 \
+    NODE_OPTIONS=--max-old-space-size=2048 \
+    SWEEP_CHROMIUM_RENDERER_PROCESS_LIMIT=6
 
 # tini reaps zombie Chromium child processes in container environments.
 RUN apt-get update \

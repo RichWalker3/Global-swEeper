@@ -7,6 +7,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { chromium, BrowserContext, Page, Frame } from 'playwright';
 import { getRandomUserAgent, getRandomViewport } from './helpers.js';
+import { buildChromiumLaunchArgs, readChromiumRuntimeConfig } from './chromiumRuntime.js';
 
 export interface BrowserConfig {
   userAgent: string;
@@ -62,21 +63,11 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   }
 
   // Build launch options
+  const runtime = readChromiumRuntimeConfig();
   const launchOptions: Parameters<typeof chromium.launch>[0] = {
     headless: true,
     executablePath: resolveFullChromiumExecutablePath(),
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-features=IsolateOrigins,site-per-process',
-      '--disable-web-security',
-      '--disable-infobars',
-      '--window-size=' + viewport.width + ',' + viewport.height,
-      '--disable-dev-shm-usage',
-      '--no-first-run',
-      '--no-default-browser-check',
-    ],
+    args: buildChromiumLaunchArgs(viewport),
   };
 
   // Add proxy if configured
@@ -96,6 +87,8 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
     details: {
       proxyConfigured: Boolean(proxyUrl),
       executablePath: launchOptions.executablePath,
+      disableDevShmUsage: runtime.disableDevShmUsage,
+      rendererProcessLimit: runtime.rendererProcessLimit,
     },
   });
 

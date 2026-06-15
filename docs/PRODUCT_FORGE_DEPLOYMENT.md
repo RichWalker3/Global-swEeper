@@ -79,6 +79,9 @@ The Dockerfile uses a multi-stage build:
 7. Docker healthcheck calls `http://127.0.0.1:${PORT}/health`.
 8. `tini` is the container entrypoint so zombie Chromium child processes are reaped.
 9. `SWEEP_MAX_CONCURRENT_ASSESSMENTS=1` is set by default so hosted runs queue instead of overlapping browsers.
+10. `NODE_OPTIONS=--max-old-space-size=2048` reserves a 2 GB Node heap when the container has enough RAM.
+11. `SWEEP_CHROMIUM_RENDERER_PROCESS_LIMIT=6` caps Chromium renderer processes per browser instance.
+12. `docker-compose.yml` documents the recommended prod-like resource profile (`shm_size: 2gb`, `mem_limit: 3g`).
 
 The earlier recursive `chown -R /app` approach was removed because it created a large duplicate Docker layer. Ownership is now handled through targeted copy/setup steps.
 
@@ -91,14 +94,41 @@ Sweep keeps **full Playwright/Chromium** as the primary assessment path. Reliabi
 - **Assessment run gate** — hosted deployments default to one active browser assessment; additional requests wait in queue (`SWEEP_MAX_CONCURRENT_ASSESSMENTS`).
 - **Scrape quality metadata** — `summary.scrapeQuality` reports full vs degraded pages, browser restarts, and fallback discovery usage.
 
-If Product Forge supports container runtime flags, prefer adequate shared memory for Chromium:
+### Recommended container resources
+
+Chromium needs both **RAM** and **shared memory** (`/dev/shm`). Defaults in the Docker image target a ~2–3 GB container.
+
+| Setting | Recommended | Where to set |
+|--------|-------------|--------------|
+| Container memory | **≥ 2 GB** (3 GB preferred) | Product Forge guest-app limits |
+| `/dev/shm` | **≥ 2 GB** | Product Forge runtime or `shm_size` in compose |
+| `NODE_OPTIONS` | `--max-old-space-size=2048` | Dockerfile default; override in PF env |
+| `SWEEP_MAX_CONCURRENT_ASSESSMENTS` | `1` | Dockerfile default |
+| `SWEEP_CHROMIUM_USE_DEV_SHM` | `1` | PF env **after** large `/dev/shm` is confirmed |
+| `SWEEP_CHROMIUM_RENDERER_PROCESS_LIMIT` | `6` | Dockerfile default; optional override |
+
+Reference compose file for local prod-like testing:
 
 ```bash
-docker run --init --ipc=host -p 3000:3000 global-sweep:dist-runtime
-# or docker compose: shm_size: '2gb'
+docker compose up --build
 ```
 
-Without enough `/dev/shm`, Chromium may crash on heavy Shopify pages even when the Node app stays healthy. The image sets `--disable-dev-shm-usage` in Chromium launch args as a fallback, but larger shared memory is still preferred when the platform allows it.
+That file sets `shm_size: 2gb`, `mem_limit: 3g`, `ipc: host`, and `SWEEP_CHROMIUM_USE_DEV_SHM=1`.
+
+### `/dev/shm` behavior
+
+Docker’s default `/dev/shm` is often **64 MB**, which causes renderer crashes on heavy Shopify pages.
+
+- **Without large `/dev/shm`:** Sweep keeps `--disable-dev-shm-usage` (Chromium uses disk instead). Safer on small containers, slightly slower.
+- **With large `/dev/shm` (≥ 2 GB):** set `SWEEP_CHROMIUM_USE_DEV_SHM=1` in the deployment environment so Chromium uses proper shared memory.
+
+If Product Forge supports container runtime flags, prefer:
+
+```bash
+docker run --init --ipc=host --shm-size=2g -p 3000:3000 global-sweep:dist-runtime
+```
+
+Ask the Product Forge owner to mirror the `docker-compose.yml` resource profile if the platform exposes memory/shared-memory settings.
 
 Future option: a dedicated Playwright browser sidecar connected via WebSocket (`PLAYWRIGHT_WS_ENDPOINT`) if Product Forge supports multi-container guest apps.
 

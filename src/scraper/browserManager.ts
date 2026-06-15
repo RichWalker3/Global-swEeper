@@ -59,6 +59,17 @@ export class StealthBrowserManager {
     return this.browser?.isConnected() ?? false;
   }
 
+  /** Launch or restart when the browser disconnected or the session was torn down. */
+  async ensureSession(reason = 'browser disconnected'): Promise<LaunchResult> {
+    if (this.browser?.isConnected() && this.context && this.config) {
+      return this.getSession();
+    }
+    if (this.browser) {
+      return this.restart(reason);
+    }
+    return this.launch();
+  }
+
   getSession(): LaunchResult {
     if (!this.browser || !this.context || !this.config) {
       throw new Error('Browser manager has no active session');

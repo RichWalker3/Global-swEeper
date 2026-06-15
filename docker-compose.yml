@@ -1,0 +1,35 @@
+# Reference production-like runtime for local verification.
+# Product Forge operators: mirror these settings in the guest-app deployment config.
+#
+#   docker compose up --build
+#
+services:
+  sweep:
+    build: .
+    image: global-sweep:prod-tuned
+    ports:
+      - "3000:3000"
+    shm_size: "2gb"
+    ipc: host
+    init: true
+    mem_limit: 3g
+    mem_reservation: 2g
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      SWEEP_MAX_CONCURRENT_ASSESSMENTS: "1"
+      NODE_OPTIONS: --max-old-space-size=2048
+      SWEEP_CHROMIUM_USE_DEV_SHM: "1"
+      SWEEP_CHROMIUM_RENDERER_PROCESS_LIMIT: "6"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

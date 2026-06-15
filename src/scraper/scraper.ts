@@ -9,8 +9,8 @@ import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from '
 import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
 import { logAssessment, type DebugInfo } from '../logger/index.js';
-import { gotoWithRetry, classifyError, randomDelay, USER_AGENTS, shouldRestartBrowserOnNavigationFailure, shouldRetryFullBrowserNavigation } from './helpers.js';
-import { createStealthContext, dismissCookieConsent, slowScroll, type BrowserConfig } from './browser.js';
+import { gotoWithRetry, classifyError, randomDelay, USER_AGENTS, isBrowserCrashError, shouldRestartBrowserOnNavigationFailure, shouldRetryFullBrowserNavigation } from './helpers.js';
+import { createStealthContext, dismissCookieConsent, slowScroll, type BrowserConfig, type ContextOptions } from './browser.js';
 import { StealthBrowserManager, attachPageCrashLogging } from './browserManager.js';
 import { discoverCrawlTargets, getFallbackTargets, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
@@ -556,7 +556,7 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
 
     // Phase 3: Test checkout (optional; web UI often skips to avoid long stalls)
     if (!opts.skipCheckout) {
-      await testCheckout(session.browser, session.context, seedUrl, state, opts, startedAt);
+      await testCheckout(session, seedUrl, state, opts, startedAt);
     } else {
       state.checkoutSkipped = true;
       scrapeProgress.phase = 'checkout';
@@ -582,9 +582,7 @@ async function restartBrowserSession(
   reason: string
 ): Promise<void> {
   const relaunched = await session.manager.restart(reason);
-  session.browser = relaunched.browser;
-  session.context = relaunched.context;
-  session.config = relaunched.config;
+  syncBrowserSession(session, relaunched);
   state.browserRestarts = session.manager.getRestartCount();
   state.degradedReasons.add('browser_restart');
   emitLog(opts, {
@@ -597,6 +595,47 @@ async function restartBrowserSession(
   });
 }
 
+function syncBrowserSession(session: BrowserSession, launched: { browser: Browser; context: BrowserContext; config: BrowserConfig }): void {
+  session.browser = launched.browser;
+  session.context = launched.context;
+  session.config = launched.config;
+}
+
+async function ensureLiveBrowserSession(
+  session: BrowserSession,
+  state: ScrapeState,
+  opts: Required<ScrapeOptions>,
+  reason: string
+): Promise<void> {
+  if (session.browser.isConnected()) return;
+  await restartBrowserSession(session, state, opts, reason);
+}
+
+async function createRecoveryContext(
+  session: BrowserSession,
+  state: ScrapeState,
+  opts: Required<ScrapeOptions>,
+  reason: string,
+  contextOptions: Omit<ContextOptions, 'verbose' | 'config'> & { config?: BrowserConfig } = {}
+): Promise<{ context: BrowserContext; config: BrowserConfig }> {
+  await ensureLiveBrowserSession(session, state, opts, reason);
+  const buildContext = () =>
+    createStealthContext(session.browser, {
+      verbose: opts.verbose,
+      config: contextOptions.config ?? session.config,
+      ...contextOptions,
+    });
+
+  try {
+    return await buildContext();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!isBrowserCrashError(message)) throw error;
+    await restartBrowserSession(session, state, opts, `${reason} (newContext failed)`);
+    return await buildContext();
+  }
+}
+
 function markFallbackDiscovery(seedUrl: string, state: ScrapeState): CrawlTarget[] {
   state.discoveryUsedFallbackUrls = true;
   state.degradedReasons.add('discovery_fallback');
@@ -606,7 +645,8 @@ function markFallbackDiscovery(seedUrl: string, state: ScrapeState): CrawlTarget
 // ============ Discovery Phase ============
 
 async function tryLightweightDiscovery(
-  browser: Browser,
+  session: BrowserSession,
+  state: ScrapeState,
   seedUrl: string,
   opts: Required<ScrapeOptions>
 ): Promise<CrawlTarget[] | null> {
@@ -619,8 +659,7 @@ async function tryLightweightDiscovery(
     details: { seedUrl },
   });
 
-  const recovery = await createStealthContext(browser, {
-    verbose: false,
+  const recovery = await createRecoveryContext(session, state, opts, 'lightweight discovery', {
     javaScriptEnabled: false,
     blockHeavyResources: true,
   });
@@ -676,7 +715,6 @@ async function discoverPages(
   state: ScrapeState,
   opts: Required<ScrapeOptions>
 ): Promise<CrawlTarget[]> {
-  const { browser, context } = session;
   scrapeProgress.phase = 'discovery';
   opts.onProgress({ phase: 'init', message: 'Discovering site structure...' });
   if (opts.verbose) console.log('  Discovering site structure...');
@@ -689,7 +727,8 @@ async function discoverPages(
     details: { seedUrl },
   });
 
-  const discoveryPage = await context.newPage();
+  await ensureLiveBrowserSession(session, state, opts, 'pre-discovery');
+  const discoveryPage = await session.context.newPage();
   attachPageCrashLogging(discoveryPage, (entry) => emitLog(opts, entry), seedUrl);
   let navResult = await gotoWithRetry(discoveryPage, seedUrl, {
     timeout: opts.timeout,
@@ -701,7 +740,7 @@ async function discoverPages(
 
   if (navResult.blocked) {
     await discoveryPage.close().catch(() => {});
-    const rotated = await createStealthContext(browser, { verbose: false });
+    const rotated = await createRecoveryContext(session, state, opts, 'discovery bot-block retry');
     activeContext = rotated.context;
     const retryPage = await activeContext.newPage();
     if (opts.verbose) {
@@ -763,7 +802,7 @@ async function discoverPages(
   }
 
   if (shouldRetryWithLightweightNavigation(navResult)) {
-    const targets = await tryLightweightDiscovery(browser, seedUrl, opts);
+    const targets = await tryLightweightDiscovery(session, state, seedUrl, opts);
     if (targets) {
       await activeContext?.close().catch(() => {});
       await discoveryPage.close().catch(() => {});
@@ -940,7 +979,6 @@ async function scrapeDiscoveredPages(
   wappalyzerReady: boolean,
   startedAt: string
 ): Promise<void> {
-  let { browser, context } = session;
   const totalTargets = Math.min(targets.length, opts.maxPages);
   let pageIndex = 0;
   let lastVisitedUrl: string | undefined;
@@ -970,7 +1008,7 @@ async function scrapeDiscoveredPages(
     try {
       if (pageIndex > 1) await randomDelay(500, 1500);
       const primaryAttempt = await scrapeTargetAttempt(
-        context,
+        session.context,
         target,
         state,
         opts,
@@ -990,10 +1028,8 @@ async function scrapeDiscoveredPages(
           console.log(`  ↻ ${target.type}: ${target.url} - Restarting browser after crash`);
         }
         await restartBrowserSession(session, state, opts, `page crash on ${target.url}`);
-        browser = session.browser;
-        context = session.context;
         const restartAttempt = await scrapeTargetAttempt(
-          context,
+          session.context,
           target,
           state,
           opts,
@@ -1012,7 +1048,7 @@ async function scrapeDiscoveredPages(
         if (opts.verbose) {
           console.log(`  ↻ ${target.type}: ${target.url} - Retrying in a fresh full-browser context`);
         }
-        const rotated = await createStealthContext(browser, { verbose: false, config: session.config });
+        const rotated = await createRecoveryContext(session, state, opts, `fresh context retry on ${target.url}`);
         try {
           const recoveryAttempt = await scrapeTargetAttempt(
             rotated.context,
@@ -1050,8 +1086,7 @@ async function scrapeDiscoveredPages(
           details: { url: target.url, targetType: target.type },
         });
 
-        const recovery = await createStealthContext(browser, {
-          verbose: false,
+        const recovery = await createRecoveryContext(session, state, opts, `lightweight retry on ${target.url}`, {
           javaScriptEnabled: false,
           blockHeavyResources: true,
         });
@@ -1083,7 +1118,7 @@ async function scrapeDiscoveredPages(
         if (opts.verbose) {
           console.log(`  ↻ ${target.type}: ${target.url} - Retrying in a fresh context`);
         }
-        const rotated = await createStealthContext(browser, { verbose: false });
+        const rotated = await createRecoveryContext(session, state, opts, `bot-block retry on ${target.url}`);
         try {
           const recoveryAttempt = await scrapeTargetAttempt(
             rotated.context,
@@ -1568,8 +1603,7 @@ async function processProductPage(pageData: PageData, state: ScrapeState, opts: 
 // ============ Checkout Phase ============
 
 async function testCheckout(
-  browser: Browser,
-  context: BrowserContext,
+  session: BrowserSession,
   seedUrl: string,
   state: ScrapeState,
   opts: Required<ScrapeOptions>,
@@ -1623,7 +1657,7 @@ async function testCheckout(
     }, 12000);
 
     const abortController = new AbortController();
-    const checkoutPromise = testCheckoutFlow(context, seedUrl, {
+    const checkoutPromise = testCheckoutFlow(session.context, seedUrl, {
       timeout: opts.timeout,
       verbose: opts.verbose,
       preferredProductUrls: checkoutProductCandidates,
@@ -1644,7 +1678,7 @@ async function testCheckout(
       if (opts.verbose) {
         console.log('  ↻ Checkout hit a challenge, retrying in a fresh context');
       }
-      const rotated = await createStealthContext(browser, { verbose: false });
+      const rotated = await createRecoveryContext(session, state, opts, 'checkout bot-block retry');
       try {
         checkoutResult = await testCheckoutFlow(rotated.context, seedUrl, {
           timeout: opts.timeout,

@@ -50,6 +50,15 @@ import {
 import type { ScrapeResult } from '../scraper/types.js';
 import type { BrdReviewResult } from '../brd/types.js';
 
+function hostedMaxPages(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.SWEEP_HOSTED_MAX_PAGES;
+  if (raw !== undefined && raw !== '') {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed >= 1) return Math.min(parsed, 50);
+  }
+  return 25;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -800,7 +809,7 @@ async function scrapeWithProgress(
   const result = await scrape(targetUrl, {
     takeScreenshots: options.screenshots !== false,
     verbose: true,
-    maxPages: 25,
+    maxPages: hostedMaxPages(),
     scrapeTimeout: options.skipCheckout === true ? 300000 : 420000,
     skipCheckout: options.skipCheckout === true,
     onLog: (entry) => log(entry),

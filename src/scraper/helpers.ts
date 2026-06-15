@@ -123,7 +123,7 @@ export function classifyError(errorMsg: string, statusCode?: number): CrawlError
 
 /** True when Playwright/Chromium lost the renderer or browser process. */
 export function isBrowserCrashError(errorMsg: string): boolean {
-  return /page crashed|browser has been closed|browser disconnected|target closed|context has been closed|session closed/i.test(
+  return /target page, context or browser has been closed|page crashed|browser has been closed|browser disconnected|target closed|context has been closed|session closed/i.test(
     errorMsg
   );
 }

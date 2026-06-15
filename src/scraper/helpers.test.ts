@@ -18,6 +18,7 @@ import {
 describe('browser crash classification', () => {
   it('detects renderer and browser disconnect errors', () => {
     expect(isBrowserCrashError('page.goto: Page crashed')).toBe(true);
+    expect(isBrowserCrashError('browser.newContext: Target page, context or browser has been closed')).toBe(true);
     expect(isBrowserCrashError('Browser has been closed')).toBe(true);
     expect(isBrowserCrashError('Target closed')).toBe(true);
     expect(isBrowserCrashError('Navigation timeout of 30000ms exceeded')).toBe(false);

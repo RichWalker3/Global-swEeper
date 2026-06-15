@@ -20,9 +20,12 @@ export interface LaunchResult {
   config: BrowserConfig;
 }
 
+import type { StructuredLogInput } from './types.js';
+
 export interface LaunchOptions {
   verbose?: boolean;
   proxyUrl?: string;
+  onLog?: (entry: StructuredLogInput) => void;
 }
 
 export interface ContextOptions {
@@ -82,6 +85,17 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   if (verbose && launchOptions.executablePath) {
     console.log(`  ✓ Using bundled Chromium: ${launchOptions.executablePath}`);
   }
+
+  opts.onLog?.({
+    level: 'info',
+    scope: 'browser',
+    event: 'browser.config',
+    message: `Browser configured with viewport ${viewport.width}x${viewport.height}`,
+    details: {
+      proxyConfigured: Boolean(proxyUrl),
+      executablePath: launchOptions.executablePath,
+    },
+  });
 
   const browser = await chromium.launch(launchOptions);
   const { context } = await createStealthContext(browser, { verbose, config });

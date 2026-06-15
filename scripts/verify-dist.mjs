@@ -87,6 +87,18 @@ try {
     }
   });
   await expectOk('/api/feedback/status');
+  await expectOk('/api/logs', async (response) => {
+    const data = await response.json();
+    if (!Array.isArray(data.logs)) {
+      throw new Error('Logs payload missing logs array');
+    }
+  });
+  await expectOk('/api/logs/runs', async (response) => {
+    const data = await response.json();
+    if (!Array.isArray(data.runs)) {
+      throw new Error('Logs runs payload missing runs array');
+    }
+  });
 
   // The crash-loop scenario: hit the app like a browser does, twice, and make
   // sure the process is still alive afterwards.

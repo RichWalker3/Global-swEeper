@@ -2,6 +2,21 @@
 
 Global-sweep uses `major.minor.patch` style versioning during the internal pilot.
 
+## v0.2.4 - 2026-06-15
+
+In-app structured logs for debugging hosted runs without server access.
+
+### Added
+
+- Assessment Logs in the hamburger menu: view recent runs, filter by merchant URL or search text, and copy a Cursor-friendly debug bundle or NDJSON.
+- Structured log API: `GET /api/logs`, `GET /api/logs/runs`, `GET /api/logs/export`, and `DELETE /api/logs` with redaction for tokens, proxy credentials, and checkout session URLs.
+- Per-run correlation (`runId`) on sweep requests, with scraper events for discovery, page scrape outcomes, product sampling, checkout, and timeouts.
+- Optional `SWEEP_LOGS_TOKEN` env var to protect log routes on hosted deployments.
+
+### Changed
+
+- Deploy verification now smoke-tests `/api/logs` in the dist-only container path.
+
 ## v0.2.3 - 2026-06-12
 
 Emergency fix for the hosted Sweep outage caused by v0.2.2.

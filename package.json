@@ -1,6 +1,6 @@
 {
   "name": "global-sweep",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Automated Website Assessment tool for Global-e merchant onboarding",
   "type": "module",
   "scripts": {

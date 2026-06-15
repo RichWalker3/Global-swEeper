@@ -11,4 +11,10 @@ describe('hosted base path routing', () => {
     expect(html).toContain('function appUrl(path)');
     expect(html).not.toMatch(/(?:fetch|EventSource)\(\s*(?:`|['"])\/(?:api|events)/);
   });
+
+  it('routes logs API calls through appUrl', () => {
+    expect(html).toContain("fetchLogsApi('/api/logs/runs')");
+    expect(html).toContain("fetchLogsApi(`/api/logs?");
+    expect(html).not.toMatch(/fetch\(\s*['"]\/api\/logs/);
+  });
 });

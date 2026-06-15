@@ -3,7 +3,7 @@
  * Coordinates browser, crawling, extraction, and analysis
  */
 
-import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence } from './types.js';
+import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence, StructuredLogInput } from './types.js';
 import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, detectDropshipFulfillment, extractProductLinks } from './detectors.js';
 import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
 import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
@@ -233,7 +233,12 @@ const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   verbose: false,
   skipCheckout: false,
   onProgress: () => {},
+  onLog: () => {},
 };
+
+function emitLog(opts: Required<ScrapeOptions>, entry: StructuredLogInput): void {
+  opts.onLog(entry);
+}
 
 let scrapeProgress = { phase: 'initializing', pagesScraped: 0, currentUrl: '' };
 
@@ -284,6 +289,14 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
 
   if (!snap) {
     const warning = `Timed out after ${opts.scrapeTimeout / 1000}s before any pages were stored (still initializing).`;
+    emitLog(opts, {
+      level: 'warn',
+      scope: 'scraper',
+      event: 'scrape.timeout',
+      phase: scrapeProgress.phase,
+      message: warning,
+      details: { pagesScraped: 0, productPagesScraped: 0 },
+    });
     return {
       pages: [],
       summary: {
@@ -317,6 +330,17 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
   const timeoutErr = { url: seedUrl, error: warning, type: 'timeout' as const };
   result.summary.errors = [...result.summary.errors, timeoutErr];
   result.summary.pagesBlocked = result.summary.errors.length;
+  emitLog(opts, {
+    level: 'warn',
+    scope: 'scraper',
+    event: 'scrape.timeout',
+    phase: scrapeProgress.phase,
+    message: warning,
+    details: {
+      pagesScraped: result.pages.length,
+      productPagesScraped: result.summary.productPagesScraped,
+    },
+  });
   return result;
 }
 
@@ -400,6 +424,18 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
       `Extending page timeout to ${Math.round(opts.timeout / 1000)}s and overall budget to ${Math.round(opts.scrapeTimeout / 1000)}s.`;
     opts.onProgress({ phase: 'init', message });
     if (opts.verbose) console.log(`  ⚠ ${message}`);
+    emitLog(opts, {
+      level: 'warn',
+      scope: 'scraper',
+      event: 'connection.slow',
+      phase: 'initializing',
+      message,
+      details: {
+        latencyMs,
+        pageTimeoutMs: opts.timeout,
+        scrapeTimeoutMs: opts.scrapeTimeout,
+      },
+    });
   }
 
   const scrapeStartedAt = Date.now();
@@ -440,9 +476,19 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
   // Initialize services
   const wappalyzerReady = await initWappalyzer();
   if (opts.verbose && wappalyzerReady) console.log('  ✓ Wappalyzer initialized');
+  emitLog(opts, {
+    level: 'info',
+    scope: 'scraper',
+    event: 'wappalyzer.ready',
+    phase: 'initializing',
+    message: wappalyzerReady ? 'Wappalyzer initialized' : 'Wappalyzer unavailable',
+    details: { ready: wappalyzerReady },
+  });
 
-  // Launch browser with stealth config
-  const { browser, context, config } = await launchStealthBrowser(opts.verbose);
+  const { browser, context, config } = await launchStealthBrowser({
+    verbose: opts.verbose,
+    onLog: (entry) => emitLog(opts, entry),
+  });
 
   // Initialize accumulators
   const state = createInitialState(seedUrl, config);
@@ -490,6 +536,14 @@ async function discoverPages(
   scrapeProgress.phase = 'discovery';
   opts.onProgress({ phase: 'init', message: 'Discovering site structure...' });
   if (opts.verbose) console.log('  Discovering site structure...');
+  emitLog(opts, {
+    level: 'info',
+    scope: 'scraper',
+    event: 'discovery.started',
+    phase: 'discovery',
+    message: 'Discovering site structure',
+    details: { seedUrl },
+  });
 
   const discoveryPage = await context.newPage();
   let navResult = await gotoWithRetry(discoveryPage, seedUrl, {
@@ -568,6 +622,14 @@ async function discoverPages(
   await activeContext?.close().catch(() => {});
   await discoveryPage.close().catch(() => {});
   if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl`);
+  emitLog(opts, {
+    level: 'info',
+    scope: 'scraper',
+    event: 'discovery.complete',
+    phase: 'discovery',
+    message: `Found ${targets.length} pages to crawl`,
+    details: { targetCount: targets.length },
+  });
   return targets;
 }
 
@@ -607,6 +669,14 @@ async function scrapeTargetAttempt(
     if (statusCode && statusCode >= 400) {
       state.errors.push({ url: target.url, error: `HTTP ${statusCode}`, type: classifyError('', statusCode) });
       if (opts.verbose) console.log(`  ✗ ${target.type}: ${target.url} - HTTP ${statusCode}`);
+      emitLog(opts, {
+        level: 'warn',
+        scope: 'scraper',
+        event: 'page.http_error',
+        phase: 'page-scraping',
+        message: `HTTP ${statusCode} for ${target.url}`,
+        details: { url: target.url, statusCode, targetType: target.type },
+      });
       return { success: false };
     }
 
@@ -638,6 +708,14 @@ async function scrapeTargetAttempt(
     await processPageContent(target, pageData, state, wappalyzerReady, opts);
 
     if (opts.verbose) console.log(`  ✓ ${target.type}: ${pageData.url}`);
+    emitLog(opts, {
+      level: 'info',
+      scope: 'scraper',
+      event: 'page.scraped',
+      phase: 'page-scraping',
+      message: `Scraped ${target.type} page`,
+      details: { url: pageData.url, targetType: target.type, statusCode },
+    });
     return { success: true, finalUrl: page.url() };
   } catch (error) {
     handlePageError(error, target, state, opts);
@@ -773,6 +851,14 @@ function handleNavigationError(
   if (navResult.error) {
     state.errors.push({ url: target.url, error: navResult.error, type: classifyError(navResult.error) });
     if (opts.verbose) console.log(`  ✗ ${target.type}: ${target.url} - ${navResult.error}`);
+    emitLog(opts, {
+      level: navResult.error.toLowerCase().includes('timeout') ? 'warn' : 'error',
+      scope: 'scraper',
+      event: navResult.error.toLowerCase().includes('timeout') ? 'page.timeout' : 'page.navigation_error',
+      phase: 'page-scraping',
+      message: navResult.error,
+      details: { url: target.url, targetType: target.type, errorType: classifyError(navResult.error) },
+    });
   } else if (navResult.blocked) {
     state.errors.push({
       url: target.url,
@@ -781,6 +867,14 @@ function handleNavigationError(
       blockType: navResult.blockType || undefined,
     });
     if (opts.verbose) console.log(`  ⚠️ ${target.type}: ${target.url} - Blocked by ${navResult.blockType}`);
+    emitLog(opts, {
+      level: 'warn',
+      scope: 'scraper',
+      event: 'page.blocked',
+      phase: 'page-scraping',
+      message: `Blocked by ${navResult.blockType}`,
+      details: { url: target.url, blockType: navResult.blockType, targetType: target.type },
+    });
   }
 }
 
@@ -962,6 +1056,14 @@ function handlePageError(error: unknown, target: CrawlTarget, state: ScrapeState
   const errorMsg = error instanceof Error ? error.message : 'Unknown error';
   state.errors.push({ url: target.url, error: errorMsg, type: 'other' });
   if (opts.verbose) console.log(`  ✗ ${target.type}: ${target.url} - ${error}`);
+  emitLog(opts, {
+    level: 'error',
+    scope: 'scraper',
+    event: 'page.error',
+    phase: 'page-scraping',
+    message: errorMsg,
+    details: { url: target.url, targetType: target.type },
+  });
 }
 
 // ============ Product Pages Phase ============
@@ -986,6 +1088,15 @@ async function scrapeProductPages(
     message: `Scraping ${productCount} product pages...`,
     current: state.visited.size,
     total: state.visited.size + productCount + 1,
+  });
+
+  emitLog(opts, {
+    level: 'info',
+    scope: 'scraper',
+    event: 'product_pages.started',
+    phase: 'product-pages',
+    message: `Scraping ${productCount} product pages`,
+    details: { productCount },
   });
 
   if (opts.verbose && state.discoveredProductUrls.length > 0) {
@@ -1170,6 +1281,15 @@ async function testCheckout(
 
   opts.onProgress({ phase: 'checkout', message: 'Testing checkout flow...' });
 
+  emitLog(opts, {
+    level: 'info',
+    scope: 'checkout',
+    event: 'checkout.started',
+    phase: 'checkout',
+    message: 'Testing checkout flow',
+    details: { checkoutUrl, productCandidates: checkoutProductCandidates.length },
+  });
+
   if (opts.verbose) {
     const elapsed = ((Date.now() - new Date(startedAt).getTime()) / 1000).toFixed(1);
     console.log(`  [checkout] Testing checkout flow... (${elapsed}s)`);
@@ -1248,9 +1368,30 @@ async function testCheckout(
           console.log(`    → BNPL options: ${checkoutResult.checkoutInfo.bnplOptions.join(', ')}`);
         }
       }
+      emitLog(opts, {
+        level: checkoutResult.reachedCheckout ? 'info' : 'warn',
+        scope: 'checkout',
+        event: checkoutResult.reachedCheckout ? 'checkout.reached' : 'checkout.not_reached',
+        phase: 'checkout',
+        message: checkoutResult.reachedCheckout ? 'Checkout reached' : 'Checkout not reached',
+        details: {
+          stoppedAt: checkoutResult.stoppedAt,
+          expressWallets: checkoutResult.checkoutInfo.expressWallets,
+          bnplOptions: checkoutResult.checkoutInfo.bnplOptions,
+          errorCount: checkoutResult.errors.length,
+        },
+      });
     } else {
       state.checkoutStoppedAt = formatCheckoutDebugStop(checkoutDebug);
       state.errors.push({ url: checkoutUrl, error: 'Checkout test timed out', type: 'timeout' });
+      emitLog(opts, {
+        level: 'warn',
+        scope: 'checkout',
+        event: 'checkout.timeout',
+        phase: 'checkout',
+        message: 'Checkout test timed out',
+        details: { checkoutUrl },
+      });
     }
   } catch (error) {
     state.errors.push({
@@ -1261,6 +1402,14 @@ async function testCheckout(
     if (opts.verbose) {
       console.log(`  ⚠ Checkout test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+    emitLog(opts, {
+      level: 'error',
+      scope: 'checkout',
+      event: 'checkout.failed',
+      phase: 'checkout',
+      message: error instanceof Error ? error.message : 'Unknown checkout error',
+      details: { checkoutUrl },
+    });
   } finally {
     if (checkoutTick) clearInterval(checkoutTick);
   }

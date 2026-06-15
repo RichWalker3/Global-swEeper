@@ -33,6 +33,19 @@ import {
 } from '../jira/session.js';
 import { formatMarkdown } from '../formatter/markdown.js';
 import { loadReleaseNotes } from './releaseNotes.js';
+import {
+  appendLog,
+  clearLogs,
+  createLogSink,
+  endRun,
+  exportDebugBundle,
+  exportNdjson,
+  isLogsAccessAllowed,
+  listRuns,
+  queryLogs,
+  startRun,
+  type LogQuery,
+} from './logStore.js';
 import type { ScrapeResult } from '../scraper/types.js';
 import type { BrdReviewResult } from '../brd/types.js';
 
@@ -119,6 +132,31 @@ const clients = new Map<string, (data: string) => void>();
 interface SweepRequestOptions {
   screenshots?: boolean;
   skipCheckout?: boolean;
+}
+
+function parseLogQuery(url: URL): LogQuery {
+  const level = url.searchParams.get('level');
+  const limitRaw = url.searchParams.get('limit');
+  return {
+    merchantUrl: url.searchParams.get('merchantUrl') ?? undefined,
+    runId: url.searchParams.get('runId') ?? undefined,
+    level: level === 'debug' || level === 'info' || level === 'warn' || level === 'error' ? level : undefined,
+    phase: url.searchParams.get('phase') ?? undefined,
+    q: url.searchParams.get('q') ?? undefined,
+    from: url.searchParams.get('from') ?? undefined,
+    to: url.searchParams.get('to') ?? undefined,
+    limit: limitRaw ? Number(limitRaw) : undefined,
+  };
+}
+
+function authorizeLogsRequest(
+  req: import('http').IncomingMessage,
+  res: import('http').ServerResponse
+): boolean {
+  if (isLogsAccessAllowed(req.headers.authorization)) return true;
+  res.writeHead(401, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Unauthorized' }));
+  return false;
 }
 
 // Broadcast to a specific client
@@ -513,6 +551,43 @@ async function handleRequest(
     return;
   }
 
+  if (url.pathname === '/api/logs/runs' && req.method === 'GET') {
+    if (!authorizeLogsRequest(req, res)) return;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ runs: listRuns() }));
+    return;
+  }
+
+  if (url.pathname === '/api/logs/export' && req.method === 'GET') {
+    if (!authorizeLogsRequest(req, res)) return;
+    const query = parseLogQuery(url);
+    const format = url.searchParams.get('format') ?? 'text';
+    if (format === 'ndjson') {
+      res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8' });
+      res.end(exportNdjson(query));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(exportDebugBundle(query));
+    return;
+  }
+
+  if (url.pathname === '/api/logs' && req.method === 'GET') {
+    if (!authorizeLogsRequest(req, res)) return;
+    const query = parseLogQuery(url);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ logs: queryLogs(query) }));
+    return;
+  }
+
+  if (url.pathname === '/api/logs' && req.method === 'DELETE') {
+    if (!authorizeLogsRequest(req, res)) return;
+    clearLogs();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+    return;
+  }
+
   // API: Get feedback status (remaining credits)
   if (url.pathname === '/api/feedback/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -628,22 +703,40 @@ function writeBrdAuditLog(result: ReturnType<typeof generateBrdDraft> | BrdRevie
 }
 
 async function runSweep(targetUrl: string, clientId: string, options: SweepRequestOptions) {
+  const runId = crypto.randomUUID();
+  startRun(runId, clientId, targetUrl);
+  const log = createLogSink({ runId, clientId, merchantUrl: targetUrl });
+
   try {
     sendToClient(clientId, 'status', { 
       step: 'starting', 
       message: 'Initializing browser...',
       progress: 5,
+      runId,
     });
 
-    // Create a custom scrape with progress updates
-    const scrapeResult = await scrapeWithProgress(targetUrl, clientId, options);
+    log({
+      level: 'info',
+      scope: 'server',
+      event: 'sweep.requested',
+      message: `Sweep requested for ${targetUrl}`,
+      details: { skipCheckout: options.skipCheckout === true },
+    });
 
-    // Build prompt for Claude (or for manual copy)
+    const scrapeResult = await scrapeWithProgress(targetUrl, clientId, options, runId, log);
+
     const { system, user } = buildPrompt(scrapeResult);
-
     const partialNote = scrapeResult.summary.scrapingCompletionWarning;
+    const status = partialNote ? 'partial' : 'completed';
+
+    endRun(runId, status, {
+      pagesScraped: scrapeResult.pages.length,
+      errorCount: scrapeResult.summary.errors?.length ?? 0,
+    });
+
     sendToClient(clientId, 'scraped', { 
       scrapeResult,
+      runId,
       prompt: { system, user },
       message: partialNote
         ? `Partial result — ${partialNote}`
@@ -652,13 +745,28 @@ async function runSweep(targetUrl: string, clientId: string, options: SweepReque
     });
 
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    log({
+      level: 'error',
+      scope: 'server',
+      event: 'sweep.failed',
+      message,
+    });
+    endRun(runId, 'failed', { pagesScraped: 0, errorCount: 1 });
     sendToClient(clientId, 'sweepError', { 
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message,
+      runId,
     });
   }
 }
 
-async function scrapeWithProgress(targetUrl: string, clientId: string, options: SweepRequestOptions): Promise<ScrapeResult> {
+async function scrapeWithProgress(
+  targetUrl: string,
+  clientId: string,
+  options: SweepRequestOptions,
+  runId: string,
+  log: ReturnType<typeof createLogSink>
+): Promise<ScrapeResult> {
   sendToClient(clientId, 'status', { 
     step: 'scraping', 
     message: 'Launching browser...',
@@ -669,10 +777,9 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
     takeScreenshots: options.screenshots !== false,
     verbose: true,
     maxPages: 25,
-    // Full WA runs need more time for add-to-cart and checkout; quick scans keep the shorter budget.
     scrapeTimeout: options.skipCheckout === true ? 300000 : 420000,
-    // Full WA runs include checkout unless the user explicitly chooses a faster quick scan.
     skipCheckout: options.skipCheckout === true,
+    onLog: (entry) => log(entry),
     onProgress: (progress) => {
       // Map scraper phases to UI progress
       let progressPercent = 10;
@@ -702,6 +809,7 @@ async function scrapeWithProgress(targetUrl: string, clientId: string, options: 
         progress: progressPercent,
         remainingSeconds: progress.secondsRemaining,
         elapsedSeconds: progress.elapsedSeconds,
+        runId,
       });
     },
   });
@@ -749,6 +857,13 @@ const isDirectRun = process.argv[1] ? import.meta.url === pathToFileURL(process.
 
 if (isDirectRun) {
   server.listen(PORT, () => {
+    appendLog({
+      level: 'info',
+      scope: 'server',
+      event: 'server.started',
+      message: `Sweep server listening on port ${PORT}`,
+      details: { baseUrl: BASE_URL },
+    });
     const displayUrl = BASE_URL.includes('localhost') ? `http://localhost:${PORT}` : BASE_URL;
     console.log(`
   ╔══════════════════════════════════════════════════════════╗

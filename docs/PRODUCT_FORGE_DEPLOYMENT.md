@@ -123,3 +123,18 @@ Rules that keep this class of bug out:
 - Health path: `/health`
 - Build command: Docker build from repository root.
 - Start command inside container: `npm start`
+
+## In-App Structured Logs
+
+Sweep exposes structured server/scraper logs without shell access:
+
+- UI: hamburger menu → **Assessment Logs**
+- API:
+  - `GET /api/logs` — filter by `merchantUrl`, `runId`, `level`, `phase`, `q`, `from`, `to`, `limit`
+  - `GET /api/logs/runs` — recent run summaries
+  - `GET /api/logs/export?format=text|ndjson` — copyable debug bundle for Cursor
+  - `DELETE /api/logs` — clear the in-memory log store
+
+Logs are redacted before storage (tokens, proxy passwords, checkout session URLs). Retention is bounded (about 2,000 entries / 5 MB in memory).
+
+Optional protection: set `SWEEP_LOGS_TOKEN` in the deployment environment. When set, log routes require `Authorization: Bearer <token>` (enterable in the Logs UI).

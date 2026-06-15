@@ -747,6 +747,118 @@
       font-size: 0.875rem;
     }
 
+    /* Structured logs viewer */
+    .logs-modal-content {
+      max-width: 900px;
+      width: min(900px, 94vw);
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logs-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      align-items: center;
+    }
+
+    .logs-toolbar input,
+    .logs-toolbar select {
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      padding: 0.5rem 0.65rem;
+      font-size: 0.8125rem;
+      font-family: inherit;
+      min-width: 120px;
+    }
+
+    .logs-toolbar input[type="text"],
+    .logs-toolbar input[type="url"] {
+      flex: 1 1 180px;
+    }
+
+    .logs-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 0.75rem;
+      min-height: 320px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    @media (max-width: 768px) {
+      .logs-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .logs-runs-list {
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      overflow-y: auto;
+      max-height: 52vh;
+      background: var(--gray-100);
+    }
+
+    .logs-run-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: none;
+      border-bottom: 1px solid var(--gray-200);
+      background: var(--white);
+      padding: 0.65rem 0.75rem;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.75rem;
+    }
+
+    .logs-run-item:hover,
+    .logs-run-item.active {
+      background: #fff7ed;
+    }
+
+    .logs-run-item strong {
+      display: block;
+      color: var(--black);
+      font-size: 0.8125rem;
+      margin-bottom: 0.15rem;
+      word-break: break-all;
+    }
+
+    .logs-run-item span {
+      color: var(--gray-400);
+    }
+
+    .logs-body {
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      background: #111;
+      color: #e8e8e8;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.75rem;
+      line-height: 1.45;
+      padding: 0.75rem;
+      overflow: auto;
+      max-height: 52vh;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .logs-note {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      margin-bottom: 0.75rem;
+      line-height: 1.4;
+    }
+
+    .log-line-error { color: #fca5a5; }
+    .log-line-warn { color: #fcd34d; }
+    .log-line-info { color: #93c5fd; }
+    .log-line-debug { color: #a3a3a3; }
+
     /* Progress */
     .progress-section {
       margin-top: 1.5rem;
@@ -1415,7 +1527,7 @@
       <span class="logo-icon">🧹</span>
       <div>
         <div class="logo-text">Global-sw<span>E</span>ep</div>
-        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.2.3</span></div>
+        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.2.4</span></div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 1rem;">
@@ -1435,12 +1547,13 @@
     <div class="side-menu-header">
       <div class="side-menu-title">
         <strong>Sweep Menu</strong>
-        <span>Jira credentials and feedback</span>
+        <span>Jira credentials, logs, and feedback</span>
       </div>
       <button class="side-menu-close" id="closeMenuBtn" type="button" aria-label="Close menu">&times;</button>
     </div>
 
     <div class="side-menu-content">
+      <button class="feedback-btn" onclick="openLogsModal()" style="width: 100%; margin-bottom: 0.75rem;">📝 Assessment Logs</button>
       <button class="feedback-btn" onclick="openFeedback()" style="width: 100%; margin-bottom: 1rem;">💬 Feedback</button>
 
       <!-- Jira Credentials -->
@@ -1546,6 +1659,42 @@
     </div>
   </div>
 
+  <!-- Structured Logs Modal -->
+  <div id="logsModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="logsModalTitle">
+    <div class="modal-content logs-modal-content">
+      <div class="modal-header">
+        <h3 id="logsModalTitle">📝 Assessment Logs</h3>
+        <button class="modal-close" type="button" onclick="closeLogsModal()" aria-label="Close logs">&times;</button>
+      </div>
+      <p class="logs-note">
+        Structured server-side logs for debugging deployed runs. Secrets are redacted. Copy a debug bundle to paste into Cursor.
+      </p>
+      <div class="logs-toolbar">
+        <input type="url" id="logsMerchantFilter" placeholder="Filter by merchant URL">
+        <input type="text" id="logsSearchFilter" placeholder="Search text (timeout, proxy, …)">
+        <select id="logsLevelFilter">
+          <option value="">All levels</option>
+          <option value="debug">Debug</option>
+          <option value="info">Info</option>
+          <option value="warn">Warn</option>
+          <option value="error">Error</option>
+        </select>
+        <input type="password" id="logsAccessToken" placeholder="Logs token (if required)" style="max-width: 180px;">
+        <button type="button" class="btn btn-secondary" id="logsRefreshBtn">Refresh</button>
+        <button type="button" class="btn" id="logsCopyBundleBtn">Copy debug bundle</button>
+        <button type="button" class="btn btn-secondary" id="logsCopyNdjsonBtn">Copy NDJSON</button>
+        <button type="button" class="btn btn-secondary" id="logsClearBtn">Clear logs</button>
+      </div>
+      <div class="logs-layout">
+        <div class="logs-runs-list" id="logsRunsList">
+          <div class="release-loading" style="padding: 1rem;">Loading runs...</div>
+        </div>
+        <pre class="logs-body" id="logsBody" aria-label="Structured log output">Loading logs...</pre>
+      </div>
+      <span class="copy-status" id="logsCopyStatus" aria-live="polite"></span>
+    </div>
+  </div>
+
   <main>
     <!-- Left Panel: Input -->
     <div class="input-panel" id="inputPanel">
@@ -1617,6 +1766,10 @@
               <span id="progressTimeHint" class="hidden" style="font-size: 0.75rem; color: var(--gray-400); padding-left: 1.75rem; line-height: 1.35;"></span>
             </div>
             <div class="pages-log" id="pagesLog"></div>
+
+            <div class="hidden" id="viewRunLogsRow" style="margin-top: 0.75rem;">
+              <button type="button" class="btn btn-secondary" id="viewRunLogsBtn" style="width: 100%;">View run logs</button>
+            </div>
             
             <!-- Scrape Errors (shown if any pages failed) -->
             <div class="scrape-errors hidden" id="scrapeErrors">
@@ -1930,6 +2083,171 @@
       document.getElementById('releaseNotesModal').style.display = 'none';
     }
 
+    const LOGS_TOKEN_STORAGE_KEY = 'sweepLogsAccessToken';
+    let currentRunId = null;
+    let logsSelectedRunId = null;
+
+    function getLogsAuthHeaders() {
+      const tokenInput = document.getElementById('logsAccessToken');
+      const token = tokenInput?.value?.trim() || sessionStorage.getItem(LOGS_TOKEN_STORAGE_KEY) || '';
+      if (!token) return {};
+      sessionStorage.setItem(LOGS_TOKEN_STORAGE_KEY, token);
+      return { Authorization: `Bearer ${token}` };
+    }
+
+    function buildLogsQueryParams() {
+      const params = new URLSearchParams();
+      const merchantUrl = document.getElementById('logsMerchantFilter')?.value?.trim();
+      const q = document.getElementById('logsSearchFilter')?.value?.trim();
+      const level = document.getElementById('logsLevelFilter')?.value;
+      if (merchantUrl) params.set('merchantUrl', merchantUrl);
+      if (q) params.set('q', q);
+      if (level) params.set('level', level);
+      if (logsSelectedRunId) params.set('runId', logsSelectedRunId);
+      params.set('limit', '500');
+      return params;
+    }
+
+    async function fetchLogsApi(path, options = {}) {
+      const response = await fetch(appUrl(path), {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          ...getLogsAuthHeaders(),
+        },
+      });
+      if (response.status === 401) {
+        throw new Error('Logs access denied. Enter the SWEEP_LOGS_TOKEN if your deployment requires it.');
+      }
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text.slice(0, 200) || `Logs request failed (${response.status})`);
+      }
+      return response;
+    }
+
+    function formatLogLine(entry) {
+      const details = entry.details ? ` ${JSON.stringify(entry.details)}` : '';
+      return `[${entry.timestamp}] ${entry.level.toUpperCase()} ${entry.scope}/${entry.event}${entry.phase ? ` (${entry.phase})` : ''}: ${entry.message}${details}`;
+    }
+
+    function renderLogsBody(logs) {
+      const body = document.getElementById('logsBody');
+      if (!logs.length) {
+        body.textContent = 'No log entries match the current filters.';
+        return;
+      }
+      body.innerHTML = logs.map((entry) => {
+        const line = escapeHtml(formatLogLine(entry));
+        return `<span class="log-line-${escapeHtml(entry.level)}">${line}</span>`;
+      }).join('\n');
+    }
+
+    function renderLogsRuns(runs) {
+      const container = document.getElementById('logsRunsList');
+      if (!runs.length) {
+        container.innerHTML = '<div class="release-loading" style="padding: 1rem;">No runs yet.</div>';
+        return;
+      }
+      container.innerHTML = runs.map((run) => `
+        <button type="button" class="logs-run-item ${logsSelectedRunId === run.runId ? 'active' : ''}" data-run-id="${escapeHtml(run.runId)}">
+          <strong>${escapeHtml(run.merchantUrl)}</strong>
+          <span>${escapeHtml(run.status)} · ${escapeHtml(run.pagesScraped ?? 0)} pages · ${escapeHtml(run.errorCount ?? 0)} errors</span>
+        </button>
+      `).join('');
+      container.querySelectorAll('.logs-run-item').forEach((button) => {
+        button.addEventListener('click', async () => {
+          logsSelectedRunId = button.dataset.runId;
+          await refreshLogsView();
+        });
+      });
+    }
+
+    async function refreshLogsView() {
+      const body = document.getElementById('logsBody');
+      const runsList = document.getElementById('logsRunsList');
+      body.textContent = 'Loading logs...';
+      try {
+        const params = buildLogsQueryParams();
+        const [runsResponse, logsResponse] = await Promise.all([
+          fetchLogsApi('/api/logs/runs'),
+          fetchLogsApi(`/api/logs?${params.toString()}`),
+        ]);
+        const runsData = await runsResponse.json();
+        const logsData = await logsResponse.json();
+        renderLogsRuns(runsData.runs || []);
+        renderLogsBody(logsData.logs || []);
+      } catch (error) {
+        runsList.innerHTML = '<div class="release-loading" style="padding: 1rem;">Could not load runs.</div>';
+        body.textContent = error.message;
+      }
+    }
+
+    async function openLogsModal(prefill = {}) {
+      document.getElementById('logsModal').style.display = 'flex';
+      if (prefill.merchantUrl) {
+        document.getElementById('logsMerchantFilter').value = prefill.merchantUrl;
+      }
+      if (prefill.runId) {
+        logsSelectedRunId = prefill.runId;
+      }
+      const savedToken = sessionStorage.getItem(LOGS_TOKEN_STORAGE_KEY);
+      if (savedToken && !document.getElementById('logsAccessToken').value) {
+        document.getElementById('logsAccessToken').value = savedToken;
+      }
+      await refreshLogsView();
+    }
+
+    function closeLogsModal() {
+      document.getElementById('logsModal').style.display = 'none';
+    }
+
+    function showLogsCopyStatus(message) {
+      const status = document.getElementById('logsCopyStatus');
+      status.textContent = message;
+      status.classList.add('visible');
+      clearTimeout(showLogsCopyStatus.timeoutId);
+      showLogsCopyStatus.timeoutId = setTimeout(() => {
+        status.classList.remove('visible');
+      }, 2000);
+    }
+
+    async function copyLogsBundle() {
+      try {
+        const params = buildLogsQueryParams();
+        const response = await fetchLogsApi(`/api/logs/export?format=text&${params.toString()}`);
+        const text = await response.text();
+        await navigator.clipboard.writeText(text);
+        showLogsCopyStatus('Debug bundle copied to clipboard');
+      } catch (error) {
+        showLogsCopyStatus(error.message);
+      }
+    }
+
+    async function copyLogsNdjson() {
+      try {
+        const params = buildLogsQueryParams();
+        const response = await fetchLogsApi(`/api/logs/export?format=ndjson&${params.toString()}`);
+        const text = await response.text();
+        await navigator.clipboard.writeText(text);
+        showLogsCopyStatus('NDJSON copied to clipboard');
+      } catch (error) {
+        showLogsCopyStatus(error.message);
+      }
+    }
+
+    async function clearLogsStore() {
+      if (!confirm('Clear all in-app logs on this server instance?')) return;
+      try {
+        await fetchLogsApi('/api/logs', { method: 'DELETE' });
+        logsSelectedRunId = null;
+        await refreshLogsView();
+        showLogsCopyStatus('Logs cleared');
+      } catch (error) {
+        showLogsCopyStatus(error.message);
+      }
+    }
+
     async function checkUnseenReleaseNotes() {
       try {
         const releases = await fetchReleaseNotes();
@@ -2003,7 +2321,6 @@
       });
     });
 
-    // State
     let clientId = null;
     let eventSource = null;
     let currentScrapeResult = null;
@@ -2232,6 +2549,7 @@
 
       eventSource.addEventListener('status', (e) => {
         const data = JSON.parse(e.data);
+        if (data.runId) currentRunId = data.runId;
         progressText.textContent = data.message;
         if (data.progress !== undefined) {
           progressBar.style.width = `${data.progress}%`;
@@ -2265,6 +2583,7 @@
 
       eventSource.addEventListener('scraped', (e) => {
         const data = JSON.parse(e.data);
+        if (data.runId) currentRunId = data.runId;
         currentScrapeResult = data.scrapeResult;
         currentPrompt = data.prompt;
         onScrapingComplete(data);
@@ -2278,6 +2597,7 @@
       eventSource.addEventListener('sweepError', (e) => {
         if (e.data) {
           const data = JSON.parse(e.data);
+          if (data.runId) currentRunId = data.runId;
           progressText.textContent = `Error: ${data.message}`;
           progressBar.style.background = 'var(--red)';
         }
@@ -2382,6 +2702,11 @@
       } else {
         warnBanner.textContent = '';
         warnBanner.classList.add('hidden');
+      }
+
+      const viewRunLogsRow = document.getElementById('viewRunLogsRow');
+      if (currentRunId && viewRunLogsRow) {
+        viewRunLogsRow.classList.remove('hidden');
       }
 
       // Show summary
@@ -3043,6 +3368,8 @@
       }
       document.getElementById('scrapeErrors').classList.add('hidden');
       document.getElementById('scrapeErrorsList').innerHTML = '';
+      document.getElementById('viewRunLogsRow')?.classList.add('hidden');
+      currentRunId = null;
       summaryCard.classList.add('hidden');
       document.getElementById('jsonConverterCard').classList.add('hidden');
       outputContent.innerHTML = '<div class="output-placeholder"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div><p style="margin-top:1rem;">Scraping in progress...</p></div>';
@@ -3069,6 +3396,23 @@
     document.getElementById('openMenuBtn').addEventListener('click', openSideMenu);
     document.getElementById('closeMenuBtn').addEventListener('click', closeSideMenu);
     document.getElementById('sideMenuOverlay').addEventListener('click', closeSideMenu);
+
+    document.getElementById('logsRefreshBtn')?.addEventListener('click', () => refreshLogsView());
+    document.getElementById('logsCopyBundleBtn')?.addEventListener('click', () => copyLogsBundle());
+    document.getElementById('logsCopyNdjsonBtn')?.addEventListener('click', () => copyLogsNdjson());
+    document.getElementById('logsClearBtn')?.addEventListener('click', () => clearLogsStore());
+    document.getElementById('viewRunLogsBtn')?.addEventListener('click', () => {
+      openLogsModal({
+        runId: currentRunId,
+        merchantUrl: document.getElementById('merchantUrl')?.value || '',
+      });
+    });
+    ['logsMerchantFilter', 'logsSearchFilter', 'logsLevelFilter'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', () => refreshLogsView());
+      document.getElementById(id)?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') refreshLogsView();
+      });
+    });
 
     document.getElementById('connectJiraBtn').addEventListener('click', async () => {
       await connectJira();

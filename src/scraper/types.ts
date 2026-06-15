@@ -183,6 +183,18 @@ export interface ScrapeProgress {
   elapsedSeconds?: number;
 }
 
+export type StructuredLogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type StructuredLogScope = 'server' | 'scraper' | 'browser' | 'checkout';
+
+export interface StructuredLogInput {
+  level: StructuredLogLevel;
+  scope: StructuredLogScope;
+  event: string;
+  phase?: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
 export interface ScrapeOptions {
   maxPages?: number;
   timeout?: number;
@@ -192,4 +204,6 @@ export interface ScrapeOptions {
   /** When true, skip add-to-cart / checkout navigation (faster; avoids stalls on some stores). Default false for CLI. */
   skipCheckout?: boolean;
   onProgress?: (progress: ScrapeProgress) => void;
+  /** Structured log sink for in-app observability */
+  onLog?: (entry: StructuredLogInput) => void;
 }

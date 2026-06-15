@@ -31,6 +31,8 @@ export interface LaunchOptions {
 export interface ContextOptions {
   verbose?: boolean;
   config?: BrowserConfig;
+  javaScriptEnabled?: boolean;
+  blockHeavyResources?: boolean;
 }
 
 function createBrowserConfig(): BrowserConfig {
@@ -156,9 +158,23 @@ export async function createStealthContext(
     timezoneId: 'America/New_York',
     geolocation: { latitude: 40.7128, longitude: -74.0060 },
     permissions: ['geolocation'],
+    javaScriptEnabled: options.javaScriptEnabled ?? true,
   });
 
-  await addStealthScripts(context);
+  if (options.blockHeavyResources) {
+    await context.route('**/*', (route) => {
+      const resourceType = route.request().resourceType();
+      if (resourceType === 'image' || resourceType === 'media' || resourceType === 'font') {
+        void route.abort();
+        return;
+      }
+      void route.continue();
+    });
+  }
+
+  if (options.javaScriptEnabled !== false) {
+    await addStealthScripts(context);
+  }
   return { context, config };
 }
 

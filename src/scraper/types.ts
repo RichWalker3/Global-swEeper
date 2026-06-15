@@ -16,6 +16,8 @@ export interface PageData {
   timestamp: string;
   statusCode?: number; // HTTP status code
   headers?: Record<string, string>; // Response headers
+  /** How the page HTML was captured — degraded pages may miss JS/network signals. */
+  captureMode?: 'full' | 'degraded';
 }
 
 export interface NetworkRequest {
@@ -128,6 +130,17 @@ export interface MarketplacePresence {
   marketplaces: string[];
 }
 
+export type ScrapeQualityLevel = 'complete' | 'partial' | 'degraded';
+
+export interface ScrapeQualitySummary {
+  level: ScrapeQualityLevel;
+  browserRestarts: number;
+  pagesFullCapture: number;
+  pagesDegradedCapture: number;
+  discoveryUsedFallbackUrls: boolean;
+  degradedReasons: string[];
+}
+
 export interface CrawlSummary {
   seedUrl: string;
   domain: string;
@@ -165,6 +178,8 @@ export interface CrawlSummary {
   marketplacePresence?: MarketplacePresence;
   /** Set when the run stopped early (timeout) but partial scrape data is still valid. */
   scrapingCompletionWarning?: string;
+  /** Assessment capture fidelity — full vs degraded evidence. */
+  scrapeQuality?: ScrapeQualitySummary;
 }
 
 export interface ScrapeResult {

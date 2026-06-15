@@ -10,6 +10,7 @@ import { dirname, extname, join } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { scrape } from '../scraper/scraper.js';
 import { buildPrompt } from '../extractor/prompt.js';
+import { acquireSweepRunSlot } from './sweepRunGate.js';
 import { generateDna } from '../dna/generator.js';
 import { generateBrdDraft } from '../brd/generator.js';
 import { composeBrdReview } from '../brd/composer.js';
@@ -707,7 +708,28 @@ async function runSweep(targetUrl: string, clientId: string, options: SweepReque
   startRun(runId, clientId, targetUrl);
   const log = createLogSink({ runId, clientId, merchantUrl: targetUrl });
 
+  let slot: Awaited<ReturnType<typeof acquireSweepRunSlot>> | undefined;
+
   try {
+    sendToClient(clientId, 'status', {
+      step: 'starting',
+      message: 'Waiting for an available assessment slot...',
+      progress: 3,
+      runId,
+    });
+
+    slot = await acquireSweepRunSlot();
+
+    if (slot.waitedMs > 0) {
+      log({
+        level: 'info',
+        scope: 'server',
+        event: 'sweep.queued',
+        message: `Assessment started after waiting ${Math.round(slot.waitedMs / 1000)}s in queue`,
+        details: { waitedMs: slot.waitedMs, activeRuns: slot.activeAfterAcquire },
+      });
+    }
+
     sendToClient(clientId, 'status', { 
       step: 'starting', 
       message: 'Initializing browser...',
@@ -720,7 +742,7 @@ async function runSweep(targetUrl: string, clientId: string, options: SweepReque
       scope: 'server',
       event: 'sweep.requested',
       message: `Sweep requested for ${targetUrl}`,
-      details: { skipCheckout: options.skipCheckout === true },
+      details: { skipCheckout: options.skipCheckout === true, activeRuns: slot.activeAfterAcquire },
     });
 
     const scrapeResult = await scrapeWithProgress(targetUrl, clientId, options, runId, log);
@@ -757,6 +779,8 @@ async function runSweep(targetUrl: string, clientId: string, options: SweepReque
       message,
       runId,
     });
+  } finally {
+    slot?.release();
   }
 }
 

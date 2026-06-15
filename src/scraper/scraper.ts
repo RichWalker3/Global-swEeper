@@ -3,18 +3,19 @@
  * Coordinates browser, crawling, extraction, and analysis
  */
 
-import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence, StructuredLogInput } from './types.js';
+import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence, StructuredLogInput, ScrapeQualitySummary, ScrapeQualityLevel } from './types.js';
 import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, detectDropshipFulfillment, extractProductLinks } from './detectors.js';
 import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
 import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
 import { logAssessment, type DebugInfo } from '../logger/index.js';
-import { gotoWithRetry, classifyError, randomDelay, USER_AGENTS } from './helpers.js';
-import { launchStealthBrowser, createStealthContext, dismissCookieConsent, slowScroll } from './browser.js';
+import { gotoWithRetry, classifyError, randomDelay, USER_AGENTS, shouldRestartBrowserOnNavigationFailure, shouldRetryFullBrowserNavigation } from './helpers.js';
+import { createStealthContext, dismissCookieConsent, slowScroll, type BrowserConfig } from './browser.js';
+import { StealthBrowserManager, attachPageCrashLogging } from './browserManager.js';
 import { discoverCrawlTargets, getFallbackTargets, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
-import type { Browser, BrowserContext } from 'playwright';
+import type { Browser, BrowserContext, Page, Request, ConsoleMessage } from 'playwright';
 
 // ============ State Management (declared early for scrape snapshot typing) ============
 
@@ -55,6 +56,9 @@ interface ScrapeState {
   marketplaceInfo: MarketplacePresence;
   discoveredProductUrls: string[];
   domain: string;
+  discoveryUsedFallbackUrls: boolean;
+  degradedReasons: Set<string>;
+  browserRestarts: number;
 }
 
 function createInitialState(seedUrl: string, _config: { userAgent: string }): ScrapeState {
@@ -91,7 +95,17 @@ function createInitialState(seedUrl: string, _config: { userAgent: string }): Sc
     marketplaceInfo: { detected: false, marketplaces: [] },
     discoveredProductUrls: [],
     domain: new URL(seedUrl).hostname,
+    discoveryUsedFallbackUrls: false,
+    degradedReasons: new Set(),
+    browserRestarts: 0,
   };
+}
+
+interface BrowserSession {
+  manager: StealthBrowserManager;
+  browser: Browser;
+  context: BrowserContext;
+  config: BrowserConfig;
 }
 
 function createDebugInfo(config: { userAgent: string; viewport: { width: number; height: number } }): Partial<DebugInfo> {
@@ -103,54 +117,6 @@ function createDebugInfo(config: { userAgent: string; viewport: { width: number;
     blockedRequests: [],
     consoleErrors: [],
   };
-}
-
-/** Max time for each teardown step (context vs browser). Avoids indefinite hang on stuck Chromium. */
-const BROWSER_TEARDOWN_STEP_MS = 15_000;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function tryKillBrowserProcess(browser: Browser): void {
-  try {
-    const proc = (browser as unknown as { process?: () => import('child_process').ChildProcess }).process?.();
-    proc?.kill?.('SIGKILL');
-  } catch {
-    // ignore
-  }
-}
-
-/**
- * Tear down Playwright without hanging forever. A single stuck `page.close()` or `browser.close()` can block the
- * Node process until Chromium exits; we cap each step and SIGKILL the browser child if Playwright exposes it.
- */
-async function closeBrowserWithTimeout(
-  browser: Browser,
-  context: BrowserContext,
-  opts: { verbose: boolean; onProgress: Required<ScrapeOptions>['onProgress'] }
-): Promise<void> {
-  const step = async (label: string, fn: () => Promise<void>): Promise<void> => {
-    const out = await Promise.race([
-      fn().then(() => 'done' as const),
-      sleep(BROWSER_TEARDOWN_STEP_MS).then(() => 'slow' as const),
-    ]);
-    if (out === 'slow' && opts.verbose) {
-      console.warn(`  ⚠ ${label} exceeded ${BROWSER_TEARDOWN_STEP_MS / 1000}s; continuing`);
-    }
-  };
-
-  // context.close() closes all pages; avoids N sequential page.close() calls that can each stall.
-  await step('context.close', () => context.close().catch(() => {}));
-
-  await step('browser.close', () => browser.close().catch(() => {}));
-
-  if (browser.isConnected()) {
-    if (opts.verbose) console.warn('  ⚠ Browser still connected after close; attempting SIGKILL');
-    tryKillBrowserProcess(browser);
-    // Do not await browser.close() without a cap — it can block like the first call.
-    await Promise.race([browser.close().catch(() => {}), sleep(3000)]);
-  }
 }
 
 export function defaultPageGotoTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
@@ -223,6 +189,64 @@ export function adaptTimeoutsForLatency(
     MAX_SCRAPE_TIMEOUT_MS
   );
   return { timeout, scrapeTimeout, adapted: true };
+}
+
+export function shouldRetryWithLightweightNavigation(navResult: {
+  error?: string | null;
+  blocked?: boolean;
+  blockType?: string | null;
+}): boolean {
+  return Boolean(navResult.error) && navResult.blocked !== true;
+}
+
+/** Lightweight/no-JS capture is only acceptable for policy and informational pages after full-browser retries fail. */
+export function shouldUseLightweightFallback(targetType: CrawlTarget['type']): boolean {
+  return targetType === 'home' || targetType === 'policy' || targetType === 'other';
+}
+
+export function deriveScrapeQuality(input: {
+  pages: PageData[];
+  browserRestarts: number;
+  discoveryUsedFallbackUrls: boolean;
+  degradedReasons: string[];
+  scrapingCompletionWarning?: string;
+}): ScrapeQualitySummary {
+  const pagesFullCapture = input.pages.filter((p) => p.captureMode !== 'degraded').length;
+  const pagesDegradedCapture = input.pages.filter((p) => p.captureMode === 'degraded').length;
+  const reasons = [...input.degradedReasons];
+  if (input.discoveryUsedFallbackUrls && !reasons.includes('discovery_fallback')) {
+    reasons.push('discovery_fallback');
+  }
+  if (pagesDegradedCapture > 0 && !reasons.includes('lightweight_capture')) {
+    reasons.push('lightweight_capture');
+  }
+  if (input.browserRestarts > 0 && !reasons.includes('browser_restart')) {
+    reasons.push('browser_restart');
+  }
+
+  let level: ScrapeQualityLevel = 'complete';
+  if (input.scrapingCompletionWarning) {
+    level = 'partial';
+  } else if (pagesDegradedCapture > 0 || input.discoveryUsedFallbackUrls || input.browserRestarts > 0) {
+    level = 'degraded';
+  }
+
+  return {
+    level,
+    browserRestarts: input.browserRestarts,
+    pagesFullCapture,
+    pagesDegradedCapture,
+    discoveryUsedFallbackUrls: input.discoveryUsedFallbackUrls,
+    degradedReasons: reasons,
+  };
+}
+
+export function lightweightNavigationTimeout(configuredTimeout: number): number {
+  return Math.max(10000, Math.min(configuredTimeout, 15000));
+}
+
+export function shouldAttemptCheckoutAfterCrawl(pagesScraped: number, productCandidateCount: number): boolean {
+  return pagesScraped > 0 || productCandidateCount > 0;
 }
 
 const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
@@ -330,6 +354,13 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
   const timeoutErr = { url: seedUrl, error: warning, type: 'timeout' as const };
   result.summary.errors = [...result.summary.errors, timeoutErr];
   result.summary.pagesBlocked = result.summary.errors.length;
+  result.summary.scrapeQuality = deriveScrapeQuality({
+    pages: result.pages,
+    browserRestarts: snap.state.browserRestarts,
+    discoveryUsedFallbackUrls: snap.state.discoveryUsedFallbackUrls,
+    degradedReasons: Array.from(snap.state.degradedReasons),
+    scrapingCompletionWarning: warning,
+  });
   emitLog(opts, {
     level: 'warn',
     scope: 'scraper',
@@ -485,29 +516,47 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     details: { ready: wappalyzerReady },
   });
 
-  const { browser, context, config } = await launchStealthBrowser({
+  const manager = new StealthBrowserManager({
     verbose: opts.verbose,
     onLog: (entry) => emitLog(opts, entry),
+    onRestart: () => {
+      emitLog(opts, {
+        level: 'warn',
+        scope: 'browser',
+        event: 'browser.restarted',
+        phase: 'scraping',
+        message: 'Chromium restarted during assessment',
+        details: { restartCount: manager.getRestartCount() },
+      });
+    },
   });
 
+  const launched = await manager.launch();
+  const session: BrowserSession = {
+    manager,
+    browser: launched.browser,
+    context: launched.context,
+    config: launched.config,
+  };
+
   // Initialize accumulators
-  const state = createInitialState(seedUrl, config);
-  const debugInfo = createDebugInfo(config);
+  const state = createInitialState(seedUrl, session.config);
+  const debugInfo = createDebugInfo(session.config);
   lastScrapeSnapshot = { seedUrl, startedAt, state, debugInfo };
 
   try {
     // Phase 0: Discover pages
-    const targets = await discoverPages(browser, context, seedUrl, state, opts);
+    const targets = await discoverPages(session, seedUrl, state, opts);
 
     // Phase 1: Scrape discovered pages
-    await scrapeDiscoveredPages(browser, context, targets, state, opts, debugInfo, wappalyzerReady, startedAt);
+    await scrapeDiscoveredPages(session, targets, state, opts, debugInfo, wappalyzerReady, startedAt);
 
     // Phase 2: Scrape product pages
-    await scrapeProductPages(context, state, opts, startedAt);
+    await scrapeProductPages(session.context, state, opts, startedAt);
 
     // Phase 3: Test checkout (optional; web UI often skips to avoid long stalls)
     if (!opts.skipCheckout) {
-      await testCheckout(browser, context, seedUrl, state, opts, startedAt);
+      await testCheckout(session.browser, session.context, seedUrl, state, opts, startedAt);
     } else {
       state.checkoutSkipped = true;
       scrapeProgress.phase = 'checkout';
@@ -516,23 +565,118 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     }
 
     // Build result before browser teardown so the UI always receives data even if Chromium hangs on close.
-    return buildResult(seedUrl, startedAt, state, debugInfo, { skipLog: scrapeRaceResolvedWithTimeout });
+    return buildResult(seedUrl, startedAt, state, debugInfo, {
+      skipLog: scrapeRaceResolvedWithTimeout,
+    });
   } finally {
     scrapeProgress.phase = 'analyzing';
     scrapeProgress.currentUrl = '';
-    void closeBrowserWithTimeout(browser, context, { verbose: opts.verbose, onProgress: () => {} }).catch(() => {});
+    void manager.close().catch(() => {});
   }
+}
+
+async function restartBrowserSession(
+  session: BrowserSession,
+  state: ScrapeState,
+  opts: Required<ScrapeOptions>,
+  reason: string
+): Promise<void> {
+  const relaunched = await session.manager.restart(reason);
+  session.browser = relaunched.browser;
+  session.context = relaunched.context;
+  session.config = relaunched.config;
+  state.browserRestarts = session.manager.getRestartCount();
+  state.degradedReasons.add('browser_restart');
+  emitLog(opts, {
+    level: 'warn',
+    scope: 'browser',
+    event: 'browser.restarted',
+    phase: scrapeProgress.phase,
+    message: `Browser restarted: ${reason}`,
+    details: { restartCount: session.manager.getRestartCount() },
+  });
+}
+
+function markFallbackDiscovery(seedUrl: string, state: ScrapeState): CrawlTarget[] {
+  state.discoveryUsedFallbackUrls = true;
+  state.degradedReasons.add('discovery_fallback');
+  return getFallbackTargets(seedUrl);
 }
 
 // ============ Discovery Phase ============
 
-async function discoverPages(
+async function tryLightweightDiscovery(
   browser: Browser,
-  context: Awaited<ReturnType<typeof launchStealthBrowser>>['context'],
+  seedUrl: string,
+  opts: Required<ScrapeOptions>
+): Promise<CrawlTarget[] | null> {
+  emitLog(opts, {
+    level: 'warn',
+    scope: 'scraper',
+    event: 'discovery.lightweight_retry',
+    phase: 'discovery',
+    message: 'Retrying discovery with lightweight rendering',
+    details: { seedUrl },
+  });
+
+  const recovery = await createStealthContext(browser, {
+    verbose: false,
+    javaScriptEnabled: false,
+    blockHeavyResources: true,
+  });
+  const page = await recovery.context.newPage();
+
+  try {
+    const navResult = await gotoWithRetry(page, seedUrl, {
+      timeout: lightweightNavigationTimeout(opts.timeout),
+      maxRetries: 0,
+      verbose: opts.verbose,
+      waitForNetworkIdle: false,
+    });
+
+    if (navResult.error || navResult.blocked) return null;
+
+    const statusCode = navResult.response?.status();
+    if (statusCode && statusCode >= 400) return null;
+
+    const discoveryPromise = discoverCrawlTargets(page, seedUrl, opts.verbose);
+    const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
+      setTimeout(() => reject(new Error('Lightweight discovery timeout')), 10000)
+    );
+    const targets = await Promise.race([discoveryPromise, timeoutPromise]);
+
+    emitLog(opts, {
+      level: 'info',
+      scope: 'scraper',
+      event: 'discovery.lightweight_complete',
+      phase: 'discovery',
+      message: `Lightweight discovery found ${targets.length} pages to crawl`,
+      details: { targetCount: targets.length },
+    });
+    return targets;
+  } catch (error) {
+    emitLog(opts, {
+      level: 'warn',
+      scope: 'scraper',
+      event: 'discovery.lightweight_failed',
+      phase: 'discovery',
+      message: error instanceof Error ? error.message : 'Lightweight discovery failed',
+      details: { seedUrl },
+    });
+    return null;
+  } finally {
+    await page.close().catch(() => {});
+    await recovery.context.close().catch(() => {});
+  }
+}
+
+async function discoverPages(
+  session: BrowserSession,
   seedUrl: string,
   state: ScrapeState,
   opts: Required<ScrapeOptions>
 ): Promise<CrawlTarget[]> {
+  const { browser, context } = session;
   scrapeProgress.phase = 'discovery';
   opts.onProgress({ phase: 'init', message: 'Discovering site structure...' });
   if (opts.verbose) console.log('  Discovering site structure...');
@@ -546,6 +690,7 @@ async function discoverPages(
   });
 
   const discoveryPage = await context.newPage();
+  attachPageCrashLogging(discoveryPage, (entry) => emitLog(opts, entry), seedUrl);
   let navResult = await gotoWithRetry(discoveryPage, seedUrl, {
     timeout: opts.timeout,
     maxRetries: 2,
@@ -587,12 +732,53 @@ async function discoverPages(
     await retryPage.close().catch(() => {});
   }
 
+  if (shouldRestartBrowserOnNavigationFailure(navResult)) {
+    await discoveryPage.close().catch(() => {});
+    await activeContext?.close().catch(() => {});
+    await restartBrowserSession(session, state, opts, 'discovery navigation crash');
+    const retryPage = await session.context.newPage();
+    attachPageCrashLogging(retryPage, (entry) => emitLog(opts, entry), seedUrl);
+    navResult = await gotoWithRetry(retryPage, seedUrl, {
+      timeout: opts.timeout,
+      maxRetries: 1,
+      verbose: opts.verbose,
+      waitForNetworkIdle: true,
+    });
+    if (!navResult.error && !navResult.blocked && (!navResult.response || navResult.response.status() < 400)) {
+      await dismissCookieConsent(retryPage, opts.verbose);
+      try {
+        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose);
+        const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
+          setTimeout(() => reject(new Error('Discovery timeout')), 10000)
+        );
+        const targets = await Promise.race([discoveryPromise, timeoutPromise]);
+        await retryPage.close().catch(() => {});
+        if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl after browser restart`);
+        return targets;
+      } catch {
+        // fall through to lightweight / fallback
+      }
+    }
+    await retryPage.close().catch(() => {});
+  }
+
+  if (shouldRetryWithLightweightNavigation(navResult)) {
+    const targets = await tryLightweightDiscovery(browser, seedUrl, opts);
+    if (targets) {
+      await activeContext?.close().catch(() => {});
+      await discoveryPage.close().catch(() => {});
+      state.degradedReasons.add('lightweight_capture');
+      if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl via lightweight discovery`);
+      return targets;
+    }
+  }
+
   if (navResult.error || navResult.blocked) {
     handleNavigationError({ url: seedUrl, type: 'home' }, navResult, state, opts);
     await activeContext?.close().catch(() => {});
     await discoveryPage.close().catch(() => {});
     if (opts.verbose) console.log('  ⚠ Discovery seed failed, using fallback targets');
-    return getFallbackTargets(seedUrl);
+    return markFallbackDiscovery(seedUrl, state);
   }
 
   const seedStatus = navResult.response?.status();
@@ -601,7 +787,7 @@ async function discoverPages(
     if (opts.verbose) console.log(`  ⚠ Seed URL HTTP ${seedStatus}, using fallback targets`);
     await activeContext?.close().catch(() => {});
     await discoveryPage.close().catch(() => {});
-    return getFallbackTargets(seedUrl);
+    return markFallbackDiscovery(seedUrl, state);
   }
 
   // Dismiss cookie consent banner if present
@@ -616,7 +802,7 @@ async function discoverPages(
     targets = await Promise.race([discoveryPromise, timeoutPromise]);
   } catch (discoveryError) {
     if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError}), using fallback targets`);
-    targets = getFallbackTargets(seedUrl);
+    targets = markFallbackDiscovery(seedUrl, state);
   }
 
   await activeContext?.close().catch(() => {});
@@ -640,29 +826,43 @@ async function scrapeTargetAttempt(
   opts: Required<ScrapeOptions>,
   debugInfo: Partial<DebugInfo>,
   wappalyzerReady: boolean,
-  lastVisitedUrl: string | undefined
-): Promise<{ success: boolean; finalUrl?: string; blockedNav?: { blocked: boolean; blockType: string | null } }> {
+  lastVisitedUrl: string | undefined,
+  options: { recordNavigationErrors?: boolean; lightweight?: boolean; captureMode?: PageData['captureMode'] } = {}
+): Promise<{
+  success: boolean;
+  finalUrl?: string;
+  navigationFailure?: { error?: string | null; blocked?: boolean; blockType?: string | null };
+}> {
   const page = await context.newPage();
   const networkRequests: NetworkRequest[] = [];
+  const recordNavigationErrors = options.recordNavigationErrors ?? true;
+  const captureMode: PageData['captureMode'] = options.lightweight ? 'degraded' : (options.captureMode ?? 'full');
 
   try {
     setupNetworkTracking(page, state, networkRequests, debugInfo);
+    attachPageCrashLogging(page, (entry) => emitLog(opts, entry), target.url);
 
     const navResult = await gotoWithRetry(page, target.url, {
-      timeout: opts.timeout,
-      maxRetries: 2,
+      timeout: options.lightweight ? lightweightNavigationTimeout(opts.timeout) : opts.timeout,
+      maxRetries: options.lightweight ? 0 : 2,
       verbose: opts.verbose,
       referer: lastVisitedUrl,
-      waitForNetworkIdle: true,
+      waitForNetworkIdle: !options.lightweight,
     });
 
     if (navResult.error) {
-      handleNavigationError(target, navResult, state, opts);
-      return { success: false };
+      if (recordNavigationErrors) {
+        handleNavigationError(target, navResult, state, opts);
+      }
+      return { success: false, navigationFailure: navResult };
     }
 
     if (navResult.blocked) {
-      return { success: false, blockedNav: { blocked: true, blockType: navResult.blockType } };
+      const navigationFailure = { blocked: true, blockType: navResult.blockType };
+      if (recordNavigationErrors) {
+        handleNavigationError(target, navigationFailure, state, opts);
+      }
+      return { success: false, navigationFailure };
     }
 
     const statusCode = navResult.response?.status();
@@ -702,6 +902,10 @@ async function scrapeTargetAttempt(
     }
 
     const pageData = await extractPageData(page, navResult.response, networkRequests, opts);
+    pageData.captureMode = captureMode;
+    if (captureMode === 'degraded') {
+      state.degradedReasons.add('lightweight_capture');
+    }
     state.pages.push(pageData);
     scrapeProgress.pagesScraped = state.pages.length;
 
@@ -728,8 +932,7 @@ async function scrapeTargetAttempt(
 // ============ Page Scraping Phase ============
 
 async function scrapeDiscoveredPages(
-  browser: Browser,
-  context: Awaited<ReturnType<typeof launchStealthBrowser>>['context'],
+  session: BrowserSession,
   targets: CrawlTarget[],
   state: ScrapeState,
   opts: Required<ScrapeOptions>,
@@ -737,6 +940,7 @@ async function scrapeDiscoveredPages(
   wappalyzerReady: boolean,
   startedAt: string
 ): Promise<void> {
+  let { browser, context } = session;
   const totalTargets = Math.min(targets.length, opts.maxPages);
   let pageIndex = 0;
   let lastVisitedUrl: string | undefined;
@@ -772,14 +976,110 @@ async function scrapeDiscoveredPages(
         opts,
         debugInfo,
         wappalyzerReady,
-        lastVisitedUrl
+        lastVisitedUrl,
+        { recordNavigationErrors: false }
       );
       if (primaryAttempt.success) {
         lastVisitedUrl = primaryAttempt.finalUrl;
         continue;
       }
 
-      if (primaryAttempt.blockedNav) {
+      const failure = primaryAttempt.navigationFailure;
+      if (failure && shouldRestartBrowserOnNavigationFailure(failure)) {
+        if (opts.verbose) {
+          console.log(`  ↻ ${target.type}: ${target.url} - Restarting browser after crash`);
+        }
+        await restartBrowserSession(session, state, opts, `page crash on ${target.url}`);
+        browser = session.browser;
+        context = session.context;
+        const restartAttempt = await scrapeTargetAttempt(
+          context,
+          target,
+          state,
+          opts,
+          debugInfo,
+          wappalyzerReady,
+          lastVisitedUrl,
+          { recordNavigationErrors: false }
+        );
+        if (restartAttempt.success) {
+          lastVisitedUrl = restartAttempt.finalUrl;
+          continue;
+        }
+      }
+
+      if (failure && shouldRetryFullBrowserNavigation(failure) && !failure.blocked) {
+        if (opts.verbose) {
+          console.log(`  ↻ ${target.type}: ${target.url} - Retrying in a fresh full-browser context`);
+        }
+        const rotated = await createStealthContext(browser, { verbose: false, config: session.config });
+        try {
+          const recoveryAttempt = await scrapeTargetAttempt(
+            rotated.context,
+            target,
+            state,
+            opts,
+            debugInfo,
+            wappalyzerReady,
+            lastVisitedUrl,
+            { recordNavigationErrors: false }
+          );
+          if (recoveryAttempt.success) {
+            lastVisitedUrl = recoveryAttempt.finalUrl;
+            continue;
+          }
+        } finally {
+          await rotated.context.close().catch(() => {});
+        }
+      }
+
+      if (
+        failure &&
+        shouldRetryWithLightweightNavigation(failure) &&
+        shouldUseLightweightFallback(target.type)
+      ) {
+        if (opts.verbose) {
+          console.log(`  ↻ ${target.type}: ${target.url} - Retrying with lightweight rendering`);
+        }
+        emitLog(opts, {
+          level: 'warn',
+          scope: 'scraper',
+          event: 'page.lightweight_retry',
+          phase: 'page-scraping',
+          message: 'Retrying page with degraded lightweight rendering (policy/info only)',
+          details: { url: target.url, targetType: target.type },
+        });
+
+        const recovery = await createStealthContext(browser, {
+          verbose: false,
+          javaScriptEnabled: false,
+          blockHeavyResources: true,
+        });
+        try {
+          const recoveryAttempt = await scrapeTargetAttempt(
+            recovery.context,
+            target,
+            state,
+            opts,
+            debugInfo,
+            wappalyzerReady,
+            lastVisitedUrl,
+            { lightweight: true }
+          );
+          if (recoveryAttempt.success) {
+            lastVisitedUrl = recoveryAttempt.finalUrl;
+            continue;
+          }
+          if (!recoveryAttempt.navigationFailure) {
+            handleNavigationError(target, failure, state, opts);
+          }
+        } finally {
+          await recovery.context.close().catch(() => {});
+        }
+        continue;
+      }
+
+      if (failure?.blocked) {
         if (opts.verbose) {
           console.log(`  ↻ ${target.type}: ${target.url} - Retrying in a fresh context`);
         }
@@ -792,18 +1092,24 @@ async function scrapeDiscoveredPages(
             opts,
             debugInfo,
             wappalyzerReady,
-            lastVisitedUrl
+            lastVisitedUrl,
+            { recordNavigationErrors: false }
           );
           if (recoveryAttempt.success) {
             lastVisitedUrl = recoveryAttempt.finalUrl;
             continue;
           }
-          if (recoveryAttempt.blockedNav) {
-            handleNavigationError(target, recoveryAttempt.blockedNav, state, opts);
+          if (recoveryAttempt.navigationFailure) {
+            handleNavigationError(target, recoveryAttempt.navigationFailure, state, opts);
           }
         } finally {
           await rotated.context.close().catch(() => {});
         }
+        continue;
+      }
+
+      if (failure) {
+        handleNavigationError(target, failure, state, opts);
       }
     } catch (error) {
       handlePageError(error, target, state, opts);
@@ -812,12 +1118,12 @@ async function scrapeDiscoveredPages(
 }
 
 function setupNetworkTracking(
-  page: Awaited<ReturnType<Awaited<ReturnType<typeof launchStealthBrowser>>['context']['newPage']>>,
+  page: Page,
   state: ScrapeState,
   networkRequests: NetworkRequest[],
   debugInfo: Partial<DebugInfo>
 ): void {
-  page.on('request', (request) => {
+  page.on('request', (request: Request) => {
     const reqUrl = request.url();
     debugInfo.totalRequestsIntercepted = (debugInfo.totalRequestsIntercepted || 0) + 1;
 
@@ -835,7 +1141,7 @@ function setupNetworkTracking(
     }
   });
 
-  page.on('console', (msg) => {
+  page.on('console', (msg: ConsoleMessage) => {
     if (msg.type() === 'error') {
       debugInfo.consoleErrors?.push(msg.text());
     }
@@ -879,7 +1185,7 @@ function handleNavigationError(
 }
 
 function validateRedirect(
-  page: Awaited<ReturnType<Awaited<ReturnType<typeof launchStealthBrowser>>['context']['newPage']>>,
+  page: Page,
   target: CrawlTarget,
   state: ScrapeState,
   debugInfo: Partial<DebugInfo>
@@ -1069,7 +1375,7 @@ function handlePageError(error: unknown, target: CrawlTarget, state: ScrapeState
 // ============ Product Pages Phase ============
 
 async function scrapeProductPages(
-  context: Awaited<ReturnType<typeof launchStealthBrowser>>['context'],
+  context: BrowserContext,
   state: ScrapeState,
   opts: Required<ScrapeOptions>,
   startedAt: string
@@ -1121,7 +1427,7 @@ async function scrapeProductPages(
       const page = await context.newPage();
       const networkRequests: NetworkRequest[] = [];
 
-      page.on('request', (request) => {
+      page.on('request', (request: Request) => {
         const reqUrl = request.url();
         const detected = detectThirdParty(reqUrl);
         if (detected) {
@@ -1263,7 +1569,7 @@ async function processProductPage(pageData: PageData, state: ScrapeState, opts: 
 
 async function testCheckout(
   browser: Browser,
-  context: Awaited<ReturnType<typeof launchStealthBrowser>>['context'],
+  context: BrowserContext,
   seedUrl: string,
   state: ScrapeState,
   opts: Required<ScrapeOptions>,
@@ -1278,6 +1584,20 @@ async function testCheckout(
   } = {};
   scrapeProgress.phase = 'checkout';
   scrapeProgress.currentUrl = checkoutUrl;
+
+  if (!shouldAttemptCheckoutAfterCrawl(state.pages.length, checkoutProductCandidates.length)) {
+    state.checkoutSkipped = true;
+    state.checkoutStoppedAt = 'skipped: no pages or product candidates collected';
+    emitLog(opts, {
+      level: 'warn',
+      scope: 'checkout',
+      event: 'checkout.skipped',
+      phase: 'checkout',
+      message: 'Skipping checkout because no pages or product candidates were collected',
+      details: { checkoutUrl },
+    });
+    return;
+  }
 
   opts.onProgress({ phase: 'checkout', message: 'Testing checkout flow...' });
 
@@ -1534,6 +1854,13 @@ function buildResult(
       loyaltyProgram: state.loyaltyInfo,
       localization: state.localizationInfo,
       marketplacePresence: state.marketplaceInfo,
+      scrapeQuality: deriveScrapeQuality({
+        pages: state.pages,
+        browserRestarts: state.browserRestarts,
+        discoveryUsedFallbackUrls: state.discoveryUsedFallbackUrls,
+        degradedReasons: Array.from(state.degradedReasons),
+        scrapingCompletionWarning: undefined,
+      }),
     },
     pages: state.pages,
   };

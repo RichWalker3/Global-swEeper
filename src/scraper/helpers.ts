@@ -121,6 +121,35 @@ export function classifyError(errorMsg: string, statusCode?: number): CrawlError
   return 'other';
 }
 
+/** True when Playwright/Chromium lost the renderer or browser process. */
+export function isBrowserCrashError(errorMsg: string): boolean {
+  return /page crashed|browser has been closed|browser disconnected|target closed|context has been closed|session closed/i.test(
+    errorMsg
+  );
+}
+
+export function shouldRestartBrowserOnNavigationFailure(navResult: {
+  error?: string | null;
+  blocked?: boolean;
+}): boolean {
+  return Boolean(navResult.error && !navResult.blocked && isBrowserCrashError(navResult.error));
+}
+
+/** Full-browser retry (fresh context) for transient navigation failures, excluding bot blocks. */
+export function shouldRetryFullBrowserNavigation(navResult: {
+  error?: string | null;
+  blocked?: boolean;
+}): boolean {
+  if (navResult.blocked || !navResult.error) return false;
+  return (
+    isBrowserCrashError(navResult.error) ||
+    navResult.error.includes('timeout') ||
+    navResult.error.includes('Timeout') ||
+    navResult.error.includes('net::ERR_') ||
+    navResult.error.includes('ERR_CONNECTION')
+  );
+}
+
 export interface GotoResult {
   response: Response | null;
   blocked: boolean;
@@ -208,7 +237,8 @@ export async function gotoWithRetry(
       lastError = error instanceof Error ? error.message : 'Unknown error';
 
       // Check if error is retryable
-      const isRetryable = 
+      const isRetryable =
+        isBrowserCrashError(lastError) ||
         lastError.includes('net::ERR_') ||
         lastError.includes('timeout') ||
         lastError.includes('Navigation timeout') ||

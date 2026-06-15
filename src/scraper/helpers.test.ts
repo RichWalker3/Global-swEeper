@@ -10,7 +10,32 @@ import {
   getRandomViewport,
   USER_AGENTS,
   VIEWPORTS,
+  isBrowserCrashError,
+  shouldRestartBrowserOnNavigationFailure,
+  shouldRetryFullBrowserNavigation,
 } from './helpers.js';
+
+describe('browser crash classification', () => {
+  it('detects renderer and browser disconnect errors', () => {
+    expect(isBrowserCrashError('page.goto: Page crashed')).toBe(true);
+    expect(isBrowserCrashError('Browser has been closed')).toBe(true);
+    expect(isBrowserCrashError('Target closed')).toBe(true);
+    expect(isBrowserCrashError('Navigation timeout of 30000ms exceeded')).toBe(false);
+  });
+
+  it('restarts browser only on crash errors, not bot blocks', () => {
+    expect(shouldRestartBrowserOnNavigationFailure({ error: 'Page crashed' })).toBe(true);
+    expect(shouldRestartBrowserOnNavigationFailure({ error: 'Page crashed', blocked: true })).toBe(false);
+    expect(shouldRestartBrowserOnNavigationFailure({ error: 'Timeout 30000ms exceeded.' })).toBe(false);
+  });
+
+  it('retries full browser on crashes, timeouts, and network errors', () => {
+    expect(shouldRetryFullBrowserNavigation({ error: 'Page crashed' })).toBe(true);
+    expect(shouldRetryFullBrowserNavigation({ error: 'Timeout 30000ms exceeded.' })).toBe(true);
+    expect(shouldRetryFullBrowserNavigation({ error: 'net::ERR_CONNECTION_RESET' })).toBe(true);
+    expect(shouldRetryFullBrowserNavigation({ blocked: true, error: 'Page crashed' })).toBe(false);
+  });
+});
 
 describe('detectBotBlock', () => {
   describe('Cloudflare detection', () => {

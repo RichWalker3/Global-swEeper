@@ -12,7 +12,15 @@ import { detectThirdParty, scanForDangerousGoods, detectB2B, extractProductLinks
 import { extractPolicyInfo } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectSubscriptions, detectPreOrders, detectBNPLWidgets } from './catalogDetector.js';
 import { tagPage } from '../prefilter/tagger.js';
-import { defaultPageGotoTimeoutMs, adaptTimeoutsForLatency } from './scraper.js';
+import {
+  adaptTimeoutsForLatency,
+  defaultPageGotoTimeoutMs,
+  lightweightNavigationTimeout,
+  shouldAttemptCheckoutAfterCrawl,
+  shouldRetryWithLightweightNavigation,
+  shouldUseLightweightFallback,
+  deriveScrapeQuality,
+} from './scraper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, '__fixtures__', 'shopify-store');
@@ -96,6 +104,82 @@ describe('scraper configuration', () => {
     expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '5000' })).toBe(10000);
     expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '45000' })).toBe(45000);
     expect(defaultPageGotoTimeoutMs({ SWEEP_PAGE_GOTO_TIMEOUT_MS: '300000' })).toBe(120000);
+  });
+});
+
+describe('lightweight navigation recovery decisions', () => {
+  it('allows lightweight retry when navigation failed and page was not bot-blocked', () => {
+    expect(shouldRetryWithLightweightNavigation({ error: 'page.goto: Page crashed' })).toBe(true);
+    expect(shouldRetryWithLightweightNavigation({ error: 'page.goto: Timeout 30000ms exceeded.' })).toBe(true);
+  });
+
+  it('does not retry explicit bot blocks with lightweight navigation', () => {
+    expect(shouldRetryWithLightweightNavigation({ blocked: true, blockType: 'cloudflare' })).toBe(false);
+  });
+
+  it('caps lightweight navigation to a short recovery budget', () => {
+    expect(lightweightNavigationTimeout(30000)).toBe(15000);
+    expect(lightweightNavigationTimeout(8000)).toBe(10000);
+  });
+
+  it('limits degraded salvage to home, policy, and other page types', () => {
+    expect(shouldUseLightweightFallback('home')).toBe(true);
+    expect(shouldUseLightweightFallback('policy')).toBe(true);
+    expect(shouldUseLightweightFallback('other')).toBe(true);
+    expect(shouldUseLightweightFallback('pdp')).toBe(false);
+    expect(shouldUseLightweightFallback('collection')).toBe(false);
+  });
+});
+
+describe('scrape quality summary', () => {
+  it('marks complete runs with only full captures', () => {
+    const quality = deriveScrapeQuality({
+      pages: [{ url: 'https://example.com/', captureMode: 'full' } as never],
+      browserRestarts: 0,
+      discoveryUsedFallbackUrls: false,
+      degradedReasons: [],
+    });
+    expect(quality.level).toBe('complete');
+    expect(quality.pagesFullCapture).toBe(1);
+    expect(quality.pagesDegradedCapture).toBe(0);
+  });
+
+  it('marks degraded runs when salvage or restarts were used', () => {
+    const quality = deriveScrapeQuality({
+      pages: [
+        { url: 'https://example.com/', captureMode: 'full' } as never,
+        { url: 'https://example.com/policies/shipping', captureMode: 'degraded' } as never,
+      ],
+      browserRestarts: 1,
+      discoveryUsedFallbackUrls: true,
+      degradedReasons: [],
+    });
+    expect(quality.level).toBe('degraded');
+    expect(quality.degradedReasons).toEqual(
+      expect.arrayContaining(['discovery_fallback', 'lightweight_capture', 'browser_restart'])
+    );
+  });
+
+  it('marks partial runs when scraping hit the overall timeout', () => {
+    const quality = deriveScrapeQuality({
+      pages: [],
+      browserRestarts: 0,
+      discoveryUsedFallbackUrls: false,
+      degradedReasons: [],
+      scrapingCompletionWarning: 'Stopped early due to scrape timeout',
+    });
+    expect(quality.level).toBe('partial');
+  });
+});
+
+describe('checkout attempt decisions', () => {
+  it('skips checkout when the crawl found no pages or product candidates', () => {
+    expect(shouldAttemptCheckoutAfterCrawl(0, 0)).toBe(false);
+  });
+
+  it('attempts checkout when any page or product candidate was collected', () => {
+    expect(shouldAttemptCheckoutAfterCrawl(1, 0)).toBe(true);
+    expect(shouldAttemptCheckoutAfterCrawl(0, 1)).toBe(true);
   });
 });
 

@@ -33,6 +33,7 @@ __fixtures__
 # Documentation
 *.md
 !README.md
+!CHANGELOG.md
 
 # OS files
 .DS_Store

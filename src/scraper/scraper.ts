@@ -12,7 +12,7 @@ import { logAssessment, type DebugInfo } from '../logger/index.js';
 import { gotoWithRetry, classifyError, randomDelay, USER_AGENTS, isBrowserCrashError, shouldRestartBrowserOnNavigationFailure, shouldRetryFullBrowserNavigation } from './helpers.js';
 import { createStealthContext, dismissCookieConsent, slowScroll, type BrowserConfig, type ContextOptions } from './browser.js';
 import { StealthBrowserManager, attachPageCrashLogging } from './browserManager.js';
-import { discoverCrawlTargets, getFallbackTargets, type CrawlTarget } from './crawler.js';
+import { discoverCrawlTargets, getFallbackTargets, dedupeCrawlTargets, normalizeCrawlUrl, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
 import type { Browser, BrowserContext, Page, Request, ConsoleMessage } from 'playwright';
@@ -59,6 +59,8 @@ interface ScrapeState {
   discoveryUsedFallbackUrls: boolean;
   degradedReasons: Set<string>;
   browserRestarts: number;
+  pageCrashCount: number;
+  preferLightweightCapture: boolean;
 }
 
 function createInitialState(seedUrl: string, _config: { userAgent: string }): ScrapeState {
@@ -98,6 +100,8 @@ function createInitialState(seedUrl: string, _config: { userAgent: string }): Sc
     discoveryUsedFallbackUrls: false,
     degradedReasons: new Set(),
     browserRestarts: 0,
+    pageCrashCount: 0,
+    preferLightweightCapture: false,
   };
 }
 
@@ -200,8 +204,77 @@ export function shouldRetryWithLightweightNavigation(navResult: {
 }
 
 /** Lightweight/no-JS capture is only acceptable for policy and informational pages after full-browser retries fail. */
-export function shouldUseLightweightFallback(targetType: CrawlTarget['type']): boolean {
-  return targetType === 'home' || targetType === 'policy' || targetType === 'other';
+export function shouldUseLightweightFallback(
+  targetType: CrawlTarget['type'],
+  lightweightFirst = false
+): boolean {
+  if (targetType === 'home' || targetType === 'policy' || targetType === 'other') return true;
+  if (lightweightFirst && (targetType === 'collection' || targetType === 'rewards')) return true;
+  return false;
+}
+
+export function rendererCrashStormThreshold(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.SWEEP_RENDERER_CRASH_STORM_THRESHOLD;
+  if (raw !== undefined && raw !== '') {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed >= 1) return parsed;
+  }
+  return 2;
+}
+
+export function maxBrowserRestarts(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.SWEEP_MAX_BROWSER_RESTARTS;
+  if (raw !== undefined && raw !== '') {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return 3;
+}
+
+export function shouldPreferLightweightFirst(state: Pick<ScrapeState, 'preferLightweightCapture' | 'pageCrashCount' | 'browserRestarts'>, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (state.preferLightweightCapture) return true;
+  return state.pageCrashCount >= rendererCrashStormThreshold(env) || state.browserRestarts >= maxBrowserRestarts(env);
+}
+
+export function shouldSkipFullBrowserTarget(
+  state: Pick<ScrapeState, 'preferLightweightCapture' | 'pageCrashCount' | 'browserRestarts'>,
+  targetType: CrawlTarget['type'],
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  return shouldPreferLightweightFirst(state, env) && !shouldUseLightweightFallback(targetType, true);
+}
+
+export function canRestartBrowser(state: Pick<ScrapeState, 'browserRestarts'>, env: NodeJS.ProcessEnv = process.env): boolean {
+  return state.browserRestarts < maxBrowserRestarts(env);
+}
+
+function noteRendererCrash(state: ScrapeState, opts: Required<ScrapeOptions>): void {
+  state.pageCrashCount += 1;
+  if (!state.preferLightweightCapture && state.pageCrashCount >= rendererCrashStormThreshold()) {
+    activateLightweightFirstMode(state, opts, `${state.pageCrashCount} renderer crashes`);
+  }
+}
+
+function activateLightweightFirstMode(state: ScrapeState, opts: Required<ScrapeOptions>, reason: string): void {
+  if (state.preferLightweightCapture) return;
+  state.preferLightweightCapture = true;
+  state.degradedReasons.add('renderer_crash_storm');
+  emitLog(opts, {
+    level: 'warn',
+    scope: 'scraper',
+    event: 'scrape.crash_storm',
+    phase: scrapeProgress.phase,
+    message: `Switching to lightweight-first capture (${reason})`,
+    details: { pageCrashCount: state.pageCrashCount, browserRestarts: state.browserRestarts },
+  });
+}
+
+function isTargetVisited(state: ScrapeState, url: string): boolean {
+  return state.visited.has(normalizeCrawlUrl(url));
+}
+
+function markTargetVisited(state: ScrapeState, url: string): void {
+  state.visited.add(normalizeCrawlUrl(url));
 }
 
 export function deriveScrapeQuality(input: {
@@ -222,6 +295,9 @@ export function deriveScrapeQuality(input: {
   }
   if (input.browserRestarts > 0 && !reasons.includes('browser_restart')) {
     reasons.push('browser_restart');
+  }
+  if (input.degradedReasons.includes('renderer_crash_storm') && !reasons.includes('renderer_crash_storm')) {
+    reasons.push('renderer_crash_storm');
   }
 
   let level: ScrapeQualityLevel = 'complete';
@@ -546,7 +622,7 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
 
   try {
     // Phase 0: Discover pages
-    const targets = await discoverPages(session, seedUrl, state, opts);
+    const targets = dedupeCrawlTargets(await discoverPages(session, seedUrl, state, opts));
 
     // Phase 1: Scrape discovered pages
     await scrapeDiscoveredPages(session, targets, state, opts, debugInfo, wappalyzerReady, startedAt);
@@ -581,6 +657,10 @@ async function restartBrowserSession(
   opts: Required<ScrapeOptions>,
   reason: string
 ): Promise<void> {
+  if (!canRestartBrowser(state)) {
+    activateLightweightFirstMode(state, opts, 'browser restart budget exhausted');
+    return;
+  }
   const relaunched = await session.manager.restart(reason);
   syncBrowserSession(session, relaunched);
   state.browserRestarts = session.manager.getRestartCount();
@@ -608,7 +688,12 @@ async function ensureLiveBrowserSession(
   reason: string
 ): Promise<void> {
   if (session.browser.isConnected()) return;
-  await restartBrowserSession(session, state, opts, reason);
+  if (canRestartBrowser(state)) {
+    await restartBrowserSession(session, state, opts, reason);
+    return;
+  }
+  const relaunched = await session.manager.ensureSession(reason);
+  syncBrowserSession(session, relaunched);
 }
 
 async function createRecoveryContext(
@@ -729,7 +814,7 @@ async function discoverPages(
 
   await ensureLiveBrowserSession(session, state, opts, 'pre-discovery');
   const discoveryPage = await session.context.newPage();
-  attachPageCrashLogging(discoveryPage, (entry) => emitLog(opts, entry), seedUrl);
+  attachPageCrashLogging(discoveryPage, (entry) => emitLog(opts, entry), seedUrl, () => noteRendererCrash(state, opts));
   let navResult = await gotoWithRetry(discoveryPage, seedUrl, {
     timeout: opts.timeout,
     maxRetries: 2,
@@ -776,7 +861,7 @@ async function discoverPages(
     await activeContext?.close().catch(() => {});
     await restartBrowserSession(session, state, opts, 'discovery navigation crash');
     const retryPage = await session.context.newPage();
-    attachPageCrashLogging(retryPage, (entry) => emitLog(opts, entry), seedUrl);
+    attachPageCrashLogging(retryPage, (entry) => emitLog(opts, entry), seedUrl, () => noteRendererCrash(state, opts));
     navResult = await gotoWithRetry(retryPage, seedUrl, {
       timeout: opts.timeout,
       maxRetries: 1,
@@ -879,7 +964,12 @@ async function scrapeTargetAttempt(
 
   try {
     setupNetworkTracking(page, state, networkRequests, debugInfo);
-    attachPageCrashLogging(page, (entry) => emitLog(opts, entry), target.url);
+    attachPageCrashLogging(
+      page,
+      (entry) => emitLog(opts, entry),
+      target.url,
+      () => noteRendererCrash(state, opts)
+    );
 
     const navResult = await gotoWithRetry(page, target.url, {
       timeout: options.lightweight ? lightweightNavigationTimeout(opts.timeout) : opts.timeout,
@@ -923,7 +1013,7 @@ async function scrapeTargetAttempt(
       return { success: false };
     }
 
-    state.visited.add(target.url);
+    markTargetVisited(state, target.url);
 
     await dismissCookieConsent(page, opts.verbose);
     if (target.type === 'home' || target.type === 'collection' || target.type === 'policy') {
@@ -970,6 +1060,62 @@ async function scrapeTargetAttempt(
 
 // ============ Page Scraping Phase ============
 
+function recordCrashFromFailure(
+  state: ScrapeState,
+  opts: Required<ScrapeOptions>,
+  failure?: { error?: string | null }
+): void {
+  if (failure?.error && isBrowserCrashError(failure.error)) {
+    noteRendererCrash(state, opts);
+  }
+}
+
+async function attemptLightweightPageScrape(
+  session: BrowserSession,
+  target: CrawlTarget,
+  state: ScrapeState,
+  opts: Required<ScrapeOptions>,
+  debugInfo: Partial<DebugInfo>,
+  wappalyzerReady: boolean,
+  lastVisitedUrl: string | undefined,
+  reason: string
+): Promise<{ success: boolean; finalUrl?: string; navigationFailure?: { error?: string | null; blocked?: boolean; blockType?: string | null } }> {
+  emitLog(opts, {
+    level: 'warn',
+    scope: 'scraper',
+    event: shouldPreferLightweightFirst(state) ? 'page.lightweight_first' : 'page.lightweight_retry',
+    phase: 'page-scraping',
+    message: shouldPreferLightweightFirst(state)
+      ? 'Using degraded lightweight rendering first after renderer instability'
+      : 'Retrying page with degraded lightweight rendering',
+    details: { url: target.url, targetType: target.type, reason },
+  });
+
+  const recovery = await createRecoveryContext(session, state, opts, reason, {
+    javaScriptEnabled: false,
+    blockHeavyResources: true,
+  });
+  try {
+    const attempt = await scrapeTargetAttempt(
+      recovery.context,
+      target,
+      state,
+      opts,
+      debugInfo,
+      wappalyzerReady,
+      lastVisitedUrl,
+      { recordNavigationErrors: false, lightweight: true }
+    );
+    return {
+      success: attempt.success,
+      finalUrl: attempt.finalUrl,
+      navigationFailure: attempt.navigationFailure,
+    };
+  } finally {
+    await recovery.context.close().catch(() => {});
+  }
+}
+
 async function scrapeDiscoveredPages(
   session: BrowserSession,
   targets: CrawlTarget[],
@@ -985,7 +1131,7 @@ async function scrapeDiscoveredPages(
 
   for (const target of targets) {
     if (state.visited.size >= opts.maxPages) break;
-    if (state.visited.has(target.url)) continue;
+    if (isTargetVisited(state, target.url)) continue;
 
     pageIndex++;
     scrapeProgress.phase = 'page-scraping';
@@ -1007,6 +1153,43 @@ async function scrapeDiscoveredPages(
 
     try {
       if (pageIndex > 1) await randomDelay(500, 1500);
+
+      if (shouldSkipFullBrowserTarget(state, target.type)) {
+        emitLog(opts, {
+          level: 'warn',
+          scope: 'scraper',
+          event: 'page.skipped_unstable',
+          phase: 'page-scraping',
+          message: 'Skipped full-browser capture after renderer crash storm',
+          details: { url: target.url, targetType: target.type },
+        });
+        state.errors.push({
+          url: target.url,
+          error: 'Skipped: full browser unstable for this page type',
+          type: 'other',
+        });
+        continue;
+      }
+
+      if (shouldPreferLightweightFirst(state) && shouldUseLightweightFallback(target.type, true)) {
+        const lightweightAttempt = await attemptLightweightPageScrape(
+          session,
+          target,
+          state,
+          opts,
+          debugInfo,
+          wappalyzerReady,
+          lastVisitedUrl,
+          'lightweight-first after renderer instability'
+        );
+        if (lightweightAttempt.success) {
+          lastVisitedUrl = lightweightAttempt.finalUrl;
+        } else if (lightweightAttempt.navigationFailure) {
+          handleNavigationError(target, lightweightAttempt.navigationFailure, state, opts);
+        }
+        continue;
+      }
+
       const primaryAttempt = await scrapeTargetAttempt(
         session.context,
         target,
@@ -1023,28 +1206,36 @@ async function scrapeDiscoveredPages(
       }
 
       const failure = primaryAttempt.navigationFailure;
+      recordCrashFromFailure(state, opts, failure);
+
       if (failure && shouldRestartBrowserOnNavigationFailure(failure)) {
         if (opts.verbose) {
           console.log(`  ↻ ${target.type}: ${target.url} - Restarting browser after crash`);
         }
         await restartBrowserSession(session, state, opts, `page crash on ${target.url}`);
-        const restartAttempt = await scrapeTargetAttempt(
-          session.context,
-          target,
-          state,
-          opts,
-          debugInfo,
-          wappalyzerReady,
-          lastVisitedUrl,
-          { recordNavigationErrors: false }
-        );
-        if (restartAttempt.success) {
-          lastVisitedUrl = restartAttempt.finalUrl;
-          continue;
+        if (session.browser.isConnected()) {
+          const restartAttempt = await scrapeTargetAttempt(
+            session.context,
+            target,
+            state,
+            opts,
+            debugInfo,
+            wappalyzerReady,
+            lastVisitedUrl,
+            { recordNavigationErrors: false }
+          );
+          if (restartAttempt.success) {
+            lastVisitedUrl = restartAttempt.finalUrl;
+            continue;
+          }
+          recordCrashFromFailure(state, opts, restartAttempt.navigationFailure);
         }
       }
 
-      if (failure && shouldRetryFullBrowserNavigation(failure) && !failure.blocked) {
+      const activeFailure = failure;
+      const lightweightEligible = shouldUseLightweightFallback(target.type, shouldPreferLightweightFirst(state));
+
+      if (activeFailure && shouldRetryFullBrowserNavigation(activeFailure) && !activeFailure.blocked && !shouldPreferLightweightFirst(state)) {
         if (opts.verbose) {
           console.log(`  ↻ ${target.type}: ${target.url} - Retrying in a fresh full-browser context`);
         }
@@ -1064,57 +1255,34 @@ async function scrapeDiscoveredPages(
             lastVisitedUrl = recoveryAttempt.finalUrl;
             continue;
           }
+          recordCrashFromFailure(state, opts, recoveryAttempt.navigationFailure);
         } finally {
           await rotated.context.close().catch(() => {});
         }
       }
 
-      if (
-        failure &&
-        shouldRetryWithLightweightNavigation(failure) &&
-        shouldUseLightweightFallback(target.type)
-      ) {
-        if (opts.verbose) {
-          console.log(`  ↻ ${target.type}: ${target.url} - Retrying with lightweight rendering`);
+      if (activeFailure && shouldRetryWithLightweightNavigation(activeFailure) && lightweightEligible) {
+        const recoveryAttempt = await attemptLightweightPageScrape(
+          session,
+          target,
+          state,
+          opts,
+          debugInfo,
+          wappalyzerReady,
+          lastVisitedUrl,
+          `lightweight retry on ${target.url}`
+        );
+        if (recoveryAttempt.success) {
+          lastVisitedUrl = recoveryAttempt.finalUrl;
+          continue;
         }
-        emitLog(opts, {
-          level: 'warn',
-          scope: 'scraper',
-          event: 'page.lightweight_retry',
-          phase: 'page-scraping',
-          message: 'Retrying page with degraded lightweight rendering (policy/info only)',
-          details: { url: target.url, targetType: target.type },
-        });
-
-        const recovery = await createRecoveryContext(session, state, opts, `lightweight retry on ${target.url}`, {
-          javaScriptEnabled: false,
-          blockHeavyResources: true,
-        });
-        try {
-          const recoveryAttempt = await scrapeTargetAttempt(
-            recovery.context,
-            target,
-            state,
-            opts,
-            debugInfo,
-            wappalyzerReady,
-            lastVisitedUrl,
-            { lightweight: true }
-          );
-          if (recoveryAttempt.success) {
-            lastVisitedUrl = recoveryAttempt.finalUrl;
-            continue;
-          }
-          if (!recoveryAttempt.navigationFailure) {
-            handleNavigationError(target, failure, state, opts);
-          }
-        } finally {
-          await recovery.context.close().catch(() => {});
+        if (!recoveryAttempt.navigationFailure && activeFailure) {
+          handleNavigationError(target, activeFailure, state, opts);
         }
         continue;
       }
 
-      if (failure?.blocked) {
+      if (activeFailure?.blocked) {
         if (opts.verbose) {
           console.log(`  ↻ ${target.type}: ${target.url} - Retrying in a fresh context`);
         }
@@ -1143,8 +1311,8 @@ async function scrapeDiscoveredPages(
         continue;
       }
 
-      if (failure) {
-        handleNavigationError(target, failure, state, opts);
+      if (activeFailure) {
+        handleNavigationError(target, activeFailure, state, opts);
       }
     } catch (error) {
       handlePageError(error, target, state, opts);

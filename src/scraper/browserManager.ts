@@ -153,9 +153,11 @@ export class StealthBrowserManager {
 export function attachPageCrashLogging(
   page: import('playwright').Page,
   onLog?: (entry: StructuredLogInput) => void,
-  url?: string
+  url?: string,
+  onCrash?: () => void
 ): void {
   page.on('crash', () => {
+    onCrash?.();
     onLog?.({
       level: 'error',
       scope: 'browser',

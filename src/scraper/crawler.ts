@@ -11,6 +11,32 @@ export interface CrawlTarget {
   source?: string;
 }
 
+/** Canonical crawl URL key — treats `/` and bare origin as the same page. */
+export function normalizeCrawlUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname === '/' || parsed.pathname === '') {
+      return parsed.origin;
+    }
+    const path = parsed.pathname.replace(/\/$/, '') || '/';
+    return parsed.origin + path + parsed.search;
+  } catch {
+    return url.replace(/\/$/, '');
+  }
+}
+
+export function dedupeCrawlTargets(targets: CrawlTarget[]): CrawlTarget[] {
+  const seen = new Set<string>();
+  const deduped: CrawlTarget[] = [];
+  for (const target of targets) {
+    const key = normalizeCrawlUrl(target.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push({ ...target, url: key });
+  }
+  return deduped;
+}
+
 // URL pattern classifiers
 const LINK_CLASSIFIERS: { pattern: RegExp; type: CrawlTarget['type']; priority: number }[] = [
   // Policy pages (high priority)
@@ -59,9 +85,9 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
   const base = new URL(seedUrl).origin;
   const discovered = new Map<string, CrawlTarget>();
 
-  // Always include homepage
-  discovered.set(base, { url: base, type: 'home', source: 'seed' });
-  discovered.set(base + '/', { url: base + '/', type: 'home', source: 'seed' });
+  // Always include homepage once (avoid scraping both `/` and bare origin).
+  const homeUrl = normalizeCrawlUrl(base);
+  discovered.set(homeUrl, { url: homeUrl, type: 'home', source: 'seed' });
 
   // Scroll to footer to trigger lazy-loading of footer content
   await scrollToFooter(page, verbose);
@@ -109,7 +135,7 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
       if (/\/(cdn|assets|static|media)\//i.test(url.pathname)) continue;
       if (/\/(account|login|register|cart\/add|checkout)/i.test(url.pathname)) continue;
 
-      const normalizedUrl = url.origin + url.pathname.replace(/\/$/, '');
+      const normalizedUrl = normalizeCrawlUrl(url.origin + url.pathname + url.search);
       if (discovered.has(normalizedUrl)) continue;
 
       // Classify the link
@@ -209,8 +235,8 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
  * Fallback targets when dynamic discovery fails
  */
 export function getFallbackTargets(seedUrl: string): CrawlTarget[] {
-  const base = seedUrl.replace(/\/$/, '');
-  return [
+  const base = normalizeCrawlUrl(seedUrl);
+  return dedupeCrawlTargets([
     { url: base, type: 'home', source: 'fallback' },
     { url: `${base}/collections/all`, type: 'collection', source: 'fallback' },
     { url: `${base}/collections`, type: 'collection', source: 'fallback' },
@@ -224,7 +250,7 @@ export function getFallbackTargets(seedUrl: string): CrawlTarget[] {
     { url: `${base}/pages/faq`, type: 'other', source: 'fallback' },
     { url: `${base}/help`, type: 'other', source: 'fallback' },
     { url: `${base}/cart`, type: 'cart', source: 'fallback' },
-  ];
+  ]);
 }
 
 /**

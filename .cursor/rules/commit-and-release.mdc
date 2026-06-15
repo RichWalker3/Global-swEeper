@@ -1,0 +1,21 @@
+---
+description: When the user asks to commit and push, update release metadata first
+alwaysApply: true
+---
+
+# Commit and Push Release Workflow
+
+When the user says **commit and push** (or similar: "commit", "push changes", "deploy this"):
+
+1. **Update release metadata** before committing (required every time):
+   - `CHANGELOG.md` — add or extend the top version entry with user-facing Added/Changed/Fixed bullets for everything in the commit.
+   - `package.json` and `package-lock.json` — bump `version` (patch for fixes, minor for features unless the user specifies otherwise).
+   - `src/web/public/index.html` — update the visible `version-label` to match `package.json`.
+
+2. **Then commit** with a conventional commit message summarizing the why.
+
+3. **Then push** to the tracked remote branch unless the user said commit-only.
+
+4. Confirm the new version number and what was documented in the changelog in the reply.
+
+Do not skip the changelog/version bump when the user explicitly asked to commit and push.

@@ -2,6 +2,32 @@
 
 Global-sweep uses `major.minor.patch` style versioning during the internal pilot.
 
+## v0.2.5 - 2026-06-15
+
+Production hardening for hosted Playwright scraping: browser lifecycle control, assessment queuing, crash recovery, container resource tuning, and smarter degraded capture when Chromium keeps crashing.
+
+### Added
+
+- **Browser manager** — launches, restarts, and closes Chromium with disconnect logging and bounded teardown.
+- **Hosted assessment gate** — FIFO queue for full-browser runs (`SWEEP_MAX_CONCURRENT_ASSESSMENTS`, default 1 in production).
+- **Scrape quality metadata** — `summary.scrapeQuality` reports full vs degraded pages, browser restarts, fallback discovery, and crash-storm salvage.
+- **Chromium runtime tuning** — env-driven launch flags (`SWEEP_CHROMIUM_USE_DEV_SHM`, `SWEEP_CHROMIUM_RENDERER_PROCESS_LIMIT`) and `docker-compose.yml` reference profile (`shm_size: 2gb`, `mem_limit: 3g`).
+- **Crash-storm mode** — after repeated renderer crashes, switches to lightweight-first salvage for policy/home/collection pages (`SWEEP_RENDERER_CRASH_STORM_THRESHOLD`, `SWEEP_MAX_BROWSER_RESTARTS`).
+- **URL deduplication** — treats `https://example.com` and `https://example.com/` as one crawl target.
+
+### Changed
+
+- **Full-browser-first recovery** — page failures retry with fresh context/browser before any no-JS salvage; salvage is marked degraded in results.
+- **Dockerfile** — `tini` entrypoint, explicit Chromium install, `NODE_OPTIONS=--max-old-space-size=2048`, default renderer process limit.
+- **Product Forge deployment docs** — recommended memory, `/dev/shm`, and environment variable checklist for hosted Chromium.
+- **Hosted page cap** — optional override via `SWEEP_HOSTED_MAX_PAGES`.
+
+### Fixed
+
+- Recovery paths no longer call `browser.newContext` on a stale closed browser after restart (fixes hosted “Target page, context or browser has been closed” hard failures).
+- Crash classification recognizes Playwright’s full “target page, context or browser has been closed” message.
+- Duplicate home URLs from discovery no longer waste scrape time on the same page twice.
+
 ## v0.2.4 - 2026-06-15
 
 In-app structured logs for debugging hosted runs without server access.

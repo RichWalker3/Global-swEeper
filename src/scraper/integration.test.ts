@@ -20,7 +20,10 @@ import {
   shouldRetryWithLightweightNavigation,
   shouldUseLightweightFallback,
   deriveScrapeQuality,
+  shouldPreferLightweightFirst,
+  shouldSkipFullBrowserTarget,
 } from './scraper.js';
+import { dedupeCrawlTargets } from './crawler.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, '__fixtures__', 'shopify-store');
@@ -122,12 +125,37 @@ describe('lightweight navigation recovery decisions', () => {
     expect(lightweightNavigationTimeout(8000)).toBe(10000);
   });
 
-  it('limits degraded salvage to home, policy, and other page types', () => {
+  it('limits degraded salvage to home, policy, and other page types by default', () => {
     expect(shouldUseLightweightFallback('home')).toBe(true);
     expect(shouldUseLightweightFallback('policy')).toBe(true);
     expect(shouldUseLightweightFallback('other')).toBe(true);
     expect(shouldUseLightweightFallback('pdp')).toBe(false);
     expect(shouldUseLightweightFallback('collection')).toBe(false);
+  });
+
+  it('allows collection salvage during lightweight-first crash storm mode', () => {
+    expect(shouldUseLightweightFallback('collection', true)).toBe(true);
+    expect(shouldUseLightweightFallback('rewards', true)).toBe(true);
+    expect(shouldUseLightweightFallback('pdp', true)).toBe(false);
+  });
+});
+
+describe('renderer crash storm decisions', () => {
+  it('enters lightweight-first mode after repeated renderer crashes', () => {
+    const state = { preferLightweightCapture: false, pageCrashCount: 2, browserRestarts: 0 };
+    expect(shouldPreferLightweightFirst(state)).toBe(true);
+    expect(shouldSkipFullBrowserTarget(state, 'pdp')).toBe(true);
+    expect(shouldSkipFullBrowserTarget(state, 'policy')).toBe(false);
+  });
+
+  it('dedupes trailing-slash home variants', () => {
+    const targets = dedupeCrawlTargets([
+      { url: 'https://de.rokid.com/', type: 'home' },
+      { url: 'https://de.rokid.com', type: 'home' },
+      { url: 'https://de.rokid.com/policies/shipping-policy', type: 'policy' },
+    ]);
+    expect(targets).toHaveLength(2);
+    expect(targets[0].url).toBe('https://de.rokid.com');
   });
 });
 

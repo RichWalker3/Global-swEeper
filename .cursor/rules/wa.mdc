@@ -21,15 +21,26 @@ When the user requests a WA (Website Assessment) using `/wa [URL]`, follow these
 
 **ALWAYS return the completed assessment directly in chat as PLAIN TEXT - not inside markdown code blocks and not only as a file preview.**
 
+**The saved file at `logs/assessments/YYYY-MM-DD_domain_WA.md` must be identical to the chat output.**
+
 Rules for output:
+- First line must be exactly `Website Assessment` (no `#` heading)
+- Section titles are plain text on their own line (no `#`, `###`, bold, or suffixes like `(DETAILED)`)
 - Do NOT wrap the assessment in triple backticks (```)
 - Do NOT use markdown link syntax like `[text](url)` - use plain URLs only
 - Do NOT use em dashes in WA output. Use a plain hyphen separator instead.
-- DO use emoji status indicators: ✅ ❔ ❌ ⚠️
+- Do NOT use horizontal rules (`---`) in completed WA output
+- DO use only these status labels on line items: `✅ Verified`, `❔ Unconfirmed`, `❌ Absent`
+- DO put warnings in the detail text, not in custom status labels like `⚠️ Verified`
 - DO put the line item subject first, bolded, then the status marker and label, then the evidence/detail.
 - Preferred bullet format: `• **Subject** - ✅ Verified - Evidence or finding here.`
-- DO keep this subject-first format for every WA unless the user explicitly asks for a different format.
+- DO keep this subject-first format for every WA line item unless the user explicitly asks for a different format.
 - DO use plain bullet points and line breaks
+- DO put one blank line between every bullet line item for Jira/Confluence copy-paste spacing
+- DO keep shipping and returns under `Shipping & Logistics` (no separate top-level Returns section)
+- DO use internationalization headers like `Market 1 (United States, USD)` followed by the six standard bullets with status labels
+- DO use `Takeaway: one sentence` at the end of sections that need a summary
+- DO read `docs/TEMPLATE.md` section `0) Output Requirements` for the full canonical format and section order before writing any WA
 - The user must be able to select all the text and copy it directly into Jira/Confluence with formatting intact
 
 Example of CORRECT output format:
@@ -77,14 +88,15 @@ Example of WRONG output (do NOT do this):
 6. Shipping & Logistics
 7. Loyalty, Subscriptions, and CRM
 8. Internationalization Testing
-9. Legal and Compliance
-10. Business Restrictions
-11. Apps, Integrations, and Data Layer
-12. Tech Risks and Integration Notes
-13. Opportunities and Recommendations
-14. Open Questions
-15. Next Steps
-16. Appendix
+9. Legal and Compliance (surface-level)
+10. Business Restrictions (split)
+11. Apps, Integrations, and Data Layer (visible only)
+12. Jewelry Merchant Considerations (Presales Scoping) - optional, jewelry merchants only
+13. Tech Risks and Integration Notes (Presales)
+14. Opportunities and Recommendations
+15. Open Questions
+16. Next Steps
+17. Appendix - Screens and Notes
 
 ## Example Usage
 

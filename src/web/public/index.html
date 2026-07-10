@@ -413,6 +413,77 @@
       padding: 1.5rem;
     }
 
+    .workflow-step {
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: var(--white);
+    }
+
+    .workflow-step:last-child {
+      margin-bottom: 0;
+    }
+
+    .workflow-step-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .workflow-step-number {
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 9999px;
+      background: var(--orange);
+      color: var(--white);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .workflow-step-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--black);
+    }
+
+    .workflow-step-copy {
+      font-size: 0.75rem;
+      color: var(--gray-400);
+      margin-top: 0.15rem;
+      line-height: 1.45;
+    }
+
+    .advanced-options {
+      border: 1px dashed var(--gray-200);
+      border-radius: 8px;
+      padding: 0.8rem;
+      background: var(--gray-100);
+      margin-top: 0.75rem;
+    }
+
+    .advanced-options summary {
+      cursor: pointer;
+      color: var(--black);
+      font-weight: 600;
+      font-size: 0.8125rem;
+    }
+
+    .guided-action-card {
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.12);
+      border-radius: 8px;
+      padding: 0.9rem;
+      margin-bottom: 0.9rem;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+    }
+
     /* Form */
     .form-group {
       margin-bottom: 1.5rem;
@@ -1197,12 +1268,18 @@
 
     .brd-table th:nth-child(3),
     .brd-table td:nth-child(3) {
-      width: 44%;
+      width: 38%;
     }
 
     .brd-table th:nth-child(4),
     .brd-table td:nth-child(4) {
-      width: 14%;
+      width: 12%;
+      min-width: 140px;
+    }
+
+    .brd-table th:nth-child(5),
+    .brd-table td:nth-child(5) {
+      width: 12%;
       min-width: 155px;
     }
 
@@ -1297,7 +1374,7 @@
       <span class="logo-icon">🧹</span>
       <div>
         <div class="logo-text">Global-sw<span>E</span>ep</div>
-        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.2.0</span></div>
+        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.3.0</span></div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 1rem;">
@@ -1424,7 +1501,7 @@
         <div class="card-body" id="howItWorksBody" style="padding: 1rem 1.5rem;">
           <ol style="margin: 0; padding-left: 1.25rem; font-size: 0.875rem; color: var(--black); line-height: 1.8;">
             <li><strong>Connect Jira:</strong> Open the hamburger menu, enter your Jira email/token, and connect for BRD updates. Use <strong>Remember on this computer</strong> if you want Sweep to reconnect from the OS credential store after restart.</li>
-            <li><strong>Run a WA:</strong> Paste the merchant URL, choose quick or full checkout mode, then click <strong>Run Assessment</strong>.</li>
+            <li><strong>Run a WA:</strong> Paste the merchant URL, choose the known ecommerce platform, choose quick or full checkout mode, then click <strong>Run Assessment</strong>.</li>
             <li><strong>Copy the WA prompt:</strong> After Sweep crawls the site, copy the <strong>Website Assessment Prompt</strong>.</li>
             <li><strong>Generate in Cursor:</strong> Paste the prompt into Cursor. Cursor returns the formatted WA plus a <strong>BRD Output for Sweep</strong> section.</li>
             <li><strong>Process BRD:</strong> Paste the finished WA into the BRD Workspace, enter the top-level SOPP key, and click <strong>Process BRD</strong>.</li>
@@ -1439,28 +1516,80 @@
       <div class="card" id="assessmentCard">
         <div class="card-header">
           <span>🎯</span>
-          <h2>New Assessment</h2>
+          <h2>Guided Assessment</h2>
         </div>
         <div class="card-body">
           <form id="sweepForm">
-            <div class="form-group">
-              <label for="merchantUrl">Merchant URL</label>
-              <input 
-                type="url" 
-                id="merchantUrl" 
-                name="url" 
-                placeholder="https://cool-brand.com"
-                required
-              >
+            <div class="workflow-step">
+              <div class="workflow-step-header">
+                <span class="workflow-step-number">1</span>
+                <div>
+                  <div class="workflow-step-title">Merchant details</div>
+                  <div class="workflow-step-copy">Start with the known platform so Sweep picks the right crawler profile.</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="merchantUrl">Merchant URL</label>
+                <input 
+                  type="url" 
+                  id="merchantUrl" 
+                  name="url" 
+                  placeholder="https://cool-brand.com"
+                  required
+                >
+              </div>
+
+              <div class="form-group">
+                <label for="merchantPlatform">Ecommerce platform</label>
+                <select id="merchantPlatform" name="platform" required style="border: 1px solid var(--gray-200); border-radius: 8px; padding: 0.75rem; width: 100%; font-size: 0.9rem;">
+                  <option value="" disabled selected>Select known platform</option>
+                  <option value="shopify">Shopify</option>
+                  <option value="sfcc">SFCC</option>
+                  <option value="gem">GEM / Custom</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+                <p style="font-size: 0.75rem; color: var(--gray-400); margin-top: 0.35rem;">
+                  Use Unknown only when the platform has not been confirmed.
+                </p>
+              </div>
             </div>
 
-            <div class="form-group" style="margin-top: 0.75rem;">
-              <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 400; cursor: pointer;">
-                <input type="checkbox" id="includeCheckout" name="includeCheckout" style="margin-top: 0.2rem;" checked>
-                <span style="font-size: 0.8125rem; color: var(--gray-400); line-height: 1.4;">
-                  Full WA mode: include checkout flow test (add-to-cart → checkout). Adds ~20s and can stall on some stores; uncheck for a faster quick scan.
-                </span>
-              </label>
+            <div class="workflow-step">
+              <div class="workflow-step-header">
+                <span class="workflow-step-number">2</span>
+                <div>
+                  <div class="workflow-step-title">Crawl setup</div>
+                  <div class="workflow-step-copy">Default mode uses sitemaps first, then a quiet browser crawl. Open advanced options only for blocked sites.</div>
+                </div>
+              </div>
+              <div class="form-group" style="margin-top: 0.75rem;">
+                <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 400; cursor: pointer;">
+                  <input type="checkbox" id="includeCheckout" name="includeCheckout" style="margin-top: 0.2rem;" checked>
+                  <span style="font-size: 0.8125rem; color: var(--gray-400); line-height: 1.4;">
+                    Full WA mode: include checkout flow test (add-to-cart → checkout). Adds time and can stall on some stores; uncheck for a faster quick scan.
+                  </span>
+                </label>
+              </div>
+              <details class="advanced-options" id="advancedCrawlOptions">
+                <summary>Advanced / blocked-site options</summary>
+                <div style="margin-top: 0.75rem; display: grid; gap: 0.75rem;">
+                  <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 400; cursor: pointer; margin: 0;">
+                    <input type="checkbox" id="watchBrowser" name="watchBrowser" style="margin-top: 0.2rem;">
+                    <span style="font-size: 0.8125rem; color: var(--gray-400); line-height: 1.4;">
+                      Watch browser: opens a visible Chromium window so you can complete a challenge if the site blocks automation.
+                    </span>
+                  </label>
+                  <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 400; cursor: pointer; margin: 0;">
+                    <input type="checkbox" id="reuseBrowserProfile" name="reuseBrowserProfile" style="margin-top: 0.2rem;">
+                    <span style="font-size: 0.8125rem; color: var(--gray-400); line-height: 1.4;">
+                      Reuse local Sweep browser profile: keeps cookies/session state in <code>tmp/browser-profiles</code> for future assisted runs. This turns on automatically with Watch browser, but you can uncheck it for a clean session.
+                    </span>
+                  </label>
+                  <p style="font-size: 0.75rem; color: var(--gray-400); margin: 0;">
+                    Proxy support is configured in <code>.env</code> with <code>PROXY_URL</code>. Sweep will recommend Brave/Search API only when sitemap discovery is thin.
+                  </p>
+                </div>
+              </details>
             </div>
 
             <button type="submit" class="btn" id="startBtn">
@@ -1500,6 +1629,11 @@
         </div>
         <div class="card-body">
           <div id="scrapingWarningBanner" class="hidden" style="margin-bottom: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; line-height: 1.45; background: rgba(245, 158, 11, 0.15); color: var(--yellow); border: 1px solid rgba(245, 158, 11, 0.35);"></div>
+          <div id="assistedModeCard" class="guided-action-card hidden">
+            <strong>Blocked-site next step</strong>
+            <p style="margin: 0.35rem 0 0.75rem 0;">Sweep was blocked while collecting page evidence. Rerun with a visible browser and persistent profile so you can complete any challenge manually.</p>
+            <button type="button" class="btn btn-secondary" id="rerunAssistedBtn" style="width: auto;">Rerun with assisted browser</button>
+          </div>
           <div class="summary-stats">
             <div class="stat-box">
               <div class="stat-value" id="statPages">0</div>
@@ -1610,7 +1744,7 @@
             <span class="alert-icon">🧭</span>
             <div class="alert-content">
               <strong>BRD completion mode</strong>
-              Load one SOPP parent, review the Jira description for context, merge SE scoping output with WA evidence, then save only to the validated child subtasks' SE scoping output field.
+              Load one SOPP parent, review the Jira description for context, merge SE scoping output with WA evidence, then save SE scoping output, Phase, and status to the validated child subtasks.
             </div>
           </div>
 
@@ -2125,8 +2259,11 @@
       // Update progress - hide spinner and show completion
       document.getElementById('progressSpinner').classList.add('hidden');
       const partialWarn = summary.scrapingCompletionWarning;
+      const botWarn = summary.botDetectionWarning;
       progressText.innerHTML = partialWarn
         ? '⚠️ Partial scrape — results below may be incomplete.'
+        : botWarn
+          ? '⚠️ Bot protection detected — review warning below.'
         : '✅ Scraping complete!';
       progressBar.style.width = '100%';
 
@@ -2137,12 +2274,20 @@
       }
 
       const warnBanner = document.getElementById('scrapingWarningBanner');
-      if (partialWarn) {
-        warnBanner.textContent = partialWarn;
+      if (partialWarn || botWarn) {
+        warnBanner.textContent = [partialWarn, botWarn].filter(Boolean).join(' ');
         warnBanner.classList.remove('hidden');
       } else {
         warnBanner.textContent = '';
         warnBanner.classList.add('hidden');
+      }
+
+      const assistedModeCard = document.getElementById('assistedModeCard');
+      const watchBrowserChecked = document.getElementById('watchBrowser')?.checked;
+      if (botWarn && !watchBrowserChecked) {
+        assistedModeCard.classList.remove('hidden');
+      } else {
+        assistedModeCard.classList.add('hidden');
       }
 
       // Show summary
@@ -2151,7 +2296,11 @@
       // Count all detected technologies (from Wappalyzer + pattern matching)
       const techCount = new Set([...(summary.thirdPartiesDetected || []), ...(summary.technologies || []).map(t => t.name)]).size;
       document.getElementById('statApps').textContent = techCount;
-      document.getElementById('statPlatform').textContent = summary.platformDetected || '?';
+      const selectedPlatform = summary.selectedPlatform?.label || 'Unknown';
+      const detectedPlatform = summary.platformDetected && summary.platformDetected !== selectedPlatform
+        ? ` / detected ${summary.platformDetected}`
+        : '';
+      document.getElementById('statPlatform').textContent = `${selectedPlatform}${detectedPlatform}`;
       
       // Show scrape health indicator
       const scrapeErrors = summary.errors || [];
@@ -2451,7 +2600,8 @@
 ## Scrape Summary
 
 - **Pages visited:** ${summary.pagesVisited} (${summary.productPagesScraped || 0} PDPs)
-- **Platform:** ${summary.platformDetected || 'Unknown'}
+- **Selected platform:** ${summary.selectedPlatform?.label || 'Unknown'}
+- **Detected platform:** ${summary.platformDetected || 'Unknown'}
 - **Shop Pay:** ${summary.shopPayDetected ? '✅ Detected' : '❌ Not detected'}
 - **Third-parties:** ${summary.thirdPartiesDetected.join(', ') || 'None detected'}
 `;
@@ -2584,8 +2734,9 @@
       const rows = previews || [];
       const doneCount = rows.filter(row => row.statusAction === 'done').length;
       const canceledCount = rows.filter(row => row.statusAction === 'canceled').length;
-      const unchangedCount = rows.length - doneCount - canceledCount;
-      return `${rows.length} SE Scoping Output fields updated in Jira. Status selections: ${doneCount} Done, ${canceledCount} Canceled, ${unchangedCount} unchanged.`;
+      const unchangedStatusCount = rows.length - doneCount - canceledCount;
+      const phaseUpdatedCount = rows.filter(row => row.phaseAction && row.phaseAction !== 'unchanged').length;
+      return `${rows.length} SE Scoping Output fields updated in Jira. Status: ${doneCount} Done, ${canceledCount} Canceled, ${unchangedStatusCount} unchanged. Phase: ${phaseUpdatedCount} updated.`;
     }
 
     function escapeHtml(value) {
@@ -2602,6 +2753,7 @@
         jiraKey: row.jiraKey,
         finalText: row.finalText,
         statusAction: row.statusAction || 'unchanged',
+        phaseAction: row.phaseAction || 'unchanged',
       }));
     }
 
@@ -2609,6 +2761,15 @@
       const status = String(row.currentStatus || '').toLowerCase();
       if (status === 'done') return 'done';
       if (status === 'canceled' || status === 'cancelled') return 'canceled';
+      return 'unchanged';
+    }
+
+    function initialPhaseAction(row) {
+      if (row.phaseAction) return row.phaseAction;
+      const phase = String(row.currentPhase || '').trim();
+      if (phase === 'in Scope') return 'in_scope';
+      if (phase === 'Out Of Scope') return 'out_of_scope';
+      if (phase === 'Future') return 'future';
       return 'unchanged';
     }
 
@@ -2627,6 +2788,7 @@
       brdReviewRows = rows.map(row => ({
         ...row,
         statusAction: row.statusAction || initialStatusAction(row),
+        phaseAction: row.phaseAction || initialPhaseAction(row),
       }));
 
       grid.innerHTML = `
@@ -2638,6 +2800,7 @@
                 <th>Description</th>
                 <th>Proposed SE Output</th>
                 <th>Status</th>
+                <th>Phase</th>
               </tr>
             </thead>
             <tbody>
@@ -2647,6 +2810,7 @@
                     <strong>${escapeHtml(row.requirementId || '')} ${escapeHtml(row.requirement || row.summary || '')}</strong>
                     <span class="brd-key-pill">${escapeHtml(row.jiraKey)}</span>
                     <span class="brd-current-status">${escapeHtml(row.currentStatus || 'No status')}</span>
+                    ${row.currentPhase ? `<span class="brd-current-status">Phase: ${escapeHtml(row.currentPhase)}</span>` : ''}
                   </td>
                   <td class="brd-description-cell">${escapeHtml(row.jiraDescriptionText || 'No Jira description.')}</td>
                   <td>
@@ -2657,6 +2821,14 @@
                       <option value="unchanged" ${row.statusAction === 'unchanged' ? 'selected' : ''}>Leave unchanged</option>
                       <option value="done" ${row.statusAction === 'done' ? 'selected' : ''}>Done</option>
                       <option value="canceled" ${row.statusAction === 'canceled' ? 'selected' : ''}>Canceled</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select data-brd-phase-index="${index}">
+                      <option value="unchanged" ${row.phaseAction === 'unchanged' ? 'selected' : ''}>Leave unchanged</option>
+                      <option value="in_scope" ${row.phaseAction === 'in_scope' ? 'selected' : ''}>in Scope</option>
+                      <option value="out_of_scope" ${row.phaseAction === 'out_of_scope' ? 'selected' : ''}>Out Of Scope</option>
+                      <option value="future" ${row.phaseAction === 'future' ? 'selected' : ''}>Future</option>
                     </select>
                   </td>
                 </tr>
@@ -2677,6 +2849,13 @@
         select.addEventListener('change', () => {
           const index = Number(select.dataset.brdStatusIndex);
           brdReviewRows[index].statusAction = select.value;
+        });
+      });
+
+      grid.querySelectorAll('select[data-brd-phase-index]').forEach(select => {
+        select.addEventListener('change', () => {
+          const index = Number(select.dataset.brdPhaseIndex);
+          brdReviewRows[index].phaseAction = select.value;
         });
       });
 
@@ -2762,7 +2941,7 @@
         setBrdSendStatus('This is a local manual table without Jira subtask keys. Connect Jira, click Process BRD again, then send to Jira.', true);
         return;
       }
-      if (!confirm('Send these SE scoping outputs and Done/Canceled selections to Jira? Only validated child subtasks under this SOPP will be updated.')) {
+      if (!confirm('Send these SE scoping outputs, Phase selections, and Done/Canceled status updates to Jira? Only validated child subtasks under this SOPP will be updated.')) {
         return;
       }
 
@@ -2781,13 +2960,24 @@
       setBrdSendStatus(`Jira update confirmed. ${summarizeBrdSendResult(data.previews)} Audit log: ${data.auditPath || 'not written'}`, false, true);
     }
 
-    // Form submit
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
+    async function runAssessment(forceAssisted = false) {
       const url = document.getElementById('merchantUrl').value;
+      const platform = document.getElementById('merchantPlatform').value;
       const includeCheckout = document.getElementById('includeCheckout').checked;
-      const options = { skipCheckout: !includeCheckout };
+      const watchBrowser = forceAssisted || document.getElementById('watchBrowser').checked;
+      const reuseBrowserProfile = forceAssisted || document.getElementById('reuseBrowserProfile').checked;
+      const options = {
+        skipCheckout: !includeCheckout,
+        platform,
+        browserMode: watchBrowser ? 'visible' : 'headless',
+        persistentProfile: reuseBrowserProfile,
+      };
+
+      if (forceAssisted) {
+        document.getElementById('watchBrowser').checked = true;
+        document.getElementById('reuseBrowserProfile').checked = true;
+        document.getElementById('advancedCrawlOptions').open = true;
+      }
 
       // Reset UI
       startBtn.disabled = true;
@@ -2804,6 +2994,7 @@
       }
       document.getElementById('scrapeErrors').classList.add('hidden');
       document.getElementById('scrapeErrorsList').innerHTML = '';
+      document.getElementById('assistedModeCard').classList.add('hidden');
       summaryCard.classList.add('hidden');
       document.getElementById('jsonConverterCard').classList.add('hidden');
       outputContent.innerHTML = '<div class="output-placeholder"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div><p style="margin-top:1rem;">Scraping in progress...</p></div>';
@@ -2818,6 +3009,12 @@
         progressText.textContent = `Error: ${error.message}`;
         startBtn.disabled = false;
       }
+    }
+
+    // Form submit
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await runAssessment(false);
     });
 
     // Tab switching
@@ -2837,6 +3034,16 @@
 
     document.getElementById('clearJiraBtn').addEventListener('click', async () => {
       await clearJiraCredentials();
+    });
+
+    document.getElementById('rerunAssistedBtn').addEventListener('click', async () => {
+      await runAssessment(true);
+    });
+
+    document.getElementById('watchBrowser').addEventListener('change', (event) => {
+      if (event.target.checked) {
+        document.getElementById('reuseBrowserProfile').checked = true;
+      }
     });
 
     document.getElementById('jiraTokenToggle').addEventListener('click', () => {

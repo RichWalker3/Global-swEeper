@@ -1,6 +1,6 @@
 # Website Assessment (WA)
 
-**Purpose:** A single template for quick first‑pass reviews that pairs the site assessment with Discovery Notes & Analysis (DNA). This doc includes 1) a short playbook and 2) a fill‑in template you can paste into any merchant thread.
+**Purpose:** A single template for quick first-pass Website Assessments (WA) that can feed the BRD Workspace review flow. This doc includes 1) a short playbook and 2) a fill-in template you can paste into any merchant thread.
 
 > **Terminology:** "WA" = Website Assessment. When the user says "WA", they mean Website Assessment.
 
@@ -12,7 +12,97 @@
 
 The chat output should be the complete, formatted assessment ready to copy-paste into Jira, Confluence, or Slack.
 
-**Line-item format:** Put the line item subject first and bold it, then put the status marker and label, then the finding/evidence. Preferred format: `• **Subject** - ✅ Verified - Evidence or finding here.` Use this subject-first format for every WA unless the user explicitly requests a different format. Do not use em dashes in WA output; use plain hyphen separators.
+**The saved file and the chat output must be identical.** Use the same plain-text WA format in both places.
+
+### Canonical WA format (required for every completed WA)
+
+Use this structure exactly. Section 2 below is the authoring worksheet; this is the delivered format.
+
+```
+Website Assessment
+
+Merchant Overview
+
+• **Brand** - ✅ Verified - Example Brand
+
+• **Primary URL** - ✅ Verified - https://example.com
+
+Evidence Log (Working Links)
+
+• **Home** - ✅ Verified - https://example.com
+
+Platform & Site Structure
+
+• **Platform & Version** - ✅ Verified - Shopify. Evidence: https://example.com/checkouts/cn/
+
+Shipping & Logistics
+
+• **Shipping tiers and SLAs** - ✅ Verified - Detail here with plain URL evidence.
+• **Returns and exchanges** - ✅ Verified - Detail here with plain URL evidence.
+
+Takeaway: One sentence section summary.
+
+Internationalization Testing
+
+Market 1 (United States, USD)
+
+• **Currency behavior** - ✅ Verified - USD at checkout.
+• **Evidence** - ✅ Verified - https://example.com/checkouts/cn/
+
+Open Questions
+
+• What is the authoritative return handling fee?
+
+Next Steps
+
+• Confirm return handling fee with merchant.
+
+Appendix - Screens and Notes
+
+• Checkout reached Shopify /checkouts/cn/ with one test item in cart.
+```
+
+### Formatting rules (non-negotiable)
+
+1. **Title** - First line is exactly `Website Assessment` (no `#`, no extra heading markup).
+2. **Section titles** - Plain text on their own line, matching the section order below. No `#`, `###`, bold, or suffixes like `(DETAILED)`.
+3. **Line items** - Every finding uses: `• **Subject** - STATUS - detail/evidence`
+4. **Status labels** - Use only `✅ Verified`, `❔ Unconfirmed`, or `❌ Absent`. Put warnings in the detail text (for example "Policy conflict: ...") rather than inventing new status labels.
+5. **URLs** - Plain URLs only. Never use markdown link syntax like `[text](url)`.
+6. **Separators** - Use plain hyphens (`-`), never em dashes.
+7. **Blank line between bullets** - Put one empty line between every `•` line item so Jira/Confluence copy-paste keeps readable spacing.
+8. **No code fences** - Do not wrap the completed WA in triple backticks in chat.
+8. **No horizontal rules** - Do not use `---` in the completed WA.
+9. **No nested Evidence bullets** - Put proof inline on the same line item.
+10. **Takeaways** - One line per section: `Takeaway: sentence`
+11. **Internationalization** - Use plain market headers like `Market 1 (United States, USD)` then the six standard bullets with status labels.
+12. **Open Questions / Next Steps** - Simple `•` bullets; status labels not required.
+13. **Opportunities and Recommendations** - Simple `•` bullets; status labels not required.
+14. **Shipping and returns** - Keep both under `Shipping & Logistics`. Do not create separate top-level Returns sections.
+14. **Jewelry merchants** - Add optional section `Jewelry Merchant Considerations (Presales Scoping)` before `Tech Risks and Integration Notes` when relevant. Every line still uses the standard status format.
+15. **Extra detail** - Add depth inside the standard template bullets, not by renaming sections or breaking the section order.
+
+### Required section order
+
+1. Merchant Overview
+2. Evidence Log (Working Links)
+3. Platform & Site Structure
+4. Catalog & Products
+5. Checkout & Payments
+6. Shipping & Logistics
+7. Loyalty, Subscriptions, and CRM
+8. Internationalization Testing
+9. Legal and Compliance (surface-level)
+10. Business Restrictions (split)
+11. Apps, Integrations, and Data Layer (visible only)
+12. Jewelry Merchant Considerations (Presales Scoping) - optional, jewelry merchants only
+13. Tech Risks and Integration Notes (Presales)
+14. Opportunities and Recommendations
+15. Open Questions
+16. Next Steps
+17. Appendix - Screens and Notes
+
+**Line-item format:** Put the line item subject first and bold it, then the status marker and label, then the finding/evidence. Preferred format: `• **Subject** - ✅ Verified - Evidence or finding here.` Use this subject-first format for every WA unless the user explicitly requests a different format. Do not use em dashes in WA output; use plain hyphen separators.
 
 **Writing perspective:** Write the WA from the perspective of a Global-e Presales Solutions Engineer documenting the merchant's current state and the future project scope the merchant may want in scope. Focus on what the merchant is doing today for cross-border, checkout, logistics, payments, localization, and related workflows. Do **not** explain where Global-e would fit, do **not** include "GE to provide" language, and do **not** turn the WA into a solution proposal. The purpose is to capture the merchant's current operating model, any future-state needs that should inform project scoping, and any integration callouts that should be identified before signature.
 

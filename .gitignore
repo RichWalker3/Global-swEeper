@@ -13,6 +13,7 @@ dist/
 .idea/
 .vscode/*
 !.vscode/tasks.json
+.cursor/rules/mcp-atlassian-default.mdc
 *.swp
 *.swo
 .DS_Store
@@ -43,3 +44,18 @@ output/
 
 # Assessment logs (local debugging)
 logs/
+
+# Local worktrees and reference assets (not source)
+.worktrees/
+*.pptx
+Global-SwEep-Pilot-Overview/
+src/*.pdf
+docs/reference/
+
+# One-off merchant scripts (local only)
+scripts/fix-chanluu-brds.*
+scripts/sync-chanluu-brds.ts
+scripts/delete-canceled-subtasks.py
+scripts/build-sweep-presentation.py
+scripts/publish-presales-apps-matrix.py
+scripts/presales-apps-matrix-payload.json

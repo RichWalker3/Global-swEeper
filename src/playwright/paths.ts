@@ -37,15 +37,25 @@ export function getPlaywrightBrowsersPath(projectRoot?: string): string {
   return join(root, BROWSERS_DIR);
 }
 
+function findInstalledChromiumExecutable(browserRoot: string): string | undefined {
+  return fullChromiumExecutableCandidates(browserRoot).find((candidate) => existsSync(candidate));
+}
+
 export function ensurePlaywrightBrowsersPath(): string {
+  const projectBrowsersPath = getPlaywrightBrowsersPath();
+  const projectChromium = findInstalledChromiumExecutable(projectBrowsersPath);
+  if (projectChromium) {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = projectBrowsersPath;
+    return projectBrowsersPath;
+  }
+
   const configuredPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
   if (configuredPath && isAbsolute(configuredPath)) {
     return configuredPath;
   }
 
-  const browsersPath = getPlaywrightBrowsersPath();
-  process.env.PLAYWRIGHT_BROWSERS_PATH = browsersPath;
-  return browsersPath;
+  process.env.PLAYWRIGHT_BROWSERS_PATH = projectBrowsersPath;
+  return projectBrowsersPath;
 }
 
 export function fullChromiumExecutableCandidates(browserRoot: string): string[] {
@@ -71,6 +81,13 @@ function isHeadlessShellPath(executablePath: string): boolean {
 }
 
 export function resolveChromiumExecutable(): string | undefined {
+  const projectBrowsersPath = getPlaywrightBrowsersPath();
+  const projectChromium = findInstalledChromiumExecutable(projectBrowsersPath);
+  if (projectChromium) {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = projectBrowsersPath;
+    return projectChromium;
+  }
+
   ensurePlaywrightBrowsersPath();
 
   const playwrightPath = chromium.executablePath();
@@ -78,10 +95,9 @@ export function resolveChromiumExecutable(): string | undefined {
     return playwrightPath;
   }
 
-  const browsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH || getPlaywrightBrowsersPath();
+  const browsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH || projectBrowsersPath;
   const resolvedBrowserRoot = isAbsolute(browsersPath) ? browsersPath : resolve(process.cwd(), browsersPath);
-  const candidates = fullChromiumExecutableCandidates(resolvedBrowserRoot);
-  const fallback = candidates.find((candidate) => existsSync(candidate));
+  const fallback = findInstalledChromiumExecutable(resolvedBrowserRoot);
   if (fallback) return fallback;
 
   return playwrightPath && existsSync(playwrightPath) ? playwrightPath : undefined;

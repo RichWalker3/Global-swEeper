@@ -6,20 +6,21 @@ Global-sweep uses `major.minor.patch` style versioning during the internal pilot
 
 Track work on feature branches not yet merged to `pilot/team-handoff`. See `docs/BRANCH_MERGE_PLAN.md` and `docs/SWEEP_TODO.md`.
 
-**Active branch:** `feat/brd-wa-quality` — **merged to `pilot/team-handoff` 2026-07-10**  
-**Parked branch:** `feat/sfcc-wa-parity` (SFCC parity — resume after rebase onto updated handoff)
+**Primary branch:** `pilot/team-handoff`
 
 ### Added
 
-- **BRD Workspace — Phase dropdown (Jira `customfield_21069`)** — per-row Phase selector: Leave unchanged, in Scope, Out Of Scope, Future. Loads from Jira, suggests defaults from WA scope, writes on Send to Jira.
-- **Canceled → Out Of Scope workflow** — Sweep no longer transitions BRD subtasks to Canceled. No-signal BRDs default to Leave unchanged + Phase Out Of Scope.
-- **Pre-order detector fix** — "Notify me when available" no longer flagged as pre-order (reduces BRD-025 false positives).
-- **Returns provider href detection** — Loop / ReturnGO / etc. detected from portal link hrefs, not just visible text (fixes BRD-030 false negatives).
-- **WA prompt slim-down** — trimmed crawl summary in prompt; BRD Output includes evidence-only lines.
+- **Local regression suite** — `npm run ci` (build + lint + 18 unit tests), `npm run ci:full` (+ Playwright smoke). See `docs/TESTING.md`.
+- **Unit tests** for `composer`, `prompt`, `jira` (mocked fetch), plus existing detector/mapper tests.
+- **Optional pre-push hook** — `npm run hooks:install` runs `npm run ci` before push.
+- **BRD Workspace — Phase dropdown (Jira `customfield_21069`)** — per-row Phase selector with Jira write on Send.
+- **Canceled → Out Of Scope workflow** — no-signal BRDs default to Phase Out Of Scope without Canceled status transitions.
+- **Pre-order detector fix** — notify-me back-in-stock no longer flagged as pre-order.
+- **Returns provider href detection** — Loop / ReturnGO detected from portal link hrefs.
 
 ### Changed
 
-- BRD parser accepts legacy `Status: Canceled` WA lines as Phase Out Of Scope without status transition.
+- WA prompt uses trimmed crawl summary and evidence-only BRD Output lines.
 - `.gitignore` excludes `.worktrees/`, local PDFs/decks, and one-off merchant scripts.
 
 ## v0.3.0 - 2026-05-18

@@ -100,8 +100,27 @@ If that command is not available in the local copy yet, paste the contents of `U
 npm run web
 npm run build
 npm run lint
-npm test
+npm run ci
+npm run ci:full
+npm run test:unit
+npm run test:smoke
 npm run pilot:package
+```
+
+## Development
+
+Before you push, run the local regression suite:
+
+```bash
+npm run ci        # build + lint + unit tests (~20s)
+npm run ci:full   # above + Playwright smoke (~2 min, before handoff merges)
+```
+
+See [`docs/TESTING.md`](docs/TESTING.md) for details, optional git hooks, and what each test guards.
+
+```bash
+npm run hooks:install   # optional pre-push hook
+npm run test:coverage   # optional coverage report
 ```
 
 ## Versioning

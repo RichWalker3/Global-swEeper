@@ -5,10 +5,12 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    exclude: ['node_modules', 'dist'],
     coverage: {
-      reporter: ['text', 'json', 'html'],
-      include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/types/**'],
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'html'],
+      include: ['src/brd/**', 'src/extractor/**', 'src/scraper/catalogDetector.ts', 'src/scraper/policyExtractor.ts'],
+      exclude: ['src/**/*.test.ts', 'src/smoke/**'],
     },
   },
 });

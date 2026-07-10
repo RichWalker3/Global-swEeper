@@ -12,6 +12,12 @@
     "pilot:package": "tsx scripts/package-pilot-bundle.ts",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
+    "test:unit": "vitest run --exclude 'src/smoke/**'",
+    "test:smoke": "vitest run src/smoke",
+    "test:coverage": "vitest run --exclude 'src/smoke/**' --coverage",
+    "ci": "npm run build && npm run lint && npm run test:unit",
+    "ci:full": "npm run ci && npm run test:smoke",
+    "hooks:install": "bash scripts/install-git-hooks.sh",
     "playwright:install": "tsx scripts/install-playwright.ts",
     "postinstall": "npm run playwright:install"
   },
@@ -42,6 +48,7 @@
     "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@vitest/coverage-v8": "^2.1.0"
   }
 }

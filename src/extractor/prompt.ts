@@ -368,7 +368,7 @@ function formatBrdPromptList(): string {
     .join('\n');
 }
 
-function summarizeCrawlForPrompt(summary: CrawlSummary): Record<string, unknown> {
+export function summarizeCrawlForPrompt(summary: CrawlSummary): Record<string, unknown> {
   return {
     seedUrl: summary.seedUrl,
     domain: summary.domain,

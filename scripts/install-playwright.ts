@@ -53,6 +53,11 @@ function runInstall(browsersPath: string): void {
 }
 
 function main(): void {
+  if (process.env.SKIP_PLAYWRIGHT_INSTALL === '1') {
+    console.log('Skipping Playwright install (SKIP_PLAYWRIGHT_INSTALL=1).');
+    return;
+  }
+
   const browsersPath = ensurePlaywrightBrowsersPath();
   const existing = validateChromiumInstall(root);
 

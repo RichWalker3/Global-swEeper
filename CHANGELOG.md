@@ -6,8 +6,8 @@ Global-sweep uses `major.minor.patch` style versioning during the internal pilot
 
 Track work on feature branches not yet merged to `pilot/team-handoff`. See `docs/BRANCH_MERGE_PLAN.md` and `docs/SWEEP_TODO.md`.
 
-**Active branch:** `feat/brd-wa-quality` (Shopify WA / BRD cleanup)  
-**Parked branch:** `feat/sfcc-wa-parity` (SFCC parity — resume after BRD branch merges)
+**Active branch:** `feat/brd-wa-quality` — **merged to `pilot/team-handoff` 2026-07-10**  
+**Parked branch:** `feat/sfcc-wa-parity` (SFCC parity — resume after rebase onto updated handoff)
 
 ### Added
 

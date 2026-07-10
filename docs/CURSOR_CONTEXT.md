@@ -26,7 +26,7 @@ I am **not** a software developer day-to-day. I use **Cursor** and **Sweep** (`g
 
 1. **Website Assessment (WA)** — Structured review of a merchant’s live storefront: platform, checkout, catalog risks, apps, international behavior, and presales red flags. Output is pasted into Jira/Confluence and fed into Sweep’s BRD Workspace.
 
-2. **BRD scoping (BRD-001 … BRD-030)** — Map WA findings to **Business Requirement Document** line items on a **SOPP parent** Jira issue (each BRD is typically a subtask). Populate **SE Output** fields and drive status (**Done** / **Canceled**) before signature (**SIGN** gate) or later (**LOCK** gate).
+2. **BRD scoping (BRD-001 … BRD-030)** — Map WA findings to **Business Requirement Document** line items on a **SOPP parent** Jira issue (each BRD is typically a subtask). Populate **SE Output** fields, set **Phase** (in Scope / Out Of Scope / Future), and drive **Done** status when evidence exists — before signature (**SIGN** gate) or later (**LOCK** gate).
 
 3. **Presales advisory** — Flag Out-of-Scope (OoS) items, unsupported apps, dangerous goods, subscriptions, loyalty gaps, and integration risks early so Sales and PM are not surprised post-signature.
 
@@ -366,15 +366,13 @@ HubSpot field mappings exist for many rows (see `src/brd/requirements.ts` in glo
 
 ## BRD Output for Sweep (end of every WA)
 
-Sweep parses this section from the WA markdown. **Exactly one line per BRD**, all 30 lines, no exceptions.
+Sweep parses this section from the WA markdown. **Include only BRDs with WA evidence** — omit no-signal BRDs (Sweep defaults those to Phase Out Of Scope).
 
 ```markdown
 ## BRD Output for Sweep
 
-- BRD-001 | Hub locations and entities | Status: Done | SE Output: [concise note from WA evidence, or "No WA evidence found."]
-- BRD-002 | 3PL / Shipping Platform | Status: Canceled | SE Output: No WA evidence found.
-...
-- BRD-030 | Returns Platform | Status: Done | SE Output: ReturnGO widget in footer; returns portal linked from policy page.
+- BRD-001 | Hub locations and entities | Status: Done | SE Output: [concise note from WA evidence]
+- BRD-030 | Returns Platform | Status: Done | SE Output: Loop Returns portal linked from returns page.
 ```
 
 ### Rules
@@ -382,10 +380,10 @@ Sweep parses this section from the WA markdown. **Exactly one line per BRD**, al
 | Rule | Detail |
 |------|--------|
 | **Status: Done** | WA has evidence, a scoping note, or a relevant finding for this BRD |
-| **Status: Canceled** | No evidence, or feature clearly absent |
+| **Omit line** | No evidence or feature absent — do not list the BRD; Sweep sets Phase **Out Of Scope** without changing Jira status |
 | **SE Output** | One concise line for the Jira SE Output field — facts from WA only |
-| **No invention** | If no evidence → `"No WA evidence found."` + **Canceled** |
-| **Format** | Single line per BRD; keep pipe separators exactly as shown |
+| **No invention** | Do not write `"No WA evidence found."` or use Status: Canceled |
+| **Format** | Single line per included BRD; keep pipe separators exactly as shown |
 
 ---
 

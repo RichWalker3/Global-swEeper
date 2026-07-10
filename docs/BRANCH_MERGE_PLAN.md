@@ -115,10 +115,31 @@ Rebase or merge feature branches onto the unified `prod` baseline before any PRO
 
 | Action | Branch |
 |--------|--------|
-| Local feature work | `feat/*` |
-| Team Cursor installs | `pilot/team-handoff` (after Phase 2 sync) |
+| Local feature work | `feat/*` → merge to `pilot/team-handoff` when `npm run ci:full` passes |
+| Team Cursor installs | `pilot/team-handoff` |
 | Release to hosted PROD | MR → GitLab `main` + tag |
 | Compare to live | `git log prod..HEAD` |
+| Before every push | `npm run ci` (see `docs/TESTING.md`) |
+| Before handoff merge | `npm run ci:full` |
+
+## Branch hygiene (solo dev)
+
+| Branch | Keep? | Notes |
+|--------|-------|-------|
+| `pilot/team-handoff` | **Yes — primary** | All Shopify/BRD work lands here |
+| `feat/sfcc-wa-parity` | **Yes — parked** | Rebase onto handoff before resuming SFCC |
+| `feat/brd-wa-quality` | Delete after merge | Merged to handoff 2026-07-10 |
+| `feature/error-handling-and-stealth` | Safe to delete locally | Stale; behind handoff |
+| `non-shopify-readiness` | Safe to delete locally | Stale; behind handoff |
+| `.worktrees/` | Remove | Duplicate clone; use main repo on `pilot/team-handoff` |
+
+Remove duplicate worktree and switch main folder to handoff:
+
+```bash
+git worktree remove .worktrees/team-handoff
+git checkout pilot/team-handoff
+git branch -d feat/brd-wa-quality   # after merge
+```
 
 ## Jira credentials on hosted (separate track)
 

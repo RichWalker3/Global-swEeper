@@ -302,8 +302,6 @@ const PREORDER_PATTERNS = [
   /expected\s*(to\s*)?ship/i,
   /back\s*order/i,
   /backorder/i,
-  /out\s*of\s*stock.*notify/i,
-  /notify\s*(me\s*)?when\s*available/i,
 ];
 
 export function detectPreOrders(text: string, html: string): { detected: boolean; evidence: string[] } {

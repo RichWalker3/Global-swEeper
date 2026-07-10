@@ -6,7 +6,7 @@
 import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence } from './types.js';
 import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, detectDropshipFulfillment, extractProductLinks } from './detectors.js';
 import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
-import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
+import { extractPolicyInfo, mergePolicies, detectReturnPortal, type ExtractedPolicy } from './policyExtractor.js';
 import { detectBundles, detectCustomizableProducts, detectVirtualProducts, detectGiftCards, detectSubscriptions, detectPreOrders, detectLoyaltyProgram, detectLocalization, detectMarketplaces, detectGWP, detectBNPLWidgets } from './catalogDetector.js';
 import { logAssessment, type DebugInfo } from '../logger/index.js';
 import { gotoWithRetry, classifyError, randomDelay } from './helpers.js';
@@ -735,9 +735,19 @@ async function processPageContent(
 ): Promise<void> {
   const networkUrls = pageData.networkRequests.map(r => r.url);
 
+  // Return portal href scan on every page (portal link often absent from visible text)
+  if (pageData.rawHtml) {
+    const hrefs = [...pageData.rawHtml.matchAll(/href=["']([^"']+)["']/gi)].map((match) => match[1]);
+    const portalFromLinks = detectReturnPortal(hrefs);
+    if (portalFromLinks.returnProvider) {
+      state.thirdParties.add(portalFromLinks.returnProvider);
+      state.extractedPolicies.push({ rawExcerpts: {}, ...portalFromLinks });
+    }
+  }
+
   // Policy extraction
   if ((target.type === 'policy' || target.type === 'other') && pageData.cleanedText.length > 100) {
-    const policyInfo = extractPolicyInfo(pageData.cleanedText, pageData.url);
+    const policyInfo = extractPolicyInfo(pageData.cleanedText, pageData.url, pageData.rawHtml);
     state.extractedPolicies.push(policyInfo);
     if (policyInfo.returnProvider) state.thirdParties.add(policyInfo.returnProvider);
 

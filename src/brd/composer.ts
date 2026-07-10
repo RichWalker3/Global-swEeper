@@ -25,7 +25,7 @@ export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentConte
       const statusAction = manualMode ? undefined : row.recommendedStatusAction;
       const phaseAction = manualMode
         ? undefined
-        : recommendedPhaseAction(row, statusAction) ?? phaseActionFromJiraPhase(currentPhase);
+        : row.recommendedPhaseAction ?? recommendedPhaseAction(row, statusAction) ?? phaseActionFromJiraPhase(currentPhase);
 
       return {
         ...row,
@@ -134,9 +134,8 @@ function recommendedPhaseAction(
   row: BrdMatrixRow,
   statusAction?: BrdStatusAction
 ): BrdPhaseAction | undefined {
-  if (statusAction === 'canceled') return 'out_of_scope';
   if (row.scopeValue === 'Future') return 'future';
-  if (row.scopeValue === 'Out Of Scope') return 'out_of_scope';
+  if (row.scopeValue === 'Out Of Scope' || row.scopeValue === 'No signal found') return 'out_of_scope';
   if (statusAction === 'done' || row.scopeValue === 'In Scope') return 'in_scope';
   return undefined;
 }

@@ -27,6 +27,7 @@ export interface BrdMatrixRow {
   descriptionPreview?: string;
   llmSeOutputText?: string;
   recommendedStatusAction?: BrdStatusAction;
+  recommendedPhaseAction?: BrdPhaseAction;
 }
 
 export interface BrdSubtask {
@@ -102,7 +103,7 @@ export interface BrdUpdateInputRow {
   finalText: string;
 }
 
-export type BrdStatusAction = 'unchanged' | 'done' | 'canceled';
+export type BrdStatusAction = 'unchanged' | 'done';
 
 export type BrdPhaseAction = 'unchanged' | 'in_scope' | 'out_of_scope' | 'future';
 

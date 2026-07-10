@@ -181,7 +181,7 @@ async function fetchJiraIssue(issueKey: string, fields: string, config: JiraConf
   return await response.json() as JiraIssueResponse;
 }
 
-/** Set SE Scoping Output. Pass empty string or null to clear the field (Canceled BRDs with no notes). */
+/** Set SE Scoping Output. Pass empty string or null to clear the field. */
 export async function setSeOutputField(
   issueKey: string,
   value: string | null,
@@ -229,14 +229,12 @@ async function transitionIdForAction(
 ): Promise<string | undefined> {
   if (!action || action === 'unchanged') return undefined;
   if (action === 'done' && currentStatus === 'done') return undefined;
-  if (action === 'canceled' && (currentStatus === 'canceled' || currentStatus === 'cancelled')) return undefined;
 
   const transitions = await fetchJiraTransitions(issueKey, config);
-  const targetNames = action === 'done' ? ['done'] : ['canceled', 'cancelled'];
   const transition = transitions.find((item) => {
     const name = item.name.toLowerCase();
     const toName = item.to?.name?.toLowerCase();
-    return targetNames.includes(name) || (toName ? targetNames.includes(toName) : false);
+    return name === 'done' || toName === 'done';
   });
 
   if (!transition) {

@@ -1508,7 +1508,7 @@
             <li><strong>Review and send:</strong> Check the SE output notes and Status dropdowns, then click <strong>Send to Jira</strong>.</li>
           </ol>
           <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--gray-200); font-size: 0.75rem; color: var(--gray-400);">
-            <strong>What Sweep prepares:</strong> Website evidence, third-party and red-flag signals, a Cursor-ready WA prompt, and a BRD table that updates Jira SE Scoping Output plus Done/Canceled status.
+            <strong>What Sweep prepares:</strong> Website evidence, third-party and red-flag signals, a Cursor-ready WA prompt, and a BRD table that updates Jira SE Scoping Output, Phase, and Done status.
           </div>
         </div>
       </div>
@@ -2733,10 +2733,10 @@
     function summarizeBrdSendResult(previews) {
       const rows = previews || [];
       const doneCount = rows.filter(row => row.statusAction === 'done').length;
-      const canceledCount = rows.filter(row => row.statusAction === 'canceled').length;
-      const unchangedStatusCount = rows.length - doneCount - canceledCount;
+      const unchangedStatusCount = rows.length - doneCount;
       const phaseUpdatedCount = rows.filter(row => row.phaseAction && row.phaseAction !== 'unchanged').length;
-      return `${rows.length} SE Scoping Output fields updated in Jira. Status: ${doneCount} Done, ${canceledCount} Canceled, ${unchangedStatusCount} unchanged. Phase: ${phaseUpdatedCount} updated.`;
+      const outOfScopeCount = rows.filter(row => row.phaseAction === 'out_of_scope').length;
+      return `${rows.length} SE Scoping Output fields updated in Jira. Status: ${doneCount} Done, ${unchangedStatusCount} unchanged. Phase: ${phaseUpdatedCount} updated (${outOfScopeCount} Out Of Scope).`;
     }
 
     function escapeHtml(value) {
@@ -2760,16 +2760,19 @@
     function initialStatusAction(row) {
       const status = String(row.currentStatus || '').toLowerCase();
       if (status === 'done') return 'done';
-      if (status === 'canceled' || status === 'cancelled') return 'canceled';
       return 'unchanged';
     }
 
     function initialPhaseAction(row) {
       if (row.phaseAction) return row.phaseAction;
+      if (row.recommendedPhaseAction) return row.recommendedPhaseAction;
       const phase = String(row.currentPhase || '').trim();
       if (phase === 'in Scope') return 'in_scope';
       if (phase === 'Out Of Scope') return 'out_of_scope';
       if (phase === 'Future') return 'future';
+      if (row.scopeValue === 'No signal found' || row.scopeValue === 'Out Of Scope') return 'out_of_scope';
+      if (row.scopeValue === 'Future') return 'future';
+      if (row.scopeValue === 'In Scope' || row.statusAction === 'done') return 'in_scope';
       return 'unchanged';
     }
 
@@ -2820,7 +2823,6 @@
                     <select data-brd-status-index="${index}">
                       <option value="unchanged" ${row.statusAction === 'unchanged' ? 'selected' : ''}>Leave unchanged</option>
                       <option value="done" ${row.statusAction === 'done' ? 'selected' : ''}>Done</option>
-                      <option value="canceled" ${row.statusAction === 'canceled' ? 'selected' : ''}>Canceled</option>
                     </select>
                   </td>
                   <td>
@@ -2941,7 +2943,7 @@
         setBrdSendStatus('This is a local manual table without Jira subtask keys. Connect Jira, click Process BRD again, then send to Jira.', true);
         return;
       }
-      if (!confirm('Send these SE scoping outputs, Phase selections, and Done/Canceled status updates to Jira? Only validated child subtasks under this SOPP will be updated.')) {
+      if (!confirm('Send these SE scoping outputs, Phase selections, and Done status updates to Jira? Only validated child subtasks under this SOPP will be updated.')) {
         return;
       }
 

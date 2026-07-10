@@ -318,6 +318,7 @@ ${JSON.stringify(summary, null, 2)}
 - Treat the selected platform as the expected implementation path for this run. Reconcile it with crawl evidence; if site evidence conflicts with the selected platform, call out the conflict as ❔ Unconfirmed or [Inference] instead of silently overriding it.
 - For GEM / Custom, assume a manual Global-e Module style implementation path unless direct evidence proves a packaged platform/plugin path.
 ${scrapeHealthLine}
+- **BRD-relevant findings guidance:** If summary.brdRelevantFindings is present, use items with useFor="brd_output" only when they support a BRD line, presales red flag, or implementation scoping question. Do not turn these into a broad site-audit section. Use useFor="coverage_note" only to qualify evidence confidence or explain crawl limitations.
 
 ## Evidence by Category
 
@@ -363,6 +364,7 @@ ${formatBrdPromptList()}
 - Mark deductions with **[Inference]**
 - Make the scope note explicit about whether checkout was reached, skipped for speed, login-gated, or blocked
 - Prefer at least one concrete PDP example and one concrete shipping/returns proof URL when the evidence bundle supports them
+- Keep findings focused on BRD/scoping relevance. Do not list every detected site feature unless it affects a BRD, red flag, merchant question, or implementation risk
 - For BRD Output for Sweep, use **Status: Done** if there is relevant information and **Status: Canceled** if there is no evidence or the feature is absent`;
 
   return {

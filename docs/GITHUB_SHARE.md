@@ -20,19 +20,13 @@ Use this when:
 - you want normal Git-based updates
 - you are okay exposing the curated share branch contents
 
-Teammate flow:
+Teammate flow (no dev tools assumed — Node and Git are installed by the setup prompt):
 
-1. Clone the GitHub repo or pilot branch:
+1. Create an empty folder (e.g. `Desktop/global-sweep`), open it in Cursor (teammate already uses Cursor).
+2. Paste **`SETUP_PROMPT.txt`** into Cursor chat. The assistant installs Node.js and Git if needed, clones `pilot/team-handoff`, runs `npm install`, starts the app, and opens `http://localhost:3847` in Simple Browser.
+3. For BRD updates, connect Jira from the hamburger menu. Jira credentials stay in local server memory by default; selecting **Remember on this computer** stores them in the OS credential store, using macOS Keychain on Mac or Windows Credential Locker on PC. Clearing credentials removes both.
 
-   ```bash
-   git clone -b pilot/team-handoff https://github.com/RichWalker3/Global-swEeper.git global-sweep
-   cd global-sweep
-   ```
-
-2. Run `npm install`.
-3. Run `npm run web`.
-4. Open `http://localhost:3847`.
-5. For BRD updates, connect Jira from the hamburger menu. Jira credentials stay in local server memory by default; selecting **Remember on this computer** stores them in the OS credential store, using macOS Keychain on Mac or Windows Credential Locker on PC. Clearing credentials removes both.
+Manual clone (if they already have Git): `git clone -b pilot/team-handoff https://github.com/RichWalker3/Global-swEeper.git global-sweep`
 
 Update flow for teammates:
 

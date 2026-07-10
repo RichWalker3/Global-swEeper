@@ -119,18 +119,24 @@ Commit and push normal work frequently. Bump the version only when preparing a c
 
 ### Playwright or Chromium install issues
 
-Fresh installs run Playwright setup automatically through `npm install`. If browser launch errors appear, run:
+Fresh installs run Playwright setup automatically through `npm install`. Sweep stores Chromium in `.playwright-browsers` inside the project folder you run it from — use one copy of the repo, not separate Desktop and Downloads folders.
+
+If browser launch errors appear, run this from that same folder:
 
 ```bash
 npm install
 npm run playwright:install
-```
-
-Then restart:
-
-```bash
 npm run web
 ```
+
+On Windows PowerShell, if you see a lock-file error, clear it first:
+
+```powershell
+Remove-Item -Recurse -Force ".\.playwright-browsers\__dirlock" -ErrorAction SilentlyContinue
+npm run playwright:install
+```
+
+Do not run bare `npx playwright install chromium` — that can install the wrong browser type or into the wrong folder.
 
 ### Slow or blocked pages
 
@@ -145,6 +151,7 @@ Then restart Sweep. The accepted range is `10000` to `120000` ms.
 ## Useful Docs
 
 - `CHANGELOG.md`
+- `docs/SWEEP_TODO.md`
 - `docs/TEAM_SETUP.md`
 - `docs/PILOT_READINESS.md`
 - `docs/GITHUB_SHARE.md`

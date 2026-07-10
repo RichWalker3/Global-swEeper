@@ -3,7 +3,7 @@
  * Coordinates browser, crawling, extraction, and analysis
  */
 
-import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence, CrawlTarget } from './types.js';
+import type { ScrapeResult, ScrapeOptions, ScrapeProgress, PageData, CrawlSummary, NetworkRequest, DGFinding, DetectedTechnology, ExtractedPolicyInfo, CheckoutFlowInfo, CatalogFeaturesInfo, LoyaltyProgramInfo, LocalizationDetected, MarketplacePresence, CrawlTarget, BrdRelevantFinding } from './types.js';
 import { detectThirdParty, isRedFlag, scanForDangerousGoods, detectB2B, detectDropshipFulfillment, extractProductLinks } from './detectors.js';
 import { initWappalyzer, analyzeWithWappalyzer, filterEcommerceRelevant } from './wappalyzer.js';
 import { extractPolicyInfo, mergePolicies, type ExtractedPolicy } from './policyExtractor.js';
@@ -15,6 +15,7 @@ import { discoverCrawlTargets, discoverIndexedCrawlTargets, getFallbackTargets, 
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
 import { getPlatformProfile } from './platforms/index.js';
+import { detectBrdRelevantFindings } from './operationalInsights.js';
 import type { Browser, BrowserContext } from 'playwright';
 
 // ============ State Management (declared early for scrape snapshot typing) ============
@@ -54,6 +55,7 @@ interface ScrapeState {
   loyaltyInfo: LoyaltyProgramInfo;
   localizationInfo: LocalizationDetected;
   marketplaceInfo: MarketplacePresence;
+  brdRelevantFindings: BrdRelevantFinding[];
   discoveredProductUrls: string[];
   domain: string;
 }
@@ -90,6 +92,7 @@ function createInitialState(seedUrl: string, _config: { userAgent: string }): Sc
     loyaltyInfo: { detected: false, evidence: [] },
     localizationInfo: { countrySelector: false, multiLanguage: false, languagesDetected: [], multiCurrency: false, currenciesDetected: [] },
     marketplaceInfo: { detected: false, marketplaces: [] },
+    brdRelevantFindings: [],
     discoveredProductUrls: [],
     domain: new URL(seedUrl).hostname,
   };
@@ -212,7 +215,7 @@ function describeIncompletePhase(phase: string): string {
 }
 
 /** Called when scrapeTimeout fires: returns partial data + warning (never rejects). */
-function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions>): ScrapeResult {
+function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions>, skipLog = false): ScrapeResult {
   const snap = lastScrapeSnapshot;
   const completedAt = new Date().toISOString();
   const domain = (() => {
@@ -249,7 +252,7 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
     };
   }
 
-  const result = buildResult(snap.seedUrl, snap.startedAt, snap.state, snap.debugInfo, { skipLog: false, platform: snap.platform });
+  const result = buildResult(snap.seedUrl, snap.startedAt, snap.state, snap.debugInfo, { skipLog, platform: snap.platform });
   const warning =
     `Timed out after ${opts.scrapeTimeout / 1000}s during "${scrapeProgress.phase}" phase. ` +
     `Collected ${result.pages.length} page(s) and ${result.summary.productPagesScraped} product page(s). ` +
@@ -340,15 +343,22 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
   }, 1000);
   heartbeat = setInterval(tickHeartbeat, HEARTBEAT_MS);
 
+  const overallAbortController = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<ScrapeResult>((resolve) => {
     timeoutId = setTimeout(() => {
       scrapeRaceResolvedWithTimeout = true;
+      overallAbortController.abort();
       resolve(buildPartialTimeoutResult(seedUrl, opts));
     }, opts.scrapeTimeout);
   });
 
-  const scrapePromise = scrapeInternal(seedUrl, opts);
+  const scrapePromise = scrapeInternal(seedUrl, opts, overallAbortController.signal).catch((error) => {
+    if (overallAbortController.signal.aborted) {
+      return buildPartialTimeoutResult(seedUrl, opts, true);
+    }
+    throw error;
+  });
 
   try {
     const result = await Promise.race([scrapePromise, timeoutPromise]);
@@ -360,7 +370,7 @@ export async function scrape(seedUrl: string, options: ScrapeOptions = {}): Prom
   }
 }
 
-async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): Promise<ScrapeResult> {
+async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>, abortSignal: AbortSignal): Promise<ScrapeResult> {
   const startedAt = new Date().toISOString();
 
   // Initialize services
@@ -379,16 +389,26 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
   const state = createInitialState(seedUrl, config);
   const debugInfo = createDebugInfo(config);
   lastScrapeSnapshot = { seedUrl, startedAt, state, debugInfo, platform: opts.platform };
+  const onAbort = (): void => {
+    void context.close().catch(() => {});
+    void browser.close().catch(() => {});
+  };
+  abortSignal.addEventListener('abort', onAbort, { once: true });
 
   try {
+    if (abortSignal.aborted) return buildPartialTimeoutResult(seedUrl, opts, true);
+
     // Phase 0: Discover pages
     const targets = await discoverPages(browser, context, seedUrl, state, opts);
+    if (abortSignal.aborted) return buildPartialTimeoutResult(seedUrl, opts, true);
 
     // Phase 1: Scrape discovered pages
     await scrapeDiscoveredPages(browser, context, targets, state, opts, debugInfo, wappalyzerReady, startedAt);
+    if (abortSignal.aborted) return buildPartialTimeoutResult(seedUrl, opts, true);
 
     // Phase 2: Scrape product pages
     await scrapeProductPages(context, state, opts, startedAt);
+    if (abortSignal.aborted) return buildPartialTimeoutResult(seedUrl, opts, true);
 
     // Phase 3: Test checkout (optional; web UI often skips to avoid long stalls)
     if (!opts.skipCheckout) {
@@ -403,6 +423,7 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     // Build result before browser teardown so the UI always receives data even if Chromium hangs on close.
     return buildResult(seedUrl, startedAt, state, debugInfo, { skipLog: scrapeRaceResolvedWithTimeout, platform: opts.platform });
   } finally {
+    abortSignal.removeEventListener('abort', onAbort);
     scrapeProgress.phase = 'analyzing';
     scrapeProgress.currentUrl = '';
     void closeBrowserWithTimeout(browser, context, { verbose: opts.verbose, onProgress: () => {} }).catch(() => {});
@@ -793,6 +814,7 @@ async function processPageContent(
   opts: Required<ScrapeOptions>
 ): Promise<void> {
   const networkUrls = pageData.networkRequests.map(r => r.url);
+  recordBrdRelevantFindings(pageData, state);
 
   // Policy extraction
   if ((target.type === 'policy' || target.type === 'other') && pageData.cleanedText.length > 100) {
@@ -1063,6 +1085,7 @@ async function scrapeProductPages(
 
 async function processProductPage(pageData: PageData, state: ScrapeState, opts: Required<ScrapeOptions>): Promise<void> {
   const networkUrls = pageData.networkRequests.map(r => r.url);
+  recordBrdRelevantFindings(pageData, state);
 
   // DG scanning
   const dgMatches = scanForDangerousGoods(pageData.cleanedText);
@@ -1124,6 +1147,33 @@ async function processProductPage(pageData: PageData, state: ScrapeState, opts: 
   if (giftCards.detected) {
     state.giftCardsDetected = true;
     giftCards.types.forEach(t => state.giftCardTypes.add(t));
+  }
+}
+
+function recordBrdRelevantFindings(pageData: PageData, state: ScrapeState): void {
+  const insights = detectBrdRelevantFindings(pageData.cleanedText, pageData.rawHtml || '', pageData.url);
+  for (const insight of insights) {
+    const duplicate = state.brdRelevantFindings.some((existing) =>
+      existing.type === insight.type &&
+      existing.label === insight.label &&
+      existing.foundOnUrl === insight.foundOnUrl
+    );
+    if (!duplicate) {
+      state.brdRelevantFindings.push(insight);
+    }
+
+    if (insight.useFor === 'brd_output' && insight.severity === 'high') {
+      state.redFlags.add(insight.label);
+    }
+    if (insight.type === 'dangerous_goods_asset' && !state.dangerousGoods.some((finding) => finding.category === 'dangerous_goods_asset')) {
+      state.dangerousGoods.push({
+        keyword: insight.label,
+        category: 'dangerous_goods_asset',
+        risk: 'high',
+        context: insight.evidence,
+        foundOnUrl: insight.foundOnUrl,
+      });
+    }
   }
 }
 
@@ -1389,6 +1439,7 @@ function buildResult(
       loyaltyProgram: state.loyaltyInfo,
       localization: state.localizationInfo,
       marketplacePresence: state.marketplaceInfo,
+      brdRelevantFindings: state.brdRelevantFindings.slice(0, 20),
     },
     pages: state.pages,
   };

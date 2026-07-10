@@ -1,5 +1,6 @@
 import type { KnownPlatform } from './types.js';
 import { getPlatformProfile } from './platforms/index.js';
+import { isNonContentActionUrl, isUnrenderedTemplateUrl } from './platforms/shared.js';
 
 /**
  * Third-party detection from network requests and page content
@@ -426,6 +427,8 @@ export function extractProductLinks(html: string, baseUrl: string, platform?: Kn
         url = domain + '/' + url;
       }
       
+      if (isUnrenderedTemplateUrl(url) || isNonContentActionUrl(url)) continue;
+
       // Skip duplicates and variant URLs
       if (!productLinks.includes(url) && !url.includes('?variant=')) {
         productLinks.push(url);

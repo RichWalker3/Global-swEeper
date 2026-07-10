@@ -3,9 +3,14 @@
  * Handles Playwright browser launch with anti-detection measures
  */
 
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { chromium, BrowserContext, Page, Frame } from 'playwright';
+import {
+  ensurePlaywrightBrowsersPath,
+  formatPlaywrightInstallHelp,
+  resolveChromiumExecutable,
+} from '../playwright/paths.js';
 import { getRandomUserAgent, getRandomViewport } from './helpers.js';
 
 export interface BrowserConfig {
@@ -51,6 +56,8 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   const browserMode = opts.browserMode || 'headless';
   const persistentProfile = opts.persistentProfile === true;
 
+  ensurePlaywrightBrowsersPath();
+
   const config = createBrowserConfig();
   const { viewport } = config;
 
@@ -65,7 +72,7 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   // Build launch options
   const launchOptions: Parameters<typeof chromium.launch>[0] = {
     headless: browserMode !== 'visible',
-    executablePath: resolveFullChromiumExecutablePath(),
+    executablePath: resolveChromiumExecutable(),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -92,10 +99,19 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
   if (persistentProfile) {
     const profileDir = resolvePersistentProfileDir(opts.profileName);
     mkdirSync(profileDir, { recursive: true });
-    const context = await chromium.launchPersistentContext(profileDir, {
-      ...launchOptions,
-      ...buildContextOptions(config),
-    });
+    let context: BrowserContext;
+    try {
+      context = await chromium.launchPersistentContext(profileDir, {
+        ...launchOptions,
+        ...buildContextOptions(config),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/executable doesn't exist|ENOENT|browserType\.launch/i.test(message)) {
+        throw new Error(`${message}\n\n${formatPlaywrightInstallHelp()}`);
+      }
+      throw error;
+    }
     await addStealthScripts(context);
     const browser = context.browser();
     if (!browser) {
@@ -104,7 +120,16 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
     return { browser, context, config };
   }
 
-  const browser = await chromium.launch(launchOptions);
+  let browser: Awaited<ReturnType<typeof chromium.launch>>;
+  try {
+    browser = await chromium.launch(launchOptions);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/executable doesn't exist|ENOENT|browserType\.launch/i.test(message)) {
+      throw new Error(`${message}\n\n${formatPlaywrightInstallHelp()}`);
+    }
+    throw error;
+  }
   const { context } = await createStealthContext(browser, { verbose, config });
 
   return {
@@ -117,34 +142,6 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
 function resolvePersistentProfileDir(profileName = 'default'): string {
   const safeProfileName = profileName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40) || 'default';
   return resolve(process.cwd(), 'tmp', 'browser-profiles', safeProfileName);
-}
-
-function resolveFullChromiumExecutablePath(): string | undefined {
-  const defaultPath = chromium.executablePath();
-  if (defaultPath && existsSync(defaultPath) && !/headless.?shell/i.test(defaultPath)) {
-    return defaultPath;
-  }
-
-  const browserRoot = process.env.PLAYWRIGHT_BROWSERS_PATH || '.playwright-browsers';
-  const resolvedBrowserRoot = isAbsolute(browserRoot) ? browserRoot : resolve(process.cwd(), browserRoot);
-  const candidates = fullChromiumExecutableCandidates(resolvedBrowserRoot);
-  return candidates.find((candidate) => existsSync(candidate)) || (existsSync(defaultPath) ? defaultPath : undefined);
-}
-
-function fullChromiumExecutableCandidates(browserRoot: string): string[] {
-  if (!existsSync(browserRoot)) return [];
-
-  return readdirSync(browserRoot)
-    .filter((entry) => /^chromium-\d+/.test(entry))
-    .flatMap((entry) => {
-      const chromiumRoot = join(browserRoot, entry);
-      return [
-        join(chromiumRoot, 'chrome-mac', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
-        join(chromiumRoot, 'chrome-mac-arm64', 'Chromium.app', 'Contents', 'MacOS', 'Chromium'),
-        join(chromiumRoot, 'chrome-linux', 'chrome'),
-        join(chromiumRoot, 'chrome-win', 'chrome.exe'),
-      ];
-    });
 }
 
 export async function createStealthContext(

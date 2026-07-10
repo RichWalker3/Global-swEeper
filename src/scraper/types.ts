@@ -143,6 +143,25 @@ export interface MarketplacePresence {
   marketplaces: string[];
 }
 
+export interface BrdRelevantFinding {
+  type:
+    | 'bot_verification'
+    | 'sfcc_endpoint'
+    | 'cross_border_provider'
+    | 'payment_restriction'
+    | 'fulfillment_restriction'
+    | 'custom_order'
+    | 'promotion_gwp'
+    | 'dangerous_goods_asset'
+    | 'marketplace_exclusion';
+  label: string;
+  evidence: string;
+  foundOnUrl: string;
+  severity: 'info' | 'medium' | 'high';
+  brdIds: string[];
+  useFor: 'brd_output' | 'coverage_note';
+}
+
 export interface CrawlSummary {
   seedUrl: string;
   domain: string;
@@ -180,6 +199,8 @@ export interface CrawlSummary {
   localization?: LocalizationDetected;
   // Marketplace presence
   marketplacePresence?: MarketplacePresence;
+  // BRD/scoping signals found outside checkout. Use coverage_note items only to qualify confidence.
+  brdRelevantFindings?: BrdRelevantFinding[];
   /** Set when the run stopped early (timeout) but partial scrape data is still valid. */
   scrapingCompletionWarning?: string;
   /** Set when Akamai, Cloudflare, DataDome, or similar bot protection blocks crawl evidence collection. */

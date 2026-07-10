@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildCheckoutProductCandidatesForPlatform, evaluateCheckoutDestination } from '../checkoutTester.js';
 import { getFallbackTargets } from '../crawler.js';
 import { extractProductLinks } from '../detectors.js';
-import { discoverSearchIndexTargets, discoverSitemapTargets } from '../indexedDiscovery.js';
+import { discoverSearchIndexTargets, discoverSitemapTargets, normalizeCrawlTargetUrl } from '../indexedDiscovery.js';
+import { isNonContentActionUrl, isUnrenderedTemplateUrl } from './shared.js';
 import { buildPrompt } from '../../extractor/prompt.js';
 import type { ScrapeResult } from '../types.js';
 import { getPlatformProfile, normalizePlatform } from './index.js';
@@ -75,6 +76,25 @@ describe('platform profiles', () => {
     expect(buildCheckoutProductCandidatesForPlatform('https://merchant.test', candidates, 'gem')[0]).not.toContain('/p/free-5-piece-complexion-sampler');
   });
 
+  it('drops unrendered theme template URLs from crawl and checkout candidates', () => {
+    expect(isUnrenderedTemplateUrl('https://ta3swim.com/products/{{ product.handle }}')).toBe(true);
+    expect(isUnrenderedTemplateUrl('https://ta3swim.com/{{ productLocale }}/products/{{ product.handle }}{{ variantUrl }}')).toBe(true);
+    expect(normalizeCrawlTargetUrl('https://ta3swim.com/products/{{ product.handle }}', 'https://ta3swim.com/')).toBeNull();
+
+    const liquidCandidates = [
+      'https://merchant.test/products/{{ product.handle }}',
+      'https://merchant.test/products/real-product',
+    ];
+    expect(buildCheckoutProductCandidatesForPlatform('https://merchant.test', liquidCandidates, 'shopify')).toEqual([
+      'https://merchant.test/products/real-product',
+    ]);
+    expect(extractProductLinks(
+      '<a href="/products/{{ product.handle }}">bad</a><a href="/products/real-product">good</a>',
+      'https://merchant.test',
+      'shopify'
+    )).toEqual(['https://merchant.test/products/real-product']);
+  });
+
   it('filters non-purchasable SFCC checkout candidates such as quick view endpoints', () => {
     const candidates = [
       'https://merchant.test/on/demandware.store/Sites-brand-Site/default/Product-ShowQuickView?pid=SKU123',
@@ -87,6 +107,33 @@ describe('platform profiles', () => {
     expect(filtered).toEqual([
       'https://merchant.test/on/demandware.store/Sites-brand-Site/default/Product-Show?pid=SKU999',
     ]);
+  });
+
+  it('filters SFCC storefront action URLs from crawl and product candidates', () => {
+    const actionUrls = [
+      'https://merchant.test/on/demandware.store/Sites-brand-Site/default/Wishlist-Add?pid=SKU123',
+      'https://merchant.test/on/demandware.store/Sites-brand-Site/default/Order-Track',
+      'https://merchant.test/findorder',
+      'https://merchant.test/Cart-RedirectToShipping',
+    ];
+
+    for (const actionUrl of actionUrls) {
+      expect(isNonContentActionUrl(actionUrl)).toBe(true);
+      expect(normalizeCrawlTargetUrl(actionUrl, 'https://merchant.test/')).toBeNull();
+    }
+
+    expect(buildCheckoutProductCandidatesForPlatform('https://merchant.test', [
+      ...actionUrls,
+      'https://merchant.test/on/demandware.store/Sites-brand-Site/default/Product-Show?pid=SKU999',
+    ], 'sfcc')).toEqual([
+      'https://merchant.test/on/demandware.store/Sites-brand-Site/default/Product-Show?pid=SKU999',
+    ]);
+
+    expect(extractProductLinks(
+      '<a href="/on/demandware.store/Sites-brand-Site/default/Wishlist-Add?pid=SKU123">wishlist</a><a href="/on/demandware.store/Sites-brand-Site/default/Product-Show?pid=SKU999">good</a>',
+      'https://merchant.test',
+      'sfcc'
+    )).toEqual(['https://merchant.test/on/demandware.store/Sites-brand-Site/default/Product-Show?pid=SKU999']);
   });
 
   it('evaluates checkout destinations with profile-specific URL patterns', () => {

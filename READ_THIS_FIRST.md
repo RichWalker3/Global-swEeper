@@ -21,7 +21,7 @@ Make full Website Assessments on **non-Shopify, non-Global-e SFCC** storefronts 
 | [`docs/NON_SHOPIFY_TEST_MERCHANTS.md`](docs/NON_SHOPIFY_TEST_MERCHANTS.md) | Curated **10 SFCC test merchants** (validated, non-GE) |
 | [`.cursor/rules/sweep-commands.mdc`](.cursor/rules/sweep-commands.mdc) | How to launch/update Sweep locally |
 
-**Backlog (not started):** Change feedback UI to post Jira comments instead of email.
+**Backlog:** See [`docs/SWEEP_TODO.md`](docs/SWEEP_TODO.md).
 
 ---
 

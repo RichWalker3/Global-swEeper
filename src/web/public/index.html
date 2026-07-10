@@ -1268,12 +1268,18 @@
 
     .brd-table th:nth-child(3),
     .brd-table td:nth-child(3) {
-      width: 44%;
+      width: 38%;
     }
 
     .brd-table th:nth-child(4),
     .brd-table td:nth-child(4) {
-      width: 14%;
+      width: 12%;
+      min-width: 140px;
+    }
+
+    .brd-table th:nth-child(5),
+    .brd-table td:nth-child(5) {
+      width: 12%;
       min-width: 155px;
     }
 
@@ -1738,7 +1744,7 @@
             <span class="alert-icon">🧭</span>
             <div class="alert-content">
               <strong>BRD completion mode</strong>
-              Load one SOPP parent, review the Jira description for context, merge SE scoping output with WA evidence, then save only to the validated child subtasks' SE scoping output field.
+              Load one SOPP parent, review the Jira description for context, merge SE scoping output with WA evidence, then save SE scoping output, Phase, and status to the validated child subtasks.
             </div>
           </div>
 
@@ -2728,8 +2734,9 @@
       const rows = previews || [];
       const doneCount = rows.filter(row => row.statusAction === 'done').length;
       const canceledCount = rows.filter(row => row.statusAction === 'canceled').length;
-      const unchangedCount = rows.length - doneCount - canceledCount;
-      return `${rows.length} SE Scoping Output fields updated in Jira. Status selections: ${doneCount} Done, ${canceledCount} Canceled, ${unchangedCount} unchanged.`;
+      const unchangedStatusCount = rows.length - doneCount - canceledCount;
+      const phaseUpdatedCount = rows.filter(row => row.phaseAction && row.phaseAction !== 'unchanged').length;
+      return `${rows.length} SE Scoping Output fields updated in Jira. Status: ${doneCount} Done, ${canceledCount} Canceled, ${unchangedStatusCount} unchanged. Phase: ${phaseUpdatedCount} updated.`;
     }
 
     function escapeHtml(value) {
@@ -2746,6 +2753,7 @@
         jiraKey: row.jiraKey,
         finalText: row.finalText,
         statusAction: row.statusAction || 'unchanged',
+        phaseAction: row.phaseAction || 'unchanged',
       }));
     }
 
@@ -2753,6 +2761,15 @@
       const status = String(row.currentStatus || '').toLowerCase();
       if (status === 'done') return 'done';
       if (status === 'canceled' || status === 'cancelled') return 'canceled';
+      return 'unchanged';
+    }
+
+    function initialPhaseAction(row) {
+      if (row.phaseAction) return row.phaseAction;
+      const phase = String(row.currentPhase || '').trim();
+      if (phase === 'in Scope') return 'in_scope';
+      if (phase === 'Out Of Scope') return 'out_of_scope';
+      if (phase === 'Future') return 'future';
       return 'unchanged';
     }
 
@@ -2771,6 +2788,7 @@
       brdReviewRows = rows.map(row => ({
         ...row,
         statusAction: row.statusAction || initialStatusAction(row),
+        phaseAction: row.phaseAction || initialPhaseAction(row),
       }));
 
       grid.innerHTML = `
@@ -2782,6 +2800,7 @@
                 <th>Description</th>
                 <th>Proposed SE Output</th>
                 <th>Status</th>
+                <th>Phase</th>
               </tr>
             </thead>
             <tbody>
@@ -2791,6 +2810,7 @@
                     <strong>${escapeHtml(row.requirementId || '')} ${escapeHtml(row.requirement || row.summary || '')}</strong>
                     <span class="brd-key-pill">${escapeHtml(row.jiraKey)}</span>
                     <span class="brd-current-status">${escapeHtml(row.currentStatus || 'No status')}</span>
+                    ${row.currentPhase ? `<span class="brd-current-status">Phase: ${escapeHtml(row.currentPhase)}</span>` : ''}
                   </td>
                   <td class="brd-description-cell">${escapeHtml(row.jiraDescriptionText || 'No Jira description.')}</td>
                   <td>
@@ -2801,6 +2821,14 @@
                       <option value="unchanged" ${row.statusAction === 'unchanged' ? 'selected' : ''}>Leave unchanged</option>
                       <option value="done" ${row.statusAction === 'done' ? 'selected' : ''}>Done</option>
                       <option value="canceled" ${row.statusAction === 'canceled' ? 'selected' : ''}>Canceled</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select data-brd-phase-index="${index}">
+                      <option value="unchanged" ${row.phaseAction === 'unchanged' ? 'selected' : ''}>Leave unchanged</option>
+                      <option value="in_scope" ${row.phaseAction === 'in_scope' ? 'selected' : ''}>in Scope</option>
+                      <option value="out_of_scope" ${row.phaseAction === 'out_of_scope' ? 'selected' : ''}>Out Of Scope</option>
+                      <option value="future" ${row.phaseAction === 'future' ? 'selected' : ''}>Future</option>
                     </select>
                   </td>
                 </tr>
@@ -2821,6 +2849,13 @@
         select.addEventListener('change', () => {
           const index = Number(select.dataset.brdStatusIndex);
           brdReviewRows[index].statusAction = select.value;
+        });
+      });
+
+      grid.querySelectorAll('select[data-brd-phase-index]').forEach(select => {
+        select.addEventListener('change', () => {
+          const index = Number(select.dataset.brdPhaseIndex);
+          brdReviewRows[index].phaseAction = select.value;
         });
       });
 
@@ -2906,7 +2941,7 @@
         setBrdSendStatus('This is a local manual table without Jira subtask keys. Connect Jira, click Process BRD again, then send to Jira.', true);
         return;
       }
-      if (!confirm('Send these SE scoping outputs and Done/Canceled selections to Jira? Only validated child subtasks under this SOPP will be updated.')) {
+      if (!confirm('Send these SE scoping outputs, Phase selections, and Done/Canceled status updates to Jira? Only validated child subtasks under this SOPP will be updated.')) {
         return;
       }
 

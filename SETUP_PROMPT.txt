@@ -1,26 +1,108 @@
-Set up Global-sweep from the repo URL my team gave me and launch it in Cursor's Simple Browser (inside the IDE), not in my default external browser. I have already opened the folder where I want the project (this folder) in Cursor. Do every step below in order. Do not ask for my confirmation; run all commands. Do not set up or ask for Confluence/Jira credentials — those will be configured separately.
+Set up Global-sweep on my computer and launch it in Cursor's Simple Browser (inside the IDE), not in my default external browser.
+
+Assume I have NO developer tools installed: no Node.js, no npm, no Git, and no package managers unless you discover them. I am not a developer. Run every step you can yourself. Do not ask me to confirm each command. Only stop and give me plain-English instructions if a step fails after you try the fallbacks below.
 
 Repo: https://github.com/RichWalker3/Global-swEeper.git
+Branch: pilot/team-handoff
 
-1. Ensure Git and Node.js 18+ are installed (verify with git --version and node -v).
-   - macOS: If git is missing, install Homebrew from https://brew.sh if needed, then run "brew install git". If node is missing or older than v18, run "brew install node".
-   - Windows: Use PowerShell or Command Prompt for all commands below. If git is missing, run "winget install Git.Git". If node is missing or older than v18, run "winget install OpenJS.NodeJS.LTS". If winget fails (not installed, no admin rights, or policy blocks it), install Git from https://git-scm.com/download/win and Node.js LTS from https://nodejs.org — then close and reopen the terminal and verify git --version and node -v again.
-   If Git or Node still cannot be installed, tell me exactly what failed and what to install manually.
+I already use Cursor (no need to install it). I have opened an empty folder (or a new empty folder on my Desktop named global-sweep) in Cursor. Work in this folder.
 
-2. Clone the repo into the current folder: git clone <repo-url> .   (the dot means this folder; it must be empty). If this folder already has the repo (.git exists), run "git pull" instead.
+Do not set up Confluence/Jira credentials — those are entered later in the Sweep web UI if needed.
 
-3. In this folder run: npm install
+---
 
-4. Then run: npm run playwright:install
+STEP 1 — Detect my computer
 
-5. Optional: only if I need custom port or proxy settings later, copy env.example to .env and fill values. Otherwise skip — .env is not required for the default app. Do not add or request Confluence/Jira/Atlassian credentials during setup. Jira email/API token are entered later in the Sweep web UI only when I need BRD Jira updates.
+Run commands to learn whether I am on macOS or Windows. Note the result for the steps below.
 
-6. Start the web app in the background with: npm run web
+---
 
-7. Open http://localhost:3847 in Cursor's Simple Browser (inside Cursor), NOT in Chrome/Safari/Edge/Firefox. Prefer this order:
-   a) Run the workspace task named "Open Sweep in Simple Browser" (Command Palette: "Tasks: Run Task" → choose that task). The repo includes .vscode/tasks.json for this after clone.
-   b) If you can execute editor commands in Cursor, run command "simpleBrowser.show" with the string argument "http://localhost:3847".
-   c) If neither (a) nor (b) is possible, tell me exactly: press Cmd+Shift+P on Mac or Ctrl+Shift+P on Windows, type "Simple Browser: Show", enter http://localhost:3847, press Enter.
-   Do NOT use "open http://localhost:3847" (Mac) or "start http://localhost:3847" (Windows) — those open the default external browser.
+STEP 2 — Install Node.js 18+ (required)
 
-When done, tell me briefly that Sweep is running and Simple Browser in Cursor should show the app. If anything failed, say what to fix.
+Check: run `node -v`. If you see v18 or higher, skip to Step 3.
+
+If Node is missing or too old, install Node.js LTS using the first method that works:
+
+**Windows (try in order):**
+1. `winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements`
+2. If winget is missing or fails: tell me to open https://nodejs.org in my browser, click the green **LTS** download, run the installer, accept all defaults, then type **done** in this chat so you can continue.
+
+**macOS (try in order):**
+1. If `brew` exists: `brew install node`
+2. If Homebrew is missing but can be installed non-interactively, install from https://brew.sh then `brew install node`
+3. If brew is not possible: tell me to open https://nodejs.org, download **LTS** for Mac, run the `.pkg` installer, accept defaults, then type **done** in this chat.
+
+**After any Node install:** open a fresh terminal session in Cursor (new terminal tab). Run `node -v` and `npm -v` again. Do not continue until both work. If they still fail after a browser install, tell me to quit Cursor completely, reopen it, open this folder again, and say **continue setup**.
+
+---
+
+STEP 3 — Install Git (required for team handoff updates)
+
+Check: run `git --version`. If Git works, skip to Step 4.
+
+**Windows (try in order):**
+1. `winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements`
+2. If winget fails: tell me to install **GitHub Desktop** from https://desktop.github.com OR Git from https://git-scm.com/download/win (default options), then type **done**.
+
+**macOS (try in order):**
+1. If `brew` exists: `brew install git`
+2. If brew fails: tell me to install **GitHub Desktop** from https://desktop.github.com OR run `xcode-select --install` if offered, then type **done**.
+
+**After any Git install:** fresh terminal tab, verify `git --version`. If only GitHub Desktop was installed and `git` still fails, clone using GitHub Desktop (File → Clone → URL above, branch pilot/team-handoff) into this folder, then skip to Step 5.
+
+---
+
+STEP 4 — Get the Sweep code (team handoff branch)
+
+If this folder already has a `.git` directory:
+- `git fetch origin pilot/team-handoff`
+- `git checkout pilot/team-handoff`
+- `git pull origin pilot/team-handoff`
+
+Otherwise (folder must be empty):
+- `git clone -b pilot/team-handoff https://github.com/RichWalker3/Global-swEeper.git .`
+
+If clone fails with auth or "repository not found", tell me to ask my team lead for GitHub access, then retry.
+
+---
+
+STEP 5 — Install Sweep dependencies
+
+In this folder:
+1. `npm install`
+2. `npm run playwright:install`
+
+If npm errors mention permissions or network, explain in plain English and retry once.
+
+Optional: skip `.env` unless I need a custom port or proxy later.
+
+---
+
+STEP 6 — Start Sweep
+
+Start in the background: `npm run web`
+
+Wait until http://localhost:3847 responds (retry a few times).
+
+---
+
+STEP 7 — Open in Cursor Simple Browser only
+
+Do NOT open my external browser.
+
+Prefer:
+a) Run workspace task **Open Sweep in Simple Browser** (after clone, from .vscode/tasks.json)
+b) Or command `simpleBrowser.show` with `http://localhost:3847`
+c) Or tell me: Cmd+Shift+P (Mac) / Ctrl+Shift+P (Windows) → **Simple Browser: Show** → enter `http://localhost:3847`
+
+---
+
+When finished
+
+Tell me in plain English:
+- Sweep is running at http://localhost:3847
+- To start again later: open this folder in Cursor and say **launch sweep**
+- To get updates: say **update sweep**
+- Jira (if needed): hamburger menu in the app, not during setup
+
+If anything failed, say exactly what I should do next in non-technical language.

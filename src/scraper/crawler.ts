@@ -6,7 +6,7 @@
 import { Page } from 'playwright';
 import type { CrawlTarget, CrawlTargetType, KnownPlatform } from './types.js';
 import { getPlatformProfile } from './platforms/index.js';
-import { buildFallbackTargets, isPhysicalStoreLocationPath, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
+import { buildFallbackTargets, isNonContentActionUrl, isPhysicalStoreLocationPath, isUnrenderedTemplateUrl, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
 import { discoverIndexedTargets, sortAndLimitTargets } from './indexedDiscovery.js';
 
 export type { CrawlTarget };
@@ -21,9 +21,8 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
   const profile = getPlatformProfile(platform);
   const discovered = new Map<string, CrawlTarget>();
 
-  // Always include homepage
+  // Always include homepage once; origin and origin slash resolve to the same page.
   discovered.set(base, { url: base, type: 'home', source: 'seed' });
-  discovered.set(base + '/', { url: base + '/', type: 'home', source: 'seed' });
 
   // Scroll to footer to trigger lazy-loading of footer content
   await scrollToFooter(page, verbose);
@@ -69,10 +68,13 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
       // Skip non-content paths
       if (/\.(jpg|jpeg|png|gif|svg|css|js|woff|ico|pdf)$/i.test(url.pathname)) continue;
       if (/\/(cdn|assets|static|media)\//i.test(url.pathname)) continue;
-      if (/\/(account|login|register|cart\/add|checkout)/i.test(url.pathname)) continue;
+      if (isNonContentActionUrl(link.href)) continue;
       if (isPhysicalStoreLocationPath(url.pathname)) continue;
+      if (isUnrenderedTemplateUrl(link.href)) continue;
 
       const normalizedUrl = url.origin + url.pathname.replace(/\/$/, '');
+      if (isNonContentActionUrl(normalizedUrl)) continue;
+      if (isUnrenderedTemplateUrl(normalizedUrl)) continue;
       if (discovered.has(normalizedUrl)) continue;
 
       // Classify the link

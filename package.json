@@ -5,14 +5,14 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "web": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts",
-    "start": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers tsx src/web/server.ts",
+    "web": "tsx src/web/server.ts",
+    "start": "tsx src/web/server.ts",
     "update:github": "tsx scripts/update-from-github.ts",
     "pilot:bundle": "tsx scripts/create-pilot-bundle.ts",
     "pilot:package": "tsx scripts/package-pilot-bundle.ts",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
-    "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium --no-shell",
+    "playwright:install": "tsx scripts/install-playwright.ts",
     "postinstall": "npm run playwright:install"
   },
   "keywords": [

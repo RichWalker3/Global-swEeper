@@ -1,6 +1,6 @@
 import type { CrawlTarget, CrawlTargetType, KnownPlatform } from './types.js';
 import { getPlatformProfile } from './platforms/index.js';
-import { isPhysicalStoreLocationPath, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
+import { isNonContentActionUrl, isPhysicalStoreLocationPath, isUnrenderedTemplateUrl, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
 import { gunzipSync } from 'node:zlib';
 
 type FetchLike = typeof fetch;
@@ -91,8 +91,12 @@ export function normalizeCrawlTargetUrl(rawUrl: string, seedUrl: string): string
     if (url.hostname.replace(/^www\./, '') !== seed.hostname.replace(/^www\./, '')) return null;
     if (/\.(jpg|jpeg|png|gif|svg|css|js|woff2?|ico|pdf|xml|xml\.gz)$/i.test(url.pathname)) return null;
     if (isPhysicalStoreLocationPath(url.pathname)) return null;
+    if (isNonContentActionUrl(url.toString())) return null;
     url.hash = '';
-    return url.origin + url.pathname.replace(/\/$/, '') + url.search;
+    const normalized = url.origin + url.pathname.replace(/\/$/, '') + url.search;
+    if (isNonContentActionUrl(normalized)) return null;
+    if (isUnrenderedTemplateUrl(normalized)) return null;
+    return normalized;
   } catch {
     return null;
   }

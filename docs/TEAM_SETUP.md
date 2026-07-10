@@ -1,176 +1,137 @@
 # Global-sweep: Team Setup Guide
 
-**Repo:** `https://github.com/RichWalker3/Global-swEeper.git`
+**Repo:** `https://github.com/RichWalker3/Global-swEeper.git`  
+**Branch:** `pilot/team-handoff`
 
-This guide is for **non-coders** who want to run Global-sweep on their own machine and get updates when the tool improves. The team handoff is shared through GitHub, and you can use **Cursor** to run it with simple slash-style commands.
-
-**Want one prompt that does everything?** Use **`SETUP_PROMPT.txt`** at the repo root (`@SETUP_PROMPT.txt` or paste it into Cursor chat).
-
----
-
-## What you need
-
-- A **Mac or Windows** computer
-- **Node.js** (we’ll install it below)
-- **Cursor** (Cursor IDE, from cursor.com)
-- **Git** (optional but recommended for updates — we’ll use a Git desktop app or the website)
+This guide is for **non-developers** with a normal work laptop — no Node, Git, or terminal experience required.
 
 ---
 
-## Step 1: Install Node.js
+## What you need before setup
 
-Node.js is the runtime the tool needs.
+- **Cursor** — you already have this; Sweep runs inside it.
+- **GitHub access** — your team lead must add you to the repo so clone/update works.
 
-1. Go to **https://nodejs.org**
-2. Download the **LTS** version (green button).
-3. Run the installer and accept the defaults.
-4. **Check it worked:**  
-   - Open **Terminal** (Mac) or **Command Prompt** (Windows).  
-   - Type: `node -v`  
-   - You should see a version number like `v20.x.x`.
+You do **not** need Node.js or Git installed beforehand. The setup prompt installs them if missing, then downloads Sweep and launches the app.
 
 ---
 
-## Step 2: Get the tool from your team's repo
+## First-time setup (recommended)
 
-### Option A: Download as ZIP (easiest, but updates are manual)
+### 1. Create a place for Sweep
 
-1. Open the GitHub repo URL your team gives you.
-2. Click **Code** → **Download ZIP** or download the release archive if your lead shared one.
-3. Unzip the folder and remember where it is (e.g. `Desktop/global-sweep`).
+On your Desktop (or anywhere you like), create an **empty folder** named `global-sweep`.
 
-**To update later:** download the ZIP again and replace the folder (or merge the new files into your folder).
+### 2. Open it in Cursor
 
-### Option B: Clone with a Git desktop app (best for regular updates)
+- **File → Open Folder** → choose that empty `global-sweep` folder
 
-1. Install a Git desktop app such as **GitHub Desktop**: https://desktop.github.com
-2. Sign in with your Git provider if needed.
-3. **File → Clone repository**.
-   - Choose **URL**, then paste `https://github.com/RichWalker3/Global-swEeper.git`.
-   - Pick a folder (e.g. `Desktop/global-sweep`) and clone.
-4. **To update later:** open the repo in your Git app and pull the latest changes.
+### 3. Run the one-time setup prompt
 
-### Option C: Clone with Git (if you already use it)
+- Start a **new chat** in Cursor
+- Attach or paste the full contents of **`SETUP_PROMPT.txt`** from the repo root  
+  (After the first clone, the file lives inside your `global-sweep` folder. Before clone, your lead can send you the file or you paste it from the GitHub repo.)
 
-```bash
-git clone <repo-url>
-cd global-sweep
-```
+The assistant will:
 
-**To update later:** `cd global-sweep` then run `git pull`.
+- Install **Node.js** if you don’t have it (tries automatic install; may ask you to run the installer from nodejs.org)
+- Install **Git** if you don’t have it (same — automatic or a simple download)
+- Download Sweep from the **team handoff** branch
+- Install dependencies and start the app
+- Open **http://localhost:3847** in Cursor’s **Simple Browser** (inside Cursor, not Chrome/Edge/Safari)
 
----
+You may need to type **done** once or twice if the assistant asks you to finish a graphical installer (Node or Git). That’s normal on locked-down company laptops.
 
-## Step 3: Install the tool (first time only)
+### 4. If the assistant stops
 
-1. Open **Terminal** (Mac) or **Command Prompt** (Windows).
-2. Go into the project folder, for example:
-   - Mac: `cd ~/Desktop/global-sweep`
-   - Windows: `cd C:\Users\YourName\Desktop\global-sweep`
-3. Run these commands **one at a time**:
-
-```bash
-npm install
-npm run playwright:install
-```
-
-4. **Environment file (optional):**  
-   You do **not** need a `.env` file for the default web app and scraper — it runs with built-in defaults (including port **3847**).  
-   Create `.env` only if you need optional settings like a custom port or proxy. Copy `env.example` to `.env` and add values your team lead provides (open in Cursor or Notepad).
-
-**Jira note:** You do not need Jira credentials to launch Sweep. For BRD updates, open the hamburger menu in the web UI and enter your Jira email/API token there. Sweep keeps those credentials in local server memory by default. If you choose **Remember on this computer**, Sweep stores them in the OS credential store, using macOS Keychain on Mac or Windows Credential Locker on PC, so they survive Sweep restarts. Clearing Jira credentials removes both the session and any saved credential-store entry.
+- **Quit Cursor completely**, reopen it, open the `global-sweep` folder, and say: **continue setup**
+- Or send your team lead a screenshot of the error
 
 ---
 
-## Step 4: Open the project in Cursor
+## Day to day (no terminal)
 
-1. Open **Cursor**.
-2. **File → Open Folder** and select the `global-sweep` folder.
-3. Cursor will load the project. The first time, it may index files; wait until it’s done.
+Open the `global-sweep` folder in Cursor and say:
 
-The project includes **Cursor rules** so you can use simple phrases instead of remembering commands.
+| You say | What happens |
+|--------|----------------|
+| **launch sweep** | Starts the web app → http://localhost:3847 |
+| **update sweep** | Gets the latest team handoff from GitHub and relaunches |
+| **/wa https://example.com** | Website Assessment for that URL |
 
----
-
-## Step 5: One-time Cursor setup
-
-In Cursor, start a **new chat** and either attach `@SETUP_PROMPT.txt` or paste the full contents of `SETUP_PROMPT.txt`. The AI will check your setup and tell you what to do next (for example `npm install`, Playwright install, and how to open the app).
+You can also paste **`UPDATE_SWEEP_PROMPT.txt`** for updates.
 
 ---
 
-## Using the tool: slash-style commands
+## Manual install (only if the prompt cannot install Node)
 
-You don’t need to remember terminal commands. In **Cursor chat**, you can say:
+If your company blocks automatic installs:
 
-| You say (in Cursor)      | What happens |
-|--------------------------|--------------|
-| **Launch sweep** or **/launch sweep** | Start the web app. You’ll get the command to run and the URL (e.g. http://localhost:3847). Open in **Cursor’s Simple Browser** or your external browser. |
-| **Update sweep** or **/update sweep** | Stop the current Sweep server, replace local Sweep with the latest GitHub pilot branch, reinstall dependencies, reinstall Playwright, and relaunch the app. |
-| **/wa https://example.com**          | Run a Website Assessment for that URL (see main README for the full workflow). |
-
-The project’s Cursor rules (in `.cursor/rules/`) define these behaviors so the AI knows what to do when you use these phrases.
+1. **Node.js:** https://nodejs.org → download **LTS** → run installer → defaults → restart Cursor  
+2. **Git:** https://desktop.github.com (easiest) **or** https://git-scm.com/download/win (Windows)  
+3. Clone in GitHub Desktop: URL above, branch **`pilot/team-handoff`**, folder `global-sweep`  
+4. Open that folder in Cursor → paste **`SETUP_PROMPT.txt`** again (it will skip installs and finish setup)
 
 ---
 
-## Getting regular updates
+## Jira
 
-- **If you use a Git desktop app:** Open the repo, pull the latest changes, then in the project folder run: `npm install` (or ask Cursor: “update sweep”).
-- **If you use Git in terminal:** `cd` into the project folder and run `git pull`, then `npm install`.
-- **If you use ZIP:** Download the latest ZIP from the repo and replace (or merge) your project folder, then run `npm install` in that folder.
-- **If you want Cursor to do the whole update:** open the `global-sweep` folder in Cursor and paste the contents of `UPDATE_SWEEP_PROMPT.txt` into Cursor chat, or just say **update sweep**.
-
-After any update, you can say **“launch sweep”** in Cursor to start the app again.
+You do **not** need Jira credentials to launch Sweep. For BRD Jira updates, use the **hamburger menu** in the web app. Credentials stay in memory unless you choose **Remember on this computer** (saved to macOS Keychain or Windows Credential Locker).
 
 ---
 
 ## Basic Sweep workflow
 
-1. Launch Sweep and open `http://localhost:3847`.
-2. Paste a merchant URL and run the assessment.
-3. Copy the **Website Assessment Prompt** into Cursor.
-4. Paste Cursor's completed WA back into the BRD Workspace.
-5. Connect Jira from the hamburger menu if you have not already done so in this running session.
-6. Enter the top-level SOPP key, process BRD, review the SE output and status rows, then send to Jira.
+1. Launch Sweep → http://localhost:3847  
+2. Paste a merchant URL and run the assessment  
+3. Copy the **Website Assessment Prompt** into Cursor  
+4. Paste Cursor’s completed WA back into BRD Workspace  
+5. Connect Jira from the hamburger menu when needed  
+6. Process BRD and send to Jira when ready  
 
 ---
 
 ## Troubleshooting
 
-- **“Command not found: npm”**  
-  Node.js isn’t installed or isn’t on your PATH. Reinstall Node from nodejs.org and restart Terminal/Command Prompt.
+- **“Command not found: npm” or “node”**  
+  Node isn’t installed or Cursor needs a restart after install. Re-run **`SETUP_PROMPT.txt`** or install Node from nodejs.org, quit Cursor, reopen.
 
-- **“Cannot find module” or install errors**  
-  In the project folder run: `npm install` and `npm run playwright:install`.
+- **Clone / access denied**  
+  Ask your team lead for access to `Global-swEeper` on GitHub.
 
-- **Playwright or Chromium errors**
-  Run `npm install` again from the project folder. The install downloads the full bundled Chromium browser that Sweep uses for crawling.
+- **Playwright / Chromium errors**  
+  Sweep installs Chromium inside the **same project folder** you run it from (`.playwright-browsers`). If you have more than one copy of `global-sweep` (for example Desktop and Downloads), install and run Sweep from **one folder only**.
 
-- **Lots of pages time out**
-  Slow networks, VPNs, or heavy sites may need more navigation time. Create a local `.env` file in the project folder with:
-  `SWEEP_PAGE_GOTO_TIMEOUT_MS=45000`
-  Then restart Sweep with `npm run web`.
+  In Cursor, say: run `npm install` and `npm run playwright:install` in my global-sweep folder, then restart with **launch sweep**.
 
-- **Port 3847 already in use**  
-  Another app is using that port. Close the other app or create a `.env` with `PORT=3848` and use http://localhost:3848.
+  **Windows (PowerShell)** — run these in the folder where you open Sweep (check the path in the error message):
 
-- **Cursor doesn’t run commands**  
-  Make sure you’ve opened the **global-sweep folder** in Cursor (File → Open Folder), not a single file. The slash-style commands rely on the project’s rules.
+  ```powershell
+  cd "C:\Users\YOURNAME\Desktop\global-sweep"
+  Remove-Item -Recurse -Force ".\.playwright-browsers\__dirlock" -ErrorAction SilentlyContinue
+  npm run playwright:install
+  npm run web
+  ```
 
-### Windows-specific
+  Do **not** run `npx playwright install chromium` without `npm run playwright:install` — that can install the wrong browser type (headless-shell) or into the wrong folder.
 
-- **`winget` doesn’t work** (policy, no admin, not installed): Install **Git** from [git-scm.com](https://git-scm.com/download/win) and **Node.js LTS** from [nodejs.org](https://nodejs.org), then **close and reopen** Command Prompt or PowerShell and verify `git --version` and `node -v`.
-- **Open the app in Cursor:** Command Palette (**Ctrl+Shift+P** / **Cmd+Shift+P**) → **Simple Browser: Show** → `http://localhost:3847`, or **Tasks: Run Task** → **Open Sweep in Simple Browser** (from `.vscode/tasks.json`).
-- **Paths:** Use `cd` into your project folder, e.g. `cd %USERPROFILE%\Desktop\global-sweep` (adjust if your folder is elsewhere).
+- **Port 3847 in use**  
+  Say **launch sweep** again (it should stop the old server) or ask the assistant to use port 3848.
+
+- **Cursor won’t run commands**  
+  Use **File → Open Folder** on `global-sweep`, not a single file.
+
+### Windows
+
+- If **winget** is blocked: use the nodejs.org and GitHub Desktop links in the manual section above.  
+- Open the app: **Ctrl+Shift+P** → **Simple Browser: Show** → `http://localhost:3847`
 
 ---
 
 ## Summary
 
-1. Install Node.js and optionally a Git desktop app.
-2. Get the repo (ZIP or clone) from the Git URL your team provides.
-3. In the project folder: `npm install` and `npm run playwright:install`.
-4. **Optional:** copy `env.example` to `.env` only if you need proxy or a custom port.
-5. Open the project in Cursor and paste the setup prompt once.
-6. Use **“launch sweep”** and **“update sweep”** (and **/wa &lt;url&gt;** for assessments) in Cursor chat.
+1. Open an **empty** `global-sweep` folder in Cursor (you already use Cursor).  
+2. Paste **`SETUP_PROMPT.txt`** once — it installs Node/Git if needed and launches Sweep.  
+3. Use **launch sweep** and **update sweep** after that.
 
-For what the tool does and how to run a full WA, see the main [README](../README.md).
+For maintainers sharing the repo, see [GITHUB_SHARE.md](./GITHUB_SHARE.md).

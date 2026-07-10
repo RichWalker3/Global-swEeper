@@ -10,6 +10,7 @@ import { dismissCookieConsent } from './browser.js';
 import { classifyError, gotoWithRetry } from './helpers.js';
 import type { KnownPlatform } from './types.js';
 import { getPlatformProfile, type PlatformProfile } from './platforms/index.js';
+import { isNonContentActionUrl, isUnrenderedTemplateUrl } from './platforms/shared.js';
 
 export interface CheckoutTestResult {
   reachedCheckout: boolean;
@@ -28,8 +29,16 @@ export interface CheckoutTestOptions {
   onDebugUpdate?: (update: {
     stage?: string;
     stoppedAt?: string;
-    addToCartResult?: { added: boolean; currentUrl: string; cartReady: boolean };
+    addToCartResult?: AddToCartResult;
   }) => void;
+}
+
+interface AddToCartResult {
+  added: boolean;
+  currentUrl: string;
+  cartReady: boolean;
+  blocked?: boolean;
+  blockReason?: string;
 }
 
 const MAX_CHECKOUT_PRODUCT_ATTEMPTS = 5;
@@ -114,10 +123,6 @@ const LOW_QUALITY_CHECKOUT_PRODUCT_PATTERNS = [
 const NON_PURCHASABLE_CHECKOUT_CANDIDATE_PATTERNS = [
   /Product-ShowQuickView/i,
   /QuickView/i,
-  /Wishlist-Add/i,
-  /Compare-AddProduct/i,
-  /Search-ShowAjax/i,
-  /\/on\/demandware\.store\/.*(?:Wishlist|Compare|Account)-/i,
   /sold-?out/i,
   /out-?of-?stock/i,
   /\/(?:search|shop|category|collection|collections)(?:\/|$)/i,
@@ -243,6 +248,8 @@ function scoreCheckoutProductCandidate(url: string, profile: PlatformProfile): n
 }
 
 function isPurchasableCheckoutCandidate(url: string, profile: PlatformProfile): boolean {
+  if (isUnrenderedTemplateUrl(url)) return false;
+  if (isNonContentActionUrl(url)) return false;
   if (NON_PURCHASABLE_CHECKOUT_CANDIDATE_PATTERNS.some((pattern) => pattern.test(url))) {
     return false;
   }
@@ -1153,7 +1160,7 @@ export async function testCheckoutFlow(
   const base = normalizeBaseUrl(seedUrl);
   const profile = getPlatformProfile(opts.platform);
   const errors: CrawlError[] = [];
-  const debug = (update: { stage?: string; stoppedAt?: string; addToCartResult?: { added: boolean; currentUrl: string; cartReady: boolean } }): void => {
+  const debug = (update: { stage?: string; stoppedAt?: string; addToCartResult?: AddToCartResult }): void => {
     opts.onDebugUpdate?.(update);
   };
 
@@ -1227,7 +1234,7 @@ export async function testCheckoutFlow(
         lastStoppedAt = stoppedAt;
         lastCheckoutInfo = checkoutInfo;
         if (reachedCheckout) {
-          return { reachedCheckout, stoppedAt, checkoutInfo, errors };
+          return { reachedCheckout, stoppedAt, checkoutInfo, errors: [] };
         }
 
         // If a candidate fell into tracking/empty-cart dead ends, keep trying other PDP candidates.
@@ -1240,6 +1247,13 @@ export async function testCheckoutFlow(
 
         // For non-retryable outcomes (e.g. login required), stop early and return what we learned.
         return { reachedCheckout: false, stoppedAt, checkoutInfo, errors };
+      } else if (addToCartResult.blocked) {
+        lastStoppedAt = addToCartResult.blockReason || 'Blocked during add-to-cart';
+        errors.push({
+          url: productUrl,
+          error: lastStoppedAt,
+          type: 'blocked',
+        });
       }
     }
 
@@ -1370,13 +1384,14 @@ async function tryAddToCart(
   base: string,
   verbose = false,
   profile: PlatformProfile
-): Promise<{ added: boolean; currentUrl: string; cartReady: boolean }> {
+): Promise<AddToCartResult> {
   await dismissInterferingOverlays(page, verbose);
   await ensurePurchasableVariant(page, verbose);
   await dismissInterferingOverlays(page, verbose);
 
   const startingUrl = page.url();
   const addToCartResponsePattern = /Cart-Add|AddProuctVariationSelection|cart\/add|bag\/add/i;
+  let sawBlockedAddToCart = false;
   for (const selector of profile.addToCartSelectors) {
     try {
       const matches = page.locator(selector);
@@ -1417,6 +1432,7 @@ async function tryAddToCart(
             if (verbose) {
               console.log('    → Add-to-cart appears rate-limited; backing off before next attempt');
             }
+            sawBlockedAddToCart = true;
             await page.waitForTimeout(4500);
             continue;
           }
@@ -1440,6 +1456,7 @@ async function tryAddToCart(
             if (verbose) {
               console.log('    → Rate-limit/block signal detected from page content; retrying with backoff');
             }
+            sawBlockedAddToCart = true;
             await page.waitForTimeout(4500);
             continue;
           }
@@ -1504,6 +1521,7 @@ async function tryAddToCart(
         addToCartResponseStatus === 429 ||
         ADD_TO_CART_RATE_LIMIT_PATTERNS.some((pattern) => pattern.test(addToCartResponseText));
       if (responseRateLimited) {
+        sawBlockedAddToCart = true;
         await page.waitForTimeout(4500);
       } else if (
         addToCartResponse &&
@@ -1535,7 +1553,13 @@ async function tryAddToCart(
     // keep falling through
   }
 
-  return { added: false, currentUrl: page.url(), cartReady: false };
+  return {
+    added: false,
+    currentUrl: page.url(),
+    cartReady: false,
+    blocked: sawBlockedAddToCart,
+    blockReason: sawBlockedAddToCart ? 'Blocked or rate-limited during add-to-cart' : undefined,
+  };
 }
 
 async function navigateToCheckout(
@@ -1544,7 +1568,7 @@ async function navigateToCheckout(
   opts: CheckoutTestOptions,
   errors: CrawlError[],
   profile: PlatformProfile,
-  addToCartResult: { added: boolean; currentUrl: string; cartReady: boolean },
+  addToCartResult: AddToCartResult,
   sourceProductUrl?: string
 ): Promise<{ reachedCheckout: boolean; stoppedAt?: string; html: string; text: string }> {
   const checkoutState: {

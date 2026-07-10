@@ -1,7 +1,20 @@
-import type { BrdParentContext, BrdTableUpdateInputRow, BrdUpdateInputRow, BrdUpdatePreview } from './types.js';
+import type {
+  BrdParentContext,
+  BrdPhaseAction,
+  BrdTableUpdateInputRow,
+  BrdUpdateInputRow,
+  BrdUpdatePreview,
+} from './types.js';
 import { adfToPlainText } from './description.js';
 
 export const SE_SCOPING_OUTPUT_FIELD_ID = 'customfield_21538';
+export const PHASE_FIELD_ID = 'customfield_21069';
+
+const PHASE_OPTION_BY_ACTION: Record<Exclude<BrdPhaseAction, 'unchanged'>, { id: string; value: string }> = {
+  in_scope: { id: '23609', value: 'in Scope' },
+  out_of_scope: { id: '23610', value: 'Out Of Scope' },
+  future: { id: '23611', value: 'Future' },
+};
 
 export interface JiraConfig {
   baseUrl: string;
@@ -47,7 +60,7 @@ export async function loadBrdParent(parentKey: string, config = getJiraConfig())
   const seOutputFieldId = await resolveSeOutputFieldId(config);
   const parent = await fetchJiraIssue(parentKey, 'summary,status,priority,subtasks', config);
   const childKeys = (parent.fields?.subtasks || []).map((subtask) => subtask.key);
-  const childFields = `summary,status,priority,description,${seOutputFieldId}`;
+  const childFields = `summary,status,priority,description,${seOutputFieldId},${PHASE_FIELD_ID}`;
   const children = await Promise.all(childKeys.map((key) => fetchJiraIssue(key, childFields, config)));
 
   return {
@@ -63,6 +76,8 @@ export async function loadBrdParent(parentKey: string, config = getJiraConfig())
       descriptionText: adfToPlainText(child.fields?.description),
       seOutputField: child.fields?.[seOutputFieldId],
       seOutputText: jiraFieldValueToPlainText(child.fields?.[seOutputFieldId]),
+      phaseField: child.fields?.[PHASE_FIELD_ID],
+      phaseText: jiraSelectValueToPlainText(child.fields?.[PHASE_FIELD_ID]),
     })),
   };
 }
@@ -75,18 +90,22 @@ export function ensureRowsBelongToParent(parent: BrdParentContext, rows: BrdUpda
   }
 }
 
-export function previewSeOutputUpdates(parent: BrdParentContext, rows: BrdUpdateInputRow[]): BrdUpdatePreview[] {
+export function previewSeOutputUpdates(parent: BrdParentContext, rows: BrdTableUpdateInputRow[]): BrdUpdatePreview[] {
   ensureRowsBelongToParent(parent, rows);
   const subtaskByKey = new Map(parent.subtasks.map((subtask) => [subtask.key, subtask]));
 
   return rows.map((row) => {
     const subtask = subtaskByKey.get(row.jiraKey);
+    const afterPhase = phaseValueForAction(row.phaseAction);
     return {
       jiraKey: row.jiraKey,
       summary: subtask?.summary || row.jiraKey,
       beforeText: subtask?.seOutputText || '',
       afterText: row.finalText,
       finalText: row.finalText,
+      beforePhase: subtask?.phaseText || '',
+      afterPhase: afterPhase ?? (subtask?.phaseText || ''),
+      phaseAction: row.phaseAction,
     };
   });
 }
@@ -97,10 +116,9 @@ export async function applySeOutputUpdates(
   config = getJiraConfig()
 ): Promise<BrdUpdatePreview[]> {
   const previews = previewSeOutputUpdates(parent, rows);
-  const seOutputFieldId = await resolveSeOutputFieldId(config);
 
   for (const row of rows) {
-    await updateJiraField(row.jiraKey, seOutputFieldId, row.finalText, config);
+    await setSeOutputField(row.jiraKey, row.finalText, config);
   }
 
   return previews;
@@ -116,17 +134,20 @@ export async function applyBrdTableUpdates(
   ensureRowsBelongToParent(parent, rows);
 
   for (const row of rows) {
-    await updateJiraField(row.jiraKey, SE_SCOPING_OUTPUT_FIELD_ID, row.finalText, config);
-    const currentStatus = subtaskByKey.get(row.jiraKey)?.status?.toLowerCase();
+    await setSeOutputField(row.jiraKey, row.finalText, config);
+    const subtask = subtaskByKey.get(row.jiraKey);
+    const currentStatus = subtask?.status?.toLowerCase();
     const transitionId = await transitionIdForAction(row.jiraKey, row.statusAction, currentStatus, config);
     if (transitionId) {
       await transitionJiraIssue(row.jiraKey, transitionId, config);
     }
+    await setPhaseFieldIfNeeded(row.jiraKey, row.phaseAction, subtask?.phaseText, config);
   }
 
   return previews.map((preview, index) => ({
     ...preview,
     statusAction: rows[index]?.statusAction || 'unchanged',
+    phaseAction: rows[index]?.phaseAction || 'unchanged',
   }));
 }
 
@@ -160,7 +181,15 @@ async function fetchJiraIssue(issueKey: string, fields: string, config: JiraConf
   return await response.json() as JiraIssueResponse;
 }
 
-async function updateJiraField(issueKey: string, fieldId: string, value: string, config: JiraConfig): Promise<void> {
+/** Set SE Scoping Output. Pass empty string or null to clear the field (Canceled BRDs with no notes). */
+export async function setSeOutputField(
+  issueKey: string,
+  value: string | null,
+  config = getJiraConfig()
+): Promise<void> {
+  const fieldId = await resolveSeOutputFieldId(config);
+  const trimmed = value?.trim() ?? '';
+  const fieldValue = trimmed ? plainTextToAdf(trimmed) : null;
   const issueUrl = `${config.baseUrl.replace(/\/$/, '')}/rest/api/3/issue/${issueKey}`;
   const response = await fetch(issueUrl, {
     method: 'PUT',
@@ -168,7 +197,7 @@ async function updateJiraField(issueKey: string, fieldId: string, value: string,
       ...jiraHeaders(config),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ fields: { [fieldId]: plainTextToAdf(value) } }),
+    body: JSON.stringify({ fields: { [fieldId]: fieldValue } }),
   });
 
   if (!response.ok) {
@@ -257,6 +286,54 @@ async function readJiraErrorDetail(response: Response): Promise<string> {
 function jiraFieldValueToPlainText(value: unknown): string {
   if (typeof value === 'string') return value;
   return adfToPlainText(value);
+}
+
+function jiraSelectValueToPlainText(value: unknown): string {
+  if (!value || typeof value !== 'object' || !('value' in value)) return '';
+  const optionValue = (value as { value?: unknown }).value;
+  return typeof optionValue === 'string' ? optionValue : '';
+}
+
+function phaseValueForAction(action: BrdPhaseAction | undefined): string | undefined {
+  if (!action || action === 'unchanged') return undefined;
+  return PHASE_OPTION_BY_ACTION[action].value;
+}
+
+async function setPhaseFieldIfNeeded(
+  issueKey: string,
+  action: BrdPhaseAction | undefined,
+  currentPhase: string | undefined,
+  config: JiraConfig
+): Promise<void> {
+  if (!action || action === 'unchanged') return;
+  const target = PHASE_OPTION_BY_ACTION[action];
+  if ((currentPhase || '').trim() === target.value) return;
+  await setPhaseField(issueKey, action, config);
+}
+
+async function setPhaseField(
+  issueKey: string,
+  action: Exclude<BrdPhaseAction, 'unchanged'>,
+  config = getJiraConfig()
+): Promise<void> {
+  const option = PHASE_OPTION_BY_ACTION[action];
+  const issueUrl = `${config.baseUrl.replace(/\/$/, '')}/rest/api/3/issue/${issueKey}`;
+  const response = await fetch(issueUrl, {
+    method: 'PUT',
+    headers: {
+      ...jiraHeaders(config),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fields: {
+        [PHASE_FIELD_ID]: { id: option.id },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Jira phase update failed for ${issueKey}: ${response.status} ${response.statusText}${await readJiraErrorDetail(response)}`);
+  }
 }
 
 function jiraHeaders(config: JiraConfig): Record<string, string> {

@@ -64,6 +64,39 @@ export function isPhysicalStoreLocationPath(path: string): boolean {
   return STORE_LOCATION_PATH_PATTERNS.some((pattern) => pattern.test(path));
 }
 
+/** Theme/sitemap URLs that still contain unrendered template tokens (e.g. Shopify `{{ product.handle }}`). */
+export function isUnrenderedTemplateUrl(url: string): boolean {
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(url);
+    } catch {
+      return url;
+    }
+  })();
+  return /\{\{[\s\S]*?\}\}/.test(decoded) || /\{%[\s\S]*?%\}/.test(decoded);
+}
+
+const NON_CONTENT_ACTION_URL_PATTERNS = [
+  /\/(?:account|login|register|checkout)\b/i,
+  /\/cart\/add\b/i,
+  /\/(?:findorder|order-?track(?:ing)?|track(?:ing)?-?order)\b/i,
+  /\/on\/demandware\.store\/.*(?:Wishlist|Compare|Account|Order|Search-ShowAjax)-/i,
+  /(?:Wishlist|Compare|Account|Order|Search-ShowAjax)-/i,
+  /Cart-RedirectToShipping/i,
+];
+
+/** Storefront action endpoints are useful signals, but not crawlable content pages or PDP candidates. */
+export function isNonContentActionUrl(url: string): boolean {
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(url);
+    } catch {
+      return url;
+    }
+  })();
+  return NON_CONTENT_ACTION_URL_PATTERNS.some((pattern) => pattern.test(decoded));
+}
+
 export const SHARED_ADD_TO_CART_SELECTORS = [
   'button:has-text("Add to cart")',
   'button:has-text("Add to Cart")',

@@ -3,7 +3,8 @@
 **For:** Codex (or any agent) continuing Website Assessment parity for **Salesforce Commerce Cloud (SFCC)** merchants.  
 **Repo:** `global-sweep`  
 **Branch:** `feat/sfcc-wa-parity` (do **not** develop on `pilot/team-handoff`; merge to `main` only after validation).  
-**Last updated:** 2026-05-20 (handoff from Cursor agent session)
+**Status:** **Parked 2026-07-10.** Active work moved to `feat/brd-wa-quality` (Shopify WA / BRD cleanup). Resume SFCC after that branch merges to `pilot/team-handoff`, then rebase this branch.  
+**Last updated:** 2026-07-10
 
 ---
 

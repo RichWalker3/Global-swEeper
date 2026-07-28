@@ -47,10 +47,19 @@ logs/
 
 # Local worktrees and reference assets (not source)
 .worktrees/
+.playwright-mcp/
 *.pptx
 Global-SwEep-Pilot-Overview/
 src/*.pdf
 docs/reference/
+
+# Presales scratch / non-Sweep merchant work (local only — do not commit)
+docs/Bogg-*
+docs/bogg-*
+docs/*.pdf
+docs/*.pptx
+docs/*.mmd
+docs/*-EDITED.json
 
 # One-off merchant scripts (local only)
 scripts/fix-chanluu-brds.*

@@ -1,0 +1,65 @@
+import type { PlatformProfile } from './shared.js';
+import {
+  SHARED_ADD_TO_CART_SELECTORS,
+  SHARED_CHECKOUT_BUTTON_SELECTORS,
+  SHARED_CHECKOUT_CONTENT_PATTERNS,
+  SHARED_LINK_CLASSIFIERS,
+} from './shared.js';
+
+export const gemProfile: PlatformProfile = {
+  id: 'gem',
+  label: 'GEM / Custom',
+  fallbackPaths: [
+    { path: '/shop', type: 'collection' },
+    { path: '/products', type: 'collection' },
+    { path: '/category', type: 'collection' },
+    { path: '/collections', type: 'collection' },
+    { path: '/cart', type: 'cart' },
+    { path: '/bag', type: 'cart' },
+    { path: '/basket', type: 'cart' },
+    { path: '/checkout', type: 'checkout' },
+    { path: '/shipping', type: 'policy' },
+    { path: '/returns', type: 'policy' },
+    { path: '/return-policy', type: 'policy' },
+    { path: '/shipping-returns', type: 'policy' },
+    { path: '/faq', type: 'other' },
+    { path: '/help', type: 'other' },
+  ],
+  linkClassifiers: [
+    ...SHARED_LINK_CLASSIFIERS,
+    { pattern: /\/(shop|products?|product|category|categories|catalog)\b/i, type: 'collection', priority: 7 },
+    { pattern: /\/(p|product)\/[^/]+/i, type: 'pdp', priority: 5 },
+    { pattern: /\/(cart|bag|basket)\b/i, type: 'cart', priority: 7 },
+    { pattern: /\/checkout\b/i, type: 'checkout', priority: 7 },
+  ],
+  productUrlPatterns: [
+    /href=["']([^"']*\/shop\/product\/[^"'#?]+)/gi,
+    /href=["']([^"']*\/(?:p|product|products)\/[^"'#?]+)/gi,
+    /href=["']([^"']*\/(?:item|sku)\/[^"'#?]+)/gi,
+  ],
+  productUrlScorePatterns: [
+    { pattern: /\/shop\/product\/[^/?#]+/i, score: 8 },
+    { pattern: /\/products?\/[^/?#]+/i, score: 8 },
+    { pattern: /\/p\/[^/?#]+/i, score: 8 },
+    { pattern: /\/item\/[^/?#]+/i, score: 6 },
+    { pattern: /\/sku\/[^/?#]+/i, score: 6 },
+  ],
+  productDiscoveryPaths: ['/', '/shop', '/products', '/category', '/catalog'],
+  addToCartSelectors: [
+    '[data-testid*="add-to-cart"]',
+    '[data-test*="add-to-cart"]',
+    '[data-action*="add"]',
+    '[data-action*="cart"]',
+    ...SHARED_ADD_TO_CART_SELECTORS,
+  ],
+  checkoutButtonSelectors: [
+    '[data-testid*="checkout"]',
+    '[data-test*="checkout"]',
+    ...SHARED_CHECKOUT_BUTTON_SELECTORS,
+  ],
+  cartPaths: ['/cart', '/bag', '/basket'],
+  checkoutPaths: ['/checkout'],
+  checkoutUrlPatterns: [/\/checkout\b/i, /global-e/i, /globale/i],
+  checkoutContentPatterns: [...SHARED_CHECKOUT_CONTENT_PATTERNS, /global-e/i, /globale/i],
+  notes: 'GEM/custom profile favors broad evidence collection and conservative generic checkout heuristics.',
+};

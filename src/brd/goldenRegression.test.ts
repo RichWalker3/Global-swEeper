@@ -86,8 +86,9 @@ describe('golden BRD regression from completed WA output', () => {
 
     const doneRows = result.rows.filter((row) => row.statusAction === 'done');
     const outOfScopeRows = result.rows.filter((row) => row.phaseAction === 'out_of_scope');
+    // HubSpot-primary BRDs with WA Done lines still count; no-evidence HubSpot-primary leave phase alone.
     expect(doneRows).toHaveLength(15);
-    expect(outOfScopeRows.length).toBeGreaterThanOrEqual(15);
+    expect(outOfScopeRows.length).toBe(11);
     expect(result.rows.every((row) => row.statusAction === 'done' || row.statusAction === undefined)).toBe(true);
 
     expect(result.rows.find((row) => row.requirementId === 'BRD-001')).toMatchObject({
@@ -100,11 +101,15 @@ describe('golden BRD regression from completed WA output', () => {
     expect(result.rows.find((row) => row.requirementId === 'BRD-002')).toMatchObject({
       jiraKey: 'SOPP-10449',
       statusAction: undefined,
-      phaseAction: 'out_of_scope',
+      phaseAction: undefined,
+      finalText: 'Sweep found no evidence for this BRD',
     });
-    expect(result.rows.find((row) => row.requirementId === 'BRD-002')?.finalText).not.toContain(
-      'No WA evidence found.'
-    );
+
+    expect(result.rows.find((row) => row.requirementId === 'BRD-013')).toMatchObject({
+      statusAction: undefined,
+      phaseAction: 'out_of_scope',
+      finalText: 'Subscriptions not detected.',
+    });
 
     expect(result.rows.find((row) => row.requirementId === 'BRD-030')).toMatchObject({
       jiraKey: 'SOPP-10477',
@@ -130,6 +135,11 @@ describe('golden BRD regression from completed WA output', () => {
     const absent = result.rows.find((row) => row.requirementId === 'BRD-013');
     expect(absent?.statusAction).toBeUndefined();
     expect(absent?.phaseAction).toBe('out_of_scope');
+    expect(absent?.finalText).toBe('Sweep found no evidence for this BRD');
+
+    const hubspotOnly = result.rows.find((row) => row.requirementId === 'BRD-002');
+    expect(hubspotOnly?.phaseAction).toBeUndefined();
+    expect(hubspotOnly?.finalText).toBe('Sweep found no evidence for this BRD');
   });
 
   it('keeps generated BRD outputs stable for known WA signals', () => {

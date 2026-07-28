@@ -82,7 +82,7 @@ describe('applyBrdTableUpdates', () => {
       .map(([, init]) => JSON.parse(String(init?.body)));
 
     expect(putBodies.some((body) => body.fields?.[SE_SCOPING_OUTPUT_FIELD_ID])).toBe(true);
-    expect(putBodies.some((body) => body.fields?.[PHASE_FIELD_ID]?.id === '23610')).toBe(true);
+    expect(putBodies.some((body) => body.fields?.[PHASE_FIELD_ID]?.id === '26660')).toBe(true);
 
     const transitionPosts = fetchMock.mock.calls.filter(
       ([, init]) => String(init?.method) === 'POST' && String(init?.body || '').includes('transition')

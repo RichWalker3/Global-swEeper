@@ -1,4 +1,5 @@
 import { buildBrdRows } from './mapper.js';
+import { isHubspotSalesOnlyBrd } from './requirements.js';
 import type {
   BrdDraftInput,
   BrdMatrixRow,
@@ -7,6 +8,9 @@ import type {
   BrdReviewResult,
   BrdStatusAction,
 } from './types.js';
+
+export const NO_EVIDENCE_SE_OUTPUT = 'Sweep found no evidence for this BRD';
+export const CONFIRM_WITH_SALES_PREFIX = 'Confirm with Sales';
 
 export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentContext }): BrdReviewResult {
   const manualMode = isManualBrdMode(input);
@@ -20,12 +24,35 @@ export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentConte
       const jiraDescriptionText = subtask?.descriptionText || '';
       const currentStatus = subtask?.status || '';
       const currentPhase = subtask?.phaseText || '';
-      const conflictNote = manualMode ? undefined : buildConflictNote(existingText, row);
-      const finalText = manualMode ? existingText : buildFinalText(existingText, row, conflictNote);
-      const statusAction = manualMode ? undefined : row.recommendedStatusAction;
-      const phaseAction = manualMode
-        ? undefined
-        : row.recommendedPhaseAction ?? recommendedPhaseAction(row, statusAction) ?? phaseActionFromJiraPhase(currentPhase);
+
+      if (manualMode) {
+        return {
+          ...row,
+          jiraKey: row.jiraKey,
+          existingText,
+          jiraDescriptionText,
+          currentStatus,
+          currentPhase,
+          statusAction: undefined,
+          phaseAction: undefined,
+          conflictNote: undefined,
+          finalText: existingText,
+        };
+      }
+
+      const hasFinding = waHasEvidence(row);
+      const hubspotPrimary = isHubspotSalesOnlyBrd(row.requirementId);
+      const conflictNote = buildConflictNote(existingText, row);
+      const finalText = buildFinalText(existingText, row, conflictNote);
+
+      // HubSpot/Sales-primary: if WA found nothing, write the short note but leave status/phase alone.
+      // If WA found something, apply normal Done / Phase recommendations.
+      const statusAction = hasFinding ? row.recommendedStatusAction : undefined;
+      const phaseAction = hasFinding
+        ? row.recommendedPhaseAction ?? recommendedPhaseAction(row, statusAction) ?? phaseActionFromJiraPhase(currentPhase)
+        : hubspotPrimary
+          ? undefined
+          : row.recommendedPhaseAction ?? recommendedPhaseAction(row, statusAction) ?? phaseActionFromJiraPhase(currentPhase);
 
       return {
         ...row,
@@ -59,75 +86,71 @@ function hasText(value: unknown): boolean {
 }
 
 function buildFinalText(existingText: string, row: BrdMatrixRow, conflictNote?: string): string {
-  if (row.llmSeOutputText) {
-    return row.llmSeOutputText;
+  const hubspotConflict = Boolean(conflictNote) || hasHubspotContradiction(existingText, row);
+  const body = resolveSeOutputBody(row);
+
+  if (hubspotConflict) {
+    return `${CONFIRM_WITH_SALES_PREFIX}\n\n${body}`;
   }
 
-  const parts = [
-    `${row.requirementId} - ${row.requirement}`,
-    '',
-    `Proposed scope: ${row.scopeValue}`,
-    `Confidence: ${row.confidence}`,
-  ];
+  return body;
+}
 
-  const existingSummary = summarizeExistingText(existingText);
-  if (existingSummary) {
-    parts.push('', `Existing SE scoping output value: ${existingSummary}`);
+function resolveSeOutputBody(row: BrdMatrixRow): string {
+  if (row.llmSeOutputText?.trim() && !isNoEvidencePhrase(row.llmSeOutputText)) {
+    return row.llmSeOutputText.trim();
   }
 
-  if (row.evidence.length > 0) {
-    parts.push('', 'WA evidence:');
-    for (const evidence of row.evidence.slice(0, 4)) {
-      parts.push(`- ${evidence.url ? `${evidence.detail} (${evidence.url})` : evidence.detail}`);
-    }
+  if (!waHasEvidence(row) || row.recommendedPhaseAction === 'out_of_scope' || isNoSignalRow(row)) {
+    return NO_EVIDENCE_SE_OUTPUT;
   }
 
-  if (conflictNote) {
-    parts.push('', `Scope note: ${conflictNote}`);
+  const evidenceLines = row.evidence
+    .filter((item) => !isPlaceholderEvidence(item.detail))
+    .slice(0, 3)
+    .map((item) => (item.url ? `${item.detail} (${item.url})` : item.detail));
+
+  if (evidenceLines.length > 0) {
+    return evidenceLines.join(' ');
   }
 
-  if (row.openQuestions.length > 0) {
-    parts.push('', 'Open questions:');
-    for (const question of row.openQuestions) {
-      parts.push(`- ${question}`);
-    }
-  }
+  return NO_EVIDENCE_SE_OUTPUT;
+}
 
-  return parts.join('\n');
+function isNoSignalRow(row: BrdMatrixRow): boolean {
+  return row.scopeValue === 'No signal found' || row.scopeValue === 'Out Of Scope';
+}
+
+function isPlaceholderEvidence(detail: string): boolean {
+  return /no direct wa evidence/i.test(detail);
+}
+
+function hasHubspotContradiction(existingText: string, row: BrdMatrixRow): boolean {
+  if (!existingText.trim()) return false;
+  if (!waHasEvidence(row)) return false;
+  return existingSaysNo(existingText);
+}
+
+function existingSaysNo(existingText: string): boolean {
+  return /\b(no|none|not interested|out of scope|oos|not applicable|n\/a)\b/i.test(existingText);
+}
+
+function waHasEvidence(row: BrdMatrixRow): boolean {
+  if (row.llmSeOutputText?.trim() && !isNoEvidencePhrase(row.llmSeOutputText)) return true;
+  if (row.recommendedStatusAction === 'done') return true;
+  // HubSpot/Sales-primary BRDs: ignore keyword bleed; only explicit WA SE notes count.
+  if (isHubspotSalesOnlyBrd(row.requirementId)) return false;
+  if (row.scopeValue === 'In Scope' || row.scopeValue === 'Unconfirmed') return true;
+  return row.evidence.some((item) => !isPlaceholderEvidence(item.detail));
+}
+
+function isNoEvidencePhrase(text: string): boolean {
+  return /^(no wa evidence found|sweep found no evidence for this brd)\.?$/i.test(text.trim());
 }
 
 function buildConflictNote(existingText: string, row: BrdMatrixRow): string | undefined {
-  const existing = existingText.toLowerCase();
-  const evidenceText = row.evidence.map((item) => `${item.source} ${item.detail}`).join(' ').toLowerCase();
-  const existingSaysNo = /\b(no|none|not interested|out of scope|oos|not applicable)\b/.test(existing);
-  const waHasSignal = row.scopeValue === 'In Scope' || row.scopeValue === 'Unconfirmed';
-  const hasLegacySignal = /\b(old|legacy|script|code|snippet)\b/.test(evidenceText)
-    || /\b(old|legacy|script|code|snippet)\b/.test(row.openQuestions.join(' ').toLowerCase())
-    || (row.requirementId === 'BRD-014' && /\b(smile\.io|loyalty script)\b/.test(evidenceText));
-
-  if (existingSaysNo && hasLegacySignal) {
-    if (row.requirementId === 'BRD-014') {
-      return `Existing SE scoping output content indicates no active loyalty program. WA found old loyalty script/code signals, but no confirmed active loyalty UI. Confirm whether this is inactive legacy code or planned future scope.`;
-    }
-    return `Existing SE scoping output content indicates no active ${row.requirement.toLowerCase()}. WA found legacy/code-level signals, but no confirmed active UI. Confirm whether this is inactive legacy code or planned future scope.`;
-  }
-
-  if (existingSaysNo && waHasSignal) {
-    return `Existing SE scoping output content indicates no ${row.requirement.toLowerCase()}, but WA found possible signals. Confirm whether this is active scope, legacy behavior, or out of scope.`;
-  }
-
-  if (!existingSaysNo && row.scopeValue === 'No signal found') {
-    return `No direct WA evidence was found. Preserve existing SE scoping output value unless the merchant confirms a change.`;
-  }
-
-  return undefined;
-}
-
-function summarizeExistingText(existingText: string): string {
-  return existingText
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 500);
+  if (!hasHubspotContradiction(existingText, row)) return undefined;
+  return 'WA evidence conflicts with existing HubSpot / SE scoping notes. Confirm with Sales.';
 }
 
 function recommendedPhaseAction(

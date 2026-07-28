@@ -2,13 +2,15 @@
  * Prompt builder for Claude extraction
  */
 
-import type { ScrapeResult, PageData, CrawlSummary } from '../scraper/types.js';
+import type { ScrapeResult, PageData, CrawlSummary, KnownPlatform } from '../scraper/types.js';
 import { BRD_REQUIREMENTS } from '../brd/requirements.js';
+import { getPlatformProfile } from '../scraper/platforms/index.js';
 
 export type PromptResponseFormat = 'markdown' | 'json';
 
 interface BuildPromptOptions {
   responseFormat?: PromptResponseFormat;
+  selectedPlatform?: KnownPlatform;
 }
 
 const SYSTEM_PROMPT = `You are analyzing evidence collected from an e-commerce website. Your task is to produce a Website Assessment (WA) using only the provided evidence bundle.
@@ -227,6 +229,7 @@ Use this one-line format for included BRDs:
 Use these rules:
 - Use **Status: Done** only when the WA includes evidence, a useful finding, or a scoping note for that BRD.
 - **Omit BRDs with no evidence** — do not list absent features. Sweep will default those rows to Phase Out Of Scope without changing Jira status.
+- **HubSpot/Sales-primary BRDs** (BRD-001, BRD-002, BRD-003, BRD-004, BRD-005, BRD-007, BRD-010): include them **only when the WA has concrete evidence**. If you have no evidence, omit them — Sweep will write a short "no evidence" note and leave Phase/Status alone for Sales.
 - Keep each SE Output note concise but useful for a Jira field.
 - Do not invent merchant capabilities.
 - Never write "No WA evidence found." or use Status: Canceled.
@@ -262,6 +265,7 @@ export function buildPrompt(
 ): { system: string; user: string } {
   const { summary, pages } = scrapeResult;
   const responseFormat = options.responseFormat || 'markdown';
+  const selectedPlatform = getPlatformProfile(options.selectedPlatform || summary.selectedPlatform?.id);
 
   // Group pages by tier for token optimization
   const { tierOne, tierTwo, tierThree } = groupPagesByTier(pages);
@@ -299,6 +303,12 @@ Keep crawlSummary aligned to the provided summary.`
 
 Respond with ONLY the Markdown Website Assessment. No preamble, no explanation after.`;
 
+  const scrapeErrorCount = summary.errors?.length || 0;
+  const scrapeHealthLine =
+    scrapeErrorCount === 0 && !summary.scrapingCompletionWarning && !summary.botDetectionWarning
+      ? '- **Scrape health guidance:** Evidence collection completed cleanly (no blocked pages/errors). Do not describe this run as a failed sweep; treat checkout gaps as isolated checkout limitations only.'
+      : '- **Scrape health guidance:** Treat scraping warnings/errors as scoped limitations. Distinguish partial coverage from total crawl failure.';
+
   // Build the user prompt with evidence
   const userPrompt = `# Website Assessment Request
 
@@ -307,6 +317,12 @@ Respond with ONLY the Markdown Website Assessment. No preamble, no explanation a
 ${JSON.stringify(summarizeCrawlForPrompt(summary), null, 2)}
 \`\`\`
 
+## Merchant-Provided Context
+
+- **Known ecommerce platform:** ${selectedPlatform.label}
+- Treat the selected platform as the expected implementation path for this run. Reconcile it with crawl evidence; if site evidence conflicts with the selected platform, call out the conflict as ❔ Unconfirmed or [Inference] instead of silently overriding it.
+- For GEM / Custom, assume a manual Global-e Module style implementation path unless direct evidence proves a packaged platform/plugin path.
+${scrapeHealthLine}
 - **Focus guidance:** This summary is intentionally trimmed to scoping-relevant signals. Do not expand the WA with a full technology inventory or list every detected app unless it affects a BRD, red flag, merchant question, or implementation risk.
 
 ## Evidence by Category
@@ -374,7 +390,9 @@ export function summarizeCrawlForPrompt(summary: CrawlSummary): Record<string, u
     domain: summary.domain,
     pagesVisited: summary.pagesVisited,
     productPagesScraped: summary.productPagesScraped,
+    selectedPlatform: summary.selectedPlatform,
     platformDetected: summary.platformDetected,
+    platformConflict: summary.platformConflict,
     headlessDetected: summary.headlessDetected,
     globalEDetected: summary.globalEDetected,
     checkoutReached: summary.checkoutReached,
@@ -394,6 +412,7 @@ export function summarizeCrawlForPrompt(summary: CrawlSummary): Record<string, u
     dropshipIndicators: summary.dropshipIndicators,
     errors: (summary.errors || []).slice(0, 5),
     scrapingCompletionWarning: summary.scrapingCompletionWarning,
+    botDetectionWarning: summary.botDetectionWarning,
   };
 }
 

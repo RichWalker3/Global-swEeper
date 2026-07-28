@@ -79,6 +79,22 @@ export function buildBrdParentFixture() {
     summary: 'Test Merchant SOPP',
     subtasks: [
       {
+        key: 'SOPP-100',
+        summary: 'BRD-001 Hub locations and entities',
+        status: 'Open',
+        phaseText: '',
+        seOutputText: '',
+        descriptionText: 'Hub locations',
+      },
+      {
+        key: 'SOPP-099',
+        summary: 'BRD-002 3PL / Shipping Platform',
+        status: 'Open',
+        phaseText: '',
+        seOutputText: '',
+        descriptionText: '3PL',
+      },
+      {
         key: 'SOPP-101',
         summary: 'BRD-025 Pre-orders',
         status: 'Open',

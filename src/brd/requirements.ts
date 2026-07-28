@@ -218,6 +218,21 @@ export const BRD_REQUIREMENTS: BrdRequirement[] = [
   },
 ];
 
+/** BRDs usually filled by HubSpot/Sales — still accept WA findings when present. */
+export const HUBSPOT_SALES_ONLY_BRD_IDS = new Set([
+  'BRD-001',
+  'BRD-002',
+  'BRD-003',
+  'BRD-004',
+  'BRD-005',
+  'BRD-007',
+  'BRD-010',
+]);
+
+export function isHubspotSalesOnlyBrd(requirementId: string): boolean {
+  return HUBSPOT_SALES_ONLY_BRD_IDS.has(requirementId);
+}
+
 export function findRequirementBySummary(summary: string): BrdRequirement | undefined {
   const normalized = summary.toLowerCase();
   return BRD_REQUIREMENTS.find((requirement) => {

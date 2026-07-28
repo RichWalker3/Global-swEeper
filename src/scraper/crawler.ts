@@ -4,90 +4,26 @@
  */
 
 import { Page } from 'playwright';
+import type { CrawlTarget, CrawlTargetType, KnownPlatform } from './types.js';
+import { getPlatformProfile } from './platforms/index.js';
+import { buildFallbackTargets, isPhysicalStoreLocationPath, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
+import { discoverIndexedTargets, sortAndLimitTargets } from './indexedDiscovery.js';
 
-export interface CrawlTarget {
-  url: string;
-  type: 'home' | 'pdp' | 'collection' | 'cart' | 'checkout' | 'policy' | 'rewards' | 'other';
-  source?: string;
-}
+export type { CrawlTarget };
 
-/** Canonical crawl URL key — treats `/` and bare origin as the same page. */
-export function normalizeCrawlUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    if (parsed.pathname === '/' || parsed.pathname === '') {
-      return parsed.origin;
-    }
-    const path = parsed.pathname.replace(/\/$/, '') || '/';
-    return parsed.origin + path + parsed.search;
-  } catch {
-    return url.replace(/\/$/, '');
-  }
-}
-
-export function dedupeCrawlTargets(targets: CrawlTarget[]): CrawlTarget[] {
-  const seen = new Set<string>();
-  const deduped: CrawlTarget[] = [];
-  for (const target of targets) {
-    const key = normalizeCrawlUrl(target.url);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push({ ...target, url: key });
-  }
-  return deduped;
-}
-
-// URL pattern classifiers
-const LINK_CLASSIFIERS: { pattern: RegExp; type: CrawlTarget['type']; priority: number }[] = [
-  // Policy pages (high priority)
-  { pattern: /\/(pages?\/)?(policies?|terms|privacy|refund|returns?|shipping|exchange|warranty|guarantee)/i, type: 'policy', priority: 10 },
-  { pattern: /\/(pages?\/)?(delivery|returns?-policy|shipping-policy|refund-policy)/i, type: 'policy', priority: 10 },
-  { pattern: /\/(pages?\/)?(customer-service|help-center|support)/i, type: 'other', priority: 8 },
-  { pattern: /\/(pages?\/)?(faq|faqs|help|contact|contact-us)/i, type: 'other', priority: 7 },
-  { pattern: /\/(info|information)\/(shipping|returns|delivery)/i, type: 'policy', priority: 9 },
-  { pattern: /\/help\/(shipping|returns|orders|payments)/i, type: 'policy', priority: 9 },
-
-  // Rewards/Loyalty pages (high priority)
-  { pattern: /\/(pages?\/)?(rewards?|loyalty|points|vip|member|referr?als?|perks)/i, type: 'rewards', priority: 10 },
-  { pattern: /\/(pages?\/)?(refer-a-friend|ambassador|affiliate)/i, type: 'rewards', priority: 8 },
-
-  // Collection pages
-  { pattern: /\/(collections?|shop|category|categories|products?)$/i, type: 'collection', priority: 8 },
-  { pattern: /\/collections\/[^\/]+$/i, type: 'collection', priority: 7 },
-  { pattern: /\/(mens?|womens?|kids?|sale|new|best-sellers?|all)/i, type: 'collection', priority: 6 },
-  { pattern: /\/shop\/(all|mens?|womens?|new)/i, type: 'collection', priority: 7 },
-
-  // Cart/Checkout
-  { pattern: /\/(cart|bag|basket)$/i, type: 'cart', priority: 6 },
-  { pattern: /\/checkout/i, type: 'checkout', priority: 6 },
-
-  // Product pages (lower priority - discovered from collections)
-  { pattern: /\/products\/[^\/]+$/i, type: 'pdp', priority: 3 },
-];
-
-// Text-based classifiers for ambiguous URLs
-const TEXT_CLASSIFIERS: { pattern: RegExp; type: CrawlTarget['type'] }[] = [
-  { pattern: /^(shipping|delivery)\s*(policy|info|information)?$/i, type: 'policy' },
-  { pattern: /^return(s)?\s*((&|and)\s*exchange(s)?)?(\s*policy)?$/i, type: 'policy' },
-  { pattern: /^refund\s*(policy)?$/i, type: 'policy' },
-  { pattern: /^(terms|privacy|legal)/i, type: 'policy' },
-  { pattern: /^(rewards?|loyalty|points|vip|perks)/i, type: 'rewards' },
-  { pattern: /^(faq|help|support|contact)/i, type: 'other' },
-  { pattern: /^(wholesale|trade|b2b)/i, type: 'other' },
-  { pattern: /^(about|our\s*story)/i, type: 'other' },
-  { pattern: /^(shop\s*all|all\s*products|collections?)/i, type: 'collection' },
-];
+const MAX_DISCOVERY_TARGETS = 24;
 
 /**
  * Discover crawl targets by extracting links from the homepage
  */
-export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose: boolean): Promise<CrawlTarget[]> {
+export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose: boolean, platform?: KnownPlatform): Promise<CrawlTarget[]> {
   const base = new URL(seedUrl).origin;
+  const profile = getPlatformProfile(platform);
   const discovered = new Map<string, CrawlTarget>();
 
-  // Always include homepage once (avoid scraping both `/` and bare origin).
-  const homeUrl = normalizeCrawlUrl(base);
-  discovered.set(homeUrl, { url: homeUrl, type: 'home', source: 'seed' });
+  // Always include homepage
+  discovered.set(base, { url: base, type: 'home', source: 'seed' });
+  discovered.set(base + '/', { url: base + '/', type: 'home', source: 'seed' });
 
   // Scroll to footer to trigger lazy-loading of footer content
   await scrollToFooter(page, verbose);
@@ -134,16 +70,17 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
       if (/\.(jpg|jpeg|png|gif|svg|css|js|woff|ico|pdf)$/i.test(url.pathname)) continue;
       if (/\/(cdn|assets|static|media)\//i.test(url.pathname)) continue;
       if (/\/(account|login|register|cart\/add|checkout)/i.test(url.pathname)) continue;
+      if (isPhysicalStoreLocationPath(url.pathname)) continue;
 
-      const normalizedUrl = normalizeCrawlUrl(url.origin + url.pathname + url.search);
+      const normalizedUrl = url.origin + url.pathname.replace(/\/$/, '');
       if (discovered.has(normalizedUrl)) continue;
 
       // Classify the link
-      let type: CrawlTarget['type'] = 'other';
+      let type: CrawlTargetType = 'other';
       let priority = 0;
 
       // URL pattern matching
-      for (const classifier of LINK_CLASSIFIERS) {
+      for (const classifier of profile.linkClassifiers) {
         if (classifier.pattern.test(url.pathname)) {
           type = classifier.type;
           priority = classifier.priority;
@@ -153,10 +90,10 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
 
       // Text-based classification for ambiguous URLs
       if (type === 'other' || priority < 5) {
-        for (const classifier of TEXT_CLASSIFIERS) {
+        for (const classifier of SHARED_TEXT_CLASSIFIERS) {
           if (classifier.pattern.test(link.text)) {
             type = classifier.type;
-            priority = 8;
+            priority = classifier.priority || 8;
             break;
           }
         }
@@ -176,7 +113,7 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
   // Convert to array and sort by priority
   let targets = Array.from(discovered.values());
 
-  const typePriority: Record<CrawlTarget['type'], number> = {
+  const typePriority: Record<CrawlTargetType, number> = {
     'home': 100,
     'policy': 95,
     'rewards': 94,
@@ -209,7 +146,7 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
 
   // Add fallbacks if too few targets
   if (targets.length < 5) {
-    const fallbacks = getFallbackTargets(seedUrl);
+    const fallbacks = getFallbackTargets(seedUrl, platform);
     for (const fb of fallbacks) {
       if (!discovered.has(fb.url)) {
         targets.push(fb);
@@ -231,26 +168,19 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
   return targets;
 }
 
+export async function discoverIndexedCrawlTargets(seedUrl: string, verbose: boolean, platform?: KnownPlatform): Promise<CrawlTarget[]> {
+  return discoverIndexedTargets(seedUrl, platform, { verbose });
+}
+
+export function mergeCrawlTargets(...targetGroups: CrawlTarget[][]): CrawlTarget[] {
+  return sortAndLimitTargets(targetGroups.flat(), MAX_DISCOVERY_TARGETS);
+}
+
 /**
  * Fallback targets when dynamic discovery fails
  */
-export function getFallbackTargets(seedUrl: string): CrawlTarget[] {
-  const base = normalizeCrawlUrl(seedUrl);
-  return dedupeCrawlTargets([
-    { url: base, type: 'home', source: 'fallback' },
-    { url: `${base}/collections/all`, type: 'collection', source: 'fallback' },
-    { url: `${base}/collections`, type: 'collection', source: 'fallback' },
-    { url: `${base}/shop`, type: 'collection', source: 'fallback' },
-    { url: `${base}/products`, type: 'collection', source: 'fallback' },
-    { url: `${base}/policies/shipping-policy`, type: 'policy', source: 'fallback' },
-    { url: `${base}/policies/refund-policy`, type: 'policy', source: 'fallback' },
-    { url: `${base}/pages/shipping`, type: 'policy', source: 'fallback' },
-    { url: `${base}/pages/returns`, type: 'policy', source: 'fallback' },
-    { url: `${base}/pages/shipping-returns`, type: 'policy', source: 'fallback' },
-    { url: `${base}/pages/faq`, type: 'other', source: 'fallback' },
-    { url: `${base}/help`, type: 'other', source: 'fallback' },
-    { url: `${base}/cart`, type: 'cart', source: 'fallback' },
-  ]);
+export function getFallbackTargets(seedUrl: string, platform?: KnownPlatform): CrawlTarget[] {
+  return buildFallbackTargets(seedUrl, getPlatformProfile(platform));
 }
 
 /**

@@ -1570,6 +1570,38 @@
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
     }
 
+    .brd-warning-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.55rem;
+      font-size: 0.8125rem;
+      color: var(--gray-600);
+      cursor: help;
+      user-select: none;
+    }
+
+    .brd-warning-toggle input {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    #brdWarningHoverTip {
+      position: fixed;
+      z-index: 10000;
+      display: none;
+      max-width: 280px;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 500;
+      line-height: 1.4;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+      pointer-events: none;
+    }
+
     .brd-table select {
       width: 100%;
       padding: 0.55rem;
@@ -2063,6 +2095,7 @@
           </div>
 
           <div id="brdReviewGrid" class="brd-review-grid hidden"></div>
+          <div id="brdWarningHoverTip" role="tooltip" aria-hidden="true"></div>
 
           <div class="hidden" id="brdSaveActions" style="margin-top: 1rem;">
             <div id="brdSendStatus" style="font-size: 0.8125rem; color: var(--gray-400); margin-bottom: 0.75rem;"></div>
@@ -3314,10 +3347,23 @@
         .replace(/'/g, '&#039;');
     }
 
+    function seOutputHasWarning(text) {
+      return /^\u26A0\uFE0F?\s*/.test(String(text || ''));
+    }
+
+    function stripSeOutputWarning(text) {
+      return String(text || '').replace(/^\u26A0\uFE0F?\s*/, '');
+    }
+
+    function withSeOutputWarning(text) {
+      const body = stripSeOutputWarning(text);
+      return body ? `\u26A0\uFE0F ${body}` : '\u26A0\uFE0F';
+    }
+
     function normalizeBrdRowsForSave() {
       return brdReviewRows.map(row => ({
         jiraKey: row.jiraKey,
-        finalText: row.finalText,
+        finalText: row.addWarning ? withSeOutputWarning(row.finalText) : stripSeOutputWarning(row.finalText),
         statusAction: row.statusAction || 'unchanged',
         phaseAction: row.phaseAction || 'unchanged',
       }));
@@ -3336,10 +3382,63 @@
       if (phase === 'in Scope') return 'in_scope';
       if (phase === 'Out Of Scope') return 'out_of_scope';
       if (phase === 'Future') return 'future';
+      // HubSpot/Sales-owned BRDs: do not default Phase from missing WA signal.
+      const hubspotSalesOnly = ['BRD-001', 'BRD-002', 'BRD-003', 'BRD-004', 'BRD-005', 'BRD-007', 'BRD-010'].includes(row.requirementId);
+      if (hubspotSalesOnly) return 'unchanged';
       if (row.scopeValue === 'No signal found' || row.scopeValue === 'Out Of Scope') return 'out_of_scope';
       if (row.scopeValue === 'Future') return 'future';
       if (row.scopeValue === 'In Scope' || row.statusAction === 'done') return 'in_scope';
       return 'unchanged';
+    }
+
+    function ensureBrdWarningHoverTip() {
+      let tip = document.getElementById('brdWarningHoverTip');
+      if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'brdWarningHoverTip';
+        tip.setAttribute('role', 'tooltip');
+        tip.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(tip);
+      }
+      return tip;
+    }
+
+    function positionBrdWarningHoverTip(event) {
+      const tip = ensureBrdWarningHoverTip();
+      const offset = 14;
+      const rect = tip.getBoundingClientRect();
+      let left = event.clientX + offset;
+      let top = event.clientY + offset;
+      const maxLeft = window.innerWidth - rect.width - 12;
+      const maxTop = window.innerHeight - rect.height - 12;
+      if (left > maxLeft) left = Math.max(12, event.clientX - rect.width - offset);
+      if (top > maxTop) top = Math.max(12, event.clientY - rect.height - offset);
+      tip.style.left = `${left}px`;
+      tip.style.top = `${top}px`;
+    }
+
+    function showBrdWarningHoverTip(event, text) {
+      const tip = ensureBrdWarningHoverTip();
+      tip.textContent = text;
+      tip.style.display = 'block';
+      tip.setAttribute('aria-hidden', 'false');
+      positionBrdWarningHoverTip(event);
+    }
+
+    function hideBrdWarningHoverTip() {
+      const tip = document.getElementById('brdWarningHoverTip');
+      if (!tip) return;
+      tip.style.display = 'none';
+      tip.setAttribute('aria-hidden', 'true');
+    }
+
+    function bindBrdWarningHoverTips(grid) {
+      grid.querySelectorAll('.brd-warning-toggle').forEach(label => {
+        const text = label.getAttribute('data-brd-warning-tip') || '';
+        label.addEventListener('mouseenter', (event) => showBrdWarningHoverTip(event, text));
+        label.addEventListener('mousemove', (event) => positionBrdWarningHoverTip(event));
+        label.addEventListener('mouseleave', hideBrdWarningHoverTip);
+      });
     }
 
     function renderBrdReviewGrid(rows) {
@@ -3354,11 +3453,17 @@
         return;
       }
 
-      brdReviewRows = rows.map(row => ({
-        ...row,
-        statusAction: row.statusAction || initialStatusAction(row),
-        phaseAction: row.phaseAction || initialPhaseAction(row),
-      }));
+      brdReviewRows = rows.map(row => {
+        const addWarning = Boolean(row.addWarning) || seOutputHasWarning(row.finalText);
+        const baseText = stripSeOutputWarning(row.finalText || '');
+        return {
+          ...row,
+          addWarning,
+          finalText: addWarning ? withSeOutputWarning(baseText) : baseText,
+          statusAction: row.statusAction || initialStatusAction(row),
+          phaseAction: row.phaseAction || initialPhaseAction(row),
+        };
+      });
 
       grid.innerHTML = `
         <div class="brd-table-wrapper">
@@ -3384,6 +3489,13 @@
                   <td class="brd-description-cell">${escapeHtml(row.jiraDescriptionText || 'No Jira description.')}</td>
                   <td>
                     <textarea data-brd-index="${index}">${escapeHtml(row.finalText || '')}</textarea>
+                    <label
+                      class="brd-warning-toggle"
+                      data-brd-warning-tip="Check this box to add a warning symbol at the beginning of the SE scoping output in Jira, so future readers know this BRD should be reviewed."
+                    >
+                      <input type="checkbox" data-brd-warning-index="${index}" ${row.addWarning ? 'checked' : ''} />
+                      <span>Add warning</span>
+                    </label>
                   </td>
                   <td>
                     <select data-brd-status-index="${index}">
@@ -3409,9 +3521,28 @@
       grid.querySelectorAll('textarea[data-brd-index]').forEach(textarea => {
         textarea.addEventListener('input', () => {
           const index = Number(textarea.dataset.brdIndex);
+          const hasWarning = seOutputHasWarning(textarea.value);
           brdReviewRows[index].finalText = textarea.value;
+          brdReviewRows[index].addWarning = hasWarning;
+          const checkbox = grid.querySelector(`input[data-brd-warning-index="${index}"]`);
+          if (checkbox) checkbox.checked = hasWarning;
         });
       });
+
+      grid.querySelectorAll('input[data-brd-warning-index]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          const index = Number(checkbox.dataset.brdWarningIndex);
+          const row = brdReviewRows[index];
+          row.addWarning = checkbox.checked;
+          row.finalText = checkbox.checked
+            ? withSeOutputWarning(row.finalText)
+            : stripSeOutputWarning(row.finalText);
+          const textarea = grid.querySelector(`textarea[data-brd-index="${index}"]`);
+          if (textarea) textarea.value = row.finalText;
+        });
+      });
+
+      bindBrdWarningHoverTips(grid);
 
       grid.querySelectorAll('select[data-brd-status-index]').forEach(select => {
         select.addEventListener('change', () => {

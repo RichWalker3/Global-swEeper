@@ -1,6 +1,6 @@
 import { WebsiteAssessmentSchema, type WebsiteAssessment } from '../schema/assessment.js';
 import type { Check, Evidence } from '../schema/common.js';
-import { BRD_REQUIREMENTS } from './requirements.js';
+import { BRD_REQUIREMENTS, isHubspotSalesOnlyBrd } from './requirements.js';
 import type {
   BrdDraftInput,
   BrdEvidence,
@@ -61,6 +61,12 @@ export function buildBrdRows(input: BrdDraftInput): BrdMatrixRow[] {
     const signal = signals[requirement.id] || defaultSignal(requirement.id);
     const jiraKey = subtaskByRequirement.get(requirement.id)?.key;
     const llmOutput = llmBrdOutputs.get(requirement.id);
+    const hubspotPrimary = isHubspotSalesOnlyBrd(requirement.id);
+    const hasWaFinding = hubspotPrimary
+      ? hasExplicitWaFinding(llmOutput)
+      : hasExplicitWaFinding(llmOutput)
+        || signal.scopeValue === 'In Scope'
+        || signal.scopeValue === 'Unconfirmed';
 
     return {
       requirementId: requirement.id,
@@ -75,8 +81,13 @@ export function buildBrdRows(input: BrdDraftInput): BrdMatrixRow[] {
       openQuestions: signal.openQuestions,
       proposedJiraText: buildProposedJiraText(requirement.id, signal),
       llmSeOutputText: llmOutput?.seOutputText,
-      recommendedStatusAction: llmOutput?.statusAction,
-      recommendedPhaseAction: llmOutput?.phaseAction ?? inferPhaseFromScope(signal.scopeValue, llmOutput?.statusAction),
+      recommendedStatusAction: hasWaFinding ? llmOutput?.statusAction : undefined,
+      // HubSpot/Sales-primary: only move phase when WA has an explicit finding.
+      recommendedPhaseAction: hasWaFinding
+        ? llmOutput?.phaseAction ?? inferPhaseFromScope(signal.scopeValue, llmOutput?.statusAction)
+        : hubspotPrimary
+          ? undefined
+          : llmOutput?.phaseAction ?? inferPhaseFromScope(signal.scopeValue, llmOutput?.statusAction),
     };
   });
 }
@@ -117,7 +128,13 @@ function parseLlmBrdOutputs(markdown: string): Map<string, LlmBrdOutput> {
 }
 
 function isNoEvidenceSeOutput(text: string): boolean {
-  return /^no wa evidence found\.?$/i.test(text.trim());
+  return /^(no wa evidence found|sweep found no evidence for this brd)\.?$/i.test(text.trim());
+}
+
+function hasExplicitWaFinding(llmOutput: LlmBrdOutput | undefined): boolean {
+  if (!llmOutput) return false;
+  if (llmOutput.statusAction === 'done') return true;
+  return Boolean(llmOutput.seOutputText && !isNoEvidenceSeOutput(llmOutput.seOutputText));
 }
 
 function inferPhaseFromScope(

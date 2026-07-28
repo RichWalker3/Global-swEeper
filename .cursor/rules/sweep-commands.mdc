@@ -8,6 +8,8 @@ alwaysApply: true
 
 When the user says any of the following in chat, perform the corresponding action. Be concise and friendly; they may not be developers.
 
+**Branch reminder:** GitLab **`main`** is **PROD** (hosted Sweep). `pilot/team-handoff` is for local/Cursor team installs — not production.
+
 ## /launch sweep (or "launch sweep")
 
 - Run in the project root: `npm run web` (or `npm start`).

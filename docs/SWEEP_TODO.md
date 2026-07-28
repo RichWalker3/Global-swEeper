@@ -18,8 +18,8 @@ Internal improvement list for Global-sweep. Not coworker-facing release notes �
   - **Shipped in app (local only):** `src/web/public/index.html`, `src/brd/jira.ts`, `src/brd/types.ts`, `src/brd/composer.ts`
   - **Release tracking:** `CHANGELOG.md` → **Unreleased**; merge via `docs/BRANCH_MERGE_PLAN.md` Phase 3
   - **Reference SOPP:** [SOPP-13184](https://global-e.atlassian.net/browse/SOPP-13184) (ALEX AND ANI)
-  - **Jira field:** `customfield_21069` (Phase) — options: `in Scope` (`23609`), `Out Of Scope` (`23610`), `Future` (`23611`)
+  - **Jira field:** `customfield_23495` (Phase) — options: `in Scope` (`26659`), `Out Of Scope` (`26660`), `Future` (`26661`)
   - **UX:** Phase column next to Status — Leave unchanged | in Scope | Out Of Scope | Future; loads from Jira, WA suggests defaults, writes on Send to Jira
-  - **Also writes:** `customfield_21538` (SE Scoping Output) + status transitions (unchanged behavior)
+  - **Also writes:** `customfield_23486` (SE Scoping Output) + status transitions (unchanged behavior)
 
 - [ ] **Feedback UI: post Jira comments instead of email** (not started)

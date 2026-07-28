@@ -17,4 +17,14 @@ describe('hosted base path routing', () => {
     expect(html).toContain("fetchLogsApi(`/api/logs?");
     expect(html).not.toMatch(/fetch\(\s*['"]\/api\/logs/);
   });
+
+  it('offers an Add warning checkbox that prefixes SE Output with a warning symbol', () => {
+    expect(html).toContain('Add warning');
+    expect(html).toContain('data-brd-warning-index');
+    expect(html).toContain('withSeOutputWarning');
+    expect(html).toContain('brdWarningHoverTip');
+    expect(html).toContain('data-brd-warning-tip');
+    expect(html).toContain('Check this box to add a warning symbol');
+    expect(html).toContain('\\u26A0\\uFE0F');
+  });
 });

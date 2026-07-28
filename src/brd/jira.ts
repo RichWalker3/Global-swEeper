@@ -7,13 +7,14 @@ import type {
 } from './types.js';
 import { adfToPlainText } from './description.js';
 
-export const SE_SCOPING_OUTPUT_FIELD_ID = 'customfield_21538';
-export const PHASE_FIELD_ID = 'customfield_21069';
+/** Current Jira fields (board columns). Old IDs were customfield_21538 / customfield_21069. */
+export const SE_SCOPING_OUTPUT_FIELD_ID = 'customfield_23486';
+export const PHASE_FIELD_ID = 'customfield_23495';
 
 const PHASE_OPTION_BY_ACTION: Record<Exclude<BrdPhaseAction, 'unchanged'>, { id: string; value: string }> = {
-  in_scope: { id: '23609', value: 'in Scope' },
-  out_of_scope: { id: '23610', value: 'Out Of Scope' },
-  future: { id: '23611', value: 'Future' },
+  in_scope: { id: '26659', value: 'in Scope' },
+  out_of_scope: { id: '26660', value: 'Out Of Scope' },
+  future: { id: '26661', value: 'Future' },
 };
 
 export interface JiraConfig {
@@ -181,7 +182,7 @@ async function fetchJiraIssue(issueKey: string, fields: string, config: JiraConf
   return await response.json() as JiraIssueResponse;
 }
 
-/** Set SE Scoping Output. Pass empty string or null to clear the field. */
+/** Set SE Scoping Output (ADF rich text). Pass empty string or null to clear the field. */
 export async function setSeOutputField(
   issueKey: string,
   value: string | null,
@@ -258,6 +259,12 @@ async function fetchJiraTransitions(issueKey: string, config: JiraConfig): Promi
   return data.transitions || [];
 }
 
+async function readJiraErrorDetail(response: Response): Promise<string> {
+  const text = await response.text().catch(() => '');
+  if (!text) return '';
+  return ` - ${text.slice(0, 500)}`;
+}
+
 function plainTextToAdf(value: string): unknown {
   const content = value
     .split(/\n{2,}/)
@@ -273,12 +280,6 @@ function plainTextToAdf(value: string): unknown {
     version: 1,
     content: content.length > 0 ? content : [{ type: 'paragraph' }],
   };
-}
-
-async function readJiraErrorDetail(response: Response): Promise<string> {
-  const text = await response.text().catch(() => '');
-  if (!text) return '';
-  return ` - ${text.slice(0, 500)}`;
 }
 
 function jiraFieldValueToPlainText(value: unknown): string {

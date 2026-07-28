@@ -30,8 +30,8 @@ export interface CheckoutInfo {
 }
 
 // Return portal patterns to detect
-const RETURN_PORTAL_PATTERNS = [
-  { pattern: /returnportal\.[a-z0-9-]+\.[a-z]+/gi, provider: null }, // Generic return portal subdomain
+const RETURN_PORTAL_PATTERNS: { pattern: RegExp; provider: string | null }[] = [
+  { pattern: /returnportal\.[a-z0-9-]+\.[a-z]+/gi, provider: null },
   { pattern: /returns\.[a-z0-9-]+\.[a-z]+/gi, provider: null },
   { pattern: /loopreturns\.com/gi, provider: 'Loop Returns' },
   { pattern: /loop\s+returns/gi, provider: 'Loop Returns' },
@@ -42,6 +42,38 @@ const RETURN_PORTAL_PATTERNS = [
   { pattern: /returnly\.com/gi, provider: 'Returnly' },
   { pattern: /aftership\.com\/returns/gi, provider: 'AfterShip Returns' },
 ];
+
+export function detectReturnPortal(sources: string[]): Pick<ExtractedPolicy, 'returnPortal' | 'returnProvider'> {
+  for (const source of sources) {
+    if (!source) continue;
+    for (const { pattern, provider } of RETURN_PORTAL_PATTERNS) {
+      pattern.lastIndex = 0;
+      const match = pattern.exec(source);
+      if (match) {
+        return {
+          returnPortal: match[0],
+          returnProvider: provider ?? inferReturnProviderFromPortal(match[0]),
+        };
+      }
+    }
+  }
+  return {};
+}
+
+function inferReturnProviderFromPortal(portal: string): string | undefined {
+  const lower = portal.toLowerCase();
+  if (lower.includes('loopreturns')) return 'Loop Returns';
+  if (lower.includes('narvar')) return 'Narvar';
+  if (lower.includes('happyreturns')) return 'Happy Returns';
+  if (lower.includes('returngo')) return 'ReturnGO';
+  if (lower.includes('returnly')) return 'Returnly';
+  if (lower.includes('aftership')) return 'AfterShip Returns';
+  return undefined;
+}
+
+function hrefSourcesFromHtml(html: string): string[] {
+  return [...html.matchAll(/href=["']([^"']+)["']/gi)].map((match) => match[1]);
+}
 
 // Express wallet patterns
 const EXPRESS_WALLET_PATTERNS = [
@@ -69,7 +101,7 @@ const BNPL_PATTERNS = [
 /**
  * Extract policy information from page text
  */
-export function extractPolicyInfo(text: string, _url?: string): ExtractedPolicy {
+export function extractPolicyInfo(text: string, _url?: string, html?: string): ExtractedPolicy {
   const lowerText = text.toLowerCase();
   const result: ExtractedPolicy = { rawExcerpts: {} };
 
@@ -167,16 +199,13 @@ export function extractPolicyInfo(text: string, _url?: string): ExtractedPolicy 
     result.finalSaleItems = finalSaleItems;
   }
 
-  // Return portal detection
-  for (const { pattern, provider } of RETURN_PORTAL_PATTERNS) {
-    const match = text.match(pattern);
-    if (match) {
-      result.returnPortal = match[0];
-      if (provider) {
-        result.returnProvider = provider;
-      }
-      break;
-    }
+  // Return portal detection — scan visible text and link hrefs (portal URL often only in href)
+  const returnPortalMatch = detectReturnPortal([text, ...hrefSourcesFromHtml(html || '')]);
+  if (returnPortalMatch.returnPortal) {
+    result.returnPortal = returnPortalMatch.returnPortal;
+  }
+  if (returnPortalMatch.returnProvider) {
+    result.returnProvider = returnPortalMatch.returnProvider;
   }
 
   // Gift with purchase

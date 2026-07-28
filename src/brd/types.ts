@@ -27,6 +27,7 @@ export interface BrdMatrixRow {
   descriptionPreview?: string;
   llmSeOutputText?: string;
   recommendedStatusAction?: BrdStatusAction;
+  recommendedPhaseAction?: BrdPhaseAction;
 }
 
 export interface BrdSubtask {
@@ -38,6 +39,8 @@ export interface BrdSubtask {
   descriptionText?: string;
   seOutputField?: unknown;
   seOutputText?: string;
+  phaseField?: unknown;
+  phaseText?: string;
 }
 
 export interface BrdParentContext {
@@ -82,7 +85,9 @@ export interface BrdReviewRow extends BrdMatrixRow {
   existingText: string;
   jiraDescriptionText: string;
   currentStatus: string;
+  currentPhase?: string;
   statusAction?: BrdStatusAction;
+  phaseAction?: BrdPhaseAction;
   conflictNote?: string;
   finalText: string;
 }
@@ -98,10 +103,13 @@ export interface BrdUpdateInputRow {
   finalText: string;
 }
 
-export type BrdStatusAction = 'unchanged' | 'done' | 'canceled';
+export type BrdStatusAction = 'unchanged' | 'done';
+
+export type BrdPhaseAction = 'unchanged' | 'in_scope' | 'out_of_scope' | 'future';
 
 export interface BrdTableUpdateInputRow extends BrdUpdateInputRow {
   statusAction?: BrdStatusAction;
+  phaseAction?: BrdPhaseAction;
 }
 
 export interface BrdUpdatePreview {
@@ -111,4 +119,7 @@ export interface BrdUpdatePreview {
   afterText: string;
   finalText: string;
   statusAction?: BrdStatusAction;
+  phaseAction?: BrdPhaseAction;
+  beforePhase?: string;
+  afterPhase?: string;
 }

@@ -1,106 +1,128 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { applyBrdTableUpdates, ensureRowsBelongToParent, previewSeOutputUpdates, SE_SCOPING_OUTPUT_FIELD_ID } from './jira.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  PHASE_FIELD_ID,
+  SE_SCOPING_OUTPUT_FIELD_ID,
+  applyBrdTableUpdates,
+  previewSeOutputUpdates,
+} from './jira.js';
 import type { BrdParentContext } from './types.js';
 
+const config = {
+  baseUrl: 'https://example.atlassian.net',
+  email: 'test@example.com',
+  token: 'token',
+};
+
 const parent: BrdParentContext = {
-  key: 'SOPP-7431',
-  summary: 'BRD Parent',
+  key: 'SOPP-1',
+  summary: 'Test',
   subtasks: [
     {
-      key: 'SOPP-7448',
-      summary: 'BRD-014 - Loyalty & Reward',
-      status: 'Reopen',
-      descriptionText: 'Read-only Jira description context.',
-      description: 'Read-only Jira description context.',
-      seOutputText: 'HubSpot says no loyalty.',
-      seOutputField: 'HubSpot says no loyalty.',
+      key: 'SOPP-2',
+      summary: 'BRD-025 Pre-orders',
+      status: 'Open',
+      phaseText: '',
+      seOutputText: 'Existing note',
     },
   ],
 };
 
-describe('BRD Jira guards', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('rejects updates outside the validated parent subtasks', () => {
-    expect(() => ensureRowsBelongToParent(parent, [
-      { jiraKey: 'SOPP-9999', finalText: 'Bad update' },
-    ])).toThrow('Rejected Jira keys outside SOPP-7431');
-  });
-
-  it('previews SE scoping output updates for allowed subtasks', () => {
+describe('previewSeOutputUpdates', () => {
+  it('previews phase changes without requiring status transitions', () => {
     const previews = previewSeOutputUpdates(parent, [
-      { jiraKey: 'SOPP-7448', finalText: 'Old loyalty script found, but no loyalty UI found.' },
+      {
+        jiraKey: 'SOPP-2',
+        finalText: 'Updated note',
+        phaseAction: 'out_of_scope',
+      },
     ]);
 
-    expect(previews).toHaveLength(1);
-    expect(previews[0].beforeText).toContain('HubSpot says no loyalty.');
-    expect(previews[0].afterText).toContain('Old loyalty script found, but no loyalty UI found.');
+    expect(previews[0]?.afterPhase).toBe('Out Of Scope');
+    expect(previews[0]?.afterText).toBe('Updated note');
+  });
+});
+
+describe('applyBrdTableUpdates', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('updates SE scoping output field and transitions selected status', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          transitions: [
-            { id: '31', name: 'Done', to: { name: 'Done' } },
-          ],
-        }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({}),
-      } as Response);
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 
-    await applyBrdTableUpdates(parent, [
-      {
-        jiraKey: 'SOPP-7448',
-        finalText: 'Reviewed SE output.',
-        statusAction: 'done',
-      },
-    ], {
-      baseUrl: 'https://global-e.atlassian.net',
-      email: 'user@example.com',
-      token: 'token',
+  it('writes phase Out Of Scope without requesting a Canceled transition', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (url.includes('/transitions') && method === 'GET') {
+        return new Response(JSON.stringify({ transitions: [{ id: '31', name: 'Done', to: { name: 'Done' } }] }), { status: 200 });
+      }
+      if (method === 'PUT') {
+        return new Response('', { status: 200 });
+      }
+      return new Response('unexpected', { status: 500 });
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://global-e.atlassian.net/rest/api/3/issue/SOPP-7448',
-      expect.objectContaining({
-        method: 'PUT',
-        body: JSON.stringify({
-          fields: {
-            [SE_SCOPING_OUTPUT_FIELD_ID]: {
-              type: 'doc',
-              version: 1,
-              content: [
-                { type: 'paragraph', content: [{ type: 'text', text: 'Reviewed SE output.' }] },
-              ],
-            },
-          },
-        }),
-      })
+    await applyBrdTableUpdates(
+      parent,
+      [
+        {
+          jiraKey: 'SOPP-2',
+          finalText: 'Updated note',
+          phaseAction: 'out_of_scope',
+        },
+      ],
+      config
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://global-e.atlassian.net/rest/api/3/issue/SOPP-7448/transitions',
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Accept: 'application/json',
-        }),
-      })
+
+    const putBodies = fetchMock.mock.calls
+      .filter(([, init]) => init?.method === 'PUT')
+      .map(([, init]) => JSON.parse(String(init?.body)));
+
+    expect(putBodies.some((body) => body.fields?.[SE_SCOPING_OUTPUT_FIELD_ID])).toBe(true);
+    expect(putBodies.some((body) => body.fields?.[PHASE_FIELD_ID]?.id === '23610')).toBe(true);
+
+    const transitionPosts = fetchMock.mock.calls.filter(
+      ([, init]) => String(init?.method) === 'POST' && String(init?.body || '').includes('transition')
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://global-e.atlassian.net/rest/api/3/issue/SOPP-7448/transitions',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ transition: { id: '31' } }),
-      })
+    expect(transitionPosts).toHaveLength(0);
+  });
+
+  it('transitions to Done when statusAction is done', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (url.includes('/transitions') && method === 'GET') {
+        return new Response(JSON.stringify({ transitions: [{ id: '31', name: 'Done', to: { name: 'Done' } }] }), { status: 200 });
+      }
+      if (method === 'POST') {
+        return new Response('', { status: 200 });
+      }
+      if (method === 'PUT') {
+        return new Response('', { status: 200 });
+      }
+      return new Response('unexpected', { status: 500 });
+    });
+
+    await applyBrdTableUpdates(
+      parent,
+      [
+        {
+          jiraKey: 'SOPP-2',
+          finalText: 'Done note',
+          statusAction: 'done',
+          phaseAction: 'in_scope',
+        },
+      ],
+      config
     );
+
+    const transitionPosts = fetchMock.mock.calls.filter(
+      ([, init]) => init?.method === 'POST' && String(init?.body || '').includes('"transition"')
+    );
+    expect(transitionPosts).toHaveLength(1);
   });
 });

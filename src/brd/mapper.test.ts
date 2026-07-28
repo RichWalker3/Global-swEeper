@@ -1,63 +1,58 @@
 import { describe, expect, it } from 'vitest';
-import { generateBrdDraft } from './generator.js';
+import { buildBrdRows } from './mapper.js';
 import type { BrdParentContext } from './types.js';
 
 const parent: BrdParentContext = {
-  key: 'SOPP-7431',
-  summary: 'BRD Lead Test',
-  status: 'In Progress',
+  key: 'SOPP-1',
+  summary: 'Test merchant',
   subtasks: [
-    { key: 'SOPP-7447', summary: 'BRD-013 - Subscriptions' },
-    { key: 'SOPP-7450', summary: 'BRD-016 - Dangerous Goods' },
+    { key: 'SOPP-2', summary: 'BRD-025 Pre-orders' },
+    { key: 'SOPP-3', summary: 'BRD-030 Returns platform' },
   ],
 };
 
-describe('BRD draft generation', () => {
-  it('maps WA text signals to BRD rows and parent-scoped Jira subtasks', () => {
-    const result = generateBrdDraft({
-      merchantName: 'Example Brand',
+describe('buildBrdRows BRD parsing', () => {
+  it('maps Done lines to status done', () => {
+    const markdown = `
+## BRD Output for Sweep
+- BRD-030 | Returns platform | Status: Done | SE Output: Loop Returns portal linked from returns page.
+`;
+
+    const rows = buildBrdRows({
       parent,
-      websiteAssessmentMarkdown: [
-        '# Website Assessment',
-        'Subscriptions are detected via Recharge on the PDP.',
-        'Dangerous goods signal: fragrance products found in catalog.',
-      ].join('\n'),
+      websiteAssessmentMarkdown: markdown,
     });
 
-    const subscriptions = result.rows.find((row) => row.requirementId === 'BRD-013');
-    const dangerousGoods = result.rows.find((row) => row.requirementId === 'BRD-016');
-
-    expect(subscriptions?.jiraKey).toBe('SOPP-7447');
-    expect(subscriptions?.scopeValue).toBe('Unconfirmed');
-    expect(dangerousGoods?.jiraKey).toBe('SOPP-7450');
-    expect(result.outputs.matrixMarkdown).toContain('BRD-013');
-    expect(result.outputs.jiraUpdatePlan).toContain('SOPP-7431 - BRD Lead Test');
+    const row = rows.find((item) => item.requirementId === 'BRD-030');
+    expect(row?.recommendedStatusAction).toBe('done');
+    expect(row?.llmSeOutputText).toContain('Loop Returns');
   });
 
-  it('does not mark missing evidence as out of scope', () => {
-    const result = generateBrdDraft({
-      merchantName: 'Example Brand',
+  it('maps legacy Canceled lines to out_of_scope phase without status transition', () => {
+    const markdown = `
+## BRD Output for Sweep
+- BRD-025 | Pre-orders | Status: Canceled | SE Output: No WA evidence found.
+`;
+
+    const rows = buildBrdRows({
+      parent,
+      websiteAssessmentMarkdown: markdown,
+    });
+
+    const row = rows.find((item) => item.requirementId === 'BRD-025');
+    expect(row?.recommendedStatusAction).toBeUndefined();
+    expect(row?.recommendedPhaseAction).toBe('out_of_scope');
+    expect(row?.llmSeOutputText).toBeUndefined();
+  });
+
+  it('defaults no-signal BRDs to out_of_scope phase', () => {
+    const rows = buildBrdRows({
+      parent,
       websiteAssessmentMarkdown: '',
     });
 
-    const b2b = result.rows.find((row) => row.requirementId === 'BRD-012');
-    expect(b2b?.scopeValue).toBe('No signal found');
-    expect(b2b?.openQuestions[0]).toContain('BRD-012');
-  });
-
-  it('only attaches Jira keys returned under the validated parent', () => {
-    const result = generateBrdDraft({
-      merchantName: 'Example Brand',
-      parent,
-      websiteAssessmentMarkdown: 'Marketplace and B2B signals were found.',
-    });
-
-    const marketplace = result.rows.find((row) => row.requirementId === 'BRD-011');
-    const b2b = result.rows.find((row) => row.requirementId === 'BRD-012');
-
-    expect(marketplace?.scopeValue).toBe('Unconfirmed');
-    expect(marketplace?.jiraKey).toBeUndefined();
-    expect(b2b?.scopeValue).toBe('Unconfirmed');
-    expect(b2b?.jiraKey).toBeUndefined();
+    const row = rows.find((item) => item.requirementId === 'BRD-025');
+    expect(row?.scopeValue).toBe('No signal found');
+    expect(row?.recommendedPhaseAction).toBe('out_of_scope');
   });
 });

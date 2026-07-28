@@ -77,7 +77,7 @@ const THIRD_PARTY_PATTERNS: ThirdPartyPattern[] = [
   { name: 'Ordergroove', patterns: [/ordergroove\.com/i], category: 'subscriptions', priority: 'high' },
 
   // ============ RETURNS ============
-  { name: 'Loop Returns', patterns: [/loopreturns\.com/i], category: 'returns', priority: 'medium' },
+  { name: 'Loop Returns', patterns: [/loopreturns\.com/i, /loop-returns-\d+/i, /\/loop-returns\//i], category: 'returns', priority: 'medium' },
   { name: 'Narvar', patterns: [/narvar\.com/i], category: 'returns', priority: 'medium' },
   { name: 'Happy Returns', patterns: [/happyreturns\.com/i], category: 'returns', priority: 'medium' },
 

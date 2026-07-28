@@ -94,7 +94,19 @@ update sweep
 
 If that command is not available in the local copy yet, paste the contents of `UPDATE_SWEEP_PROMPT.txt` into Cursor chat. The update workflow stops the running server, pulls the latest pilot branch, installs dependencies, installs Playwright browsers, and restarts Sweep.
 
+## Development
+
+Before you push, run the local regression suite:
+
+```bash
+npm run ci        # typecheck + lint + unit tests
+npm run ci:full   # above + Playwright smoke
+```
+
+See [`docs/TESTING.md`](docs/TESTING.md) for golden BRD / fixture coverage and optional git hooks.
+
 ## Common Commands
+
 
 ```bash
 npm run web

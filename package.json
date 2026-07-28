@@ -1,6 +1,6 @@
 {
   "name": "global-sweep",
-  "version": "0.2.5",
+  "version": "0.3.1",
   "description": "Automated Website Assessment tool for Global-e merchant onboarding",
   "type": "module",
   "scripts": {
@@ -14,7 +14,13 @@
     "pilot:package": "tsx scripts/package-pilot-bundle.ts",
     "lint": "eslint src --ext .ts",
     "test": "vitest",
-    "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright install chromium --no-shell",
+    "test:unit": "vitest run --exclude 'src/smoke/**'",
+    "test:smoke": "vitest run src/smoke",
+    "test:coverage": "vitest run --exclude 'src/smoke/**' --coverage",
+    "ci": "npm run typecheck && npm run lint && npm run test:unit",
+    "ci:full": "npm run ci && npm run test:smoke",
+    "hooks:install": "bash scripts/install-git-hooks.sh",
+    "playwright:install": "tsx scripts/install-playwright.ts",
     "postinstall": "npm run playwright:install"
   },
   "keywords": [
@@ -41,6 +47,7 @@
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.1.0",
     "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",

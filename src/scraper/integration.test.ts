@@ -269,9 +269,15 @@ describe('Integration: Returns Policy Page', () => {
     expect(policy.finalSaleItems!.length).toBeGreaterThan(0);
   });
 
-  it('detects return provider', () => {
-    const policy = extractPolicyInfo(fixtures.returnsPolicyText);
+  it('detects return provider from visible text and portal href', () => {
+    const policy = extractPolicyInfo(fixtures.returnsPolicyText, undefined, fixtures.returnsPolicyHtml);
     expect(policy.returnProvider).toBe(fixtures.expected.returnsPolicy.policy.returnProvider);
+  });
+
+  it('detects Loop Returns from href when visible text omits the vendor name', () => {
+    const html = '<a href="https://merchant.loopreturns.com/#/">Returns & Exchanges Portal</a>';
+    const policy = extractPolicyInfo('Returns & Exchanges Portal', undefined, html);
+    expect(policy.returnProvider).toBe('Loop Returns');
   });
 
   it('tags page with returns category', () => {

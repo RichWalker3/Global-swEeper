@@ -6,6 +6,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { chromium, BrowserContext, Page, Frame } from 'playwright';
+import { formatPlaywrightInstallHelp } from '../playwright/paths.js';
 import { getRandomUserAgent, getRandomViewport } from './helpers.js';
 import { buildChromiumLaunchArgs, readChromiumRuntimeConfig } from './chromiumRuntime.js';
 
@@ -92,7 +93,16 @@ export async function launchStealthBrowser(options: LaunchOptions | boolean = fa
     },
   });
 
-  const browser = await chromium.launch(launchOptions);
+  let browser: Awaited<ReturnType<typeof chromium.launch>>;
+  try {
+    browser = await chromium.launch(launchOptions);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/executable doesn't exist|ENOENT|browserType\.launch/i.test(message)) {
+      throw new Error(`${message}\n\n${formatPlaywrightInstallHelp()}`);
+    }
+    throw error;
+  }
   const { context } = await createStealthContext(browser, { verbose, config });
 
   return {

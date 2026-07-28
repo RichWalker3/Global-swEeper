@@ -6,6 +6,7 @@ import type {
   BrdEvidence,
   BrdMatrixRow,
   BrdParentContext,
+  BrdPhaseAction,
   BrdScopeValue,
   BrdStatusAction,
   RequirementSignal,
@@ -75,13 +76,15 @@ export function buildBrdRows(input: BrdDraftInput): BrdMatrixRow[] {
       proposedJiraText: buildProposedJiraText(requirement.id, signal),
       llmSeOutputText: llmOutput?.seOutputText,
       recommendedStatusAction: llmOutput?.statusAction,
+      recommendedPhaseAction: llmOutput?.phaseAction ?? inferPhaseFromScope(signal.scopeValue, llmOutput?.statusAction),
     };
   });
 }
 
 interface LlmBrdOutput {
-  statusAction: BrdStatusAction;
-  seOutputText: string;
+  statusAction?: BrdStatusAction;
+  phaseAction?: BrdPhaseAction;
+  seOutputText?: string;
 }
 
 function parseLlmBrdOutputs(markdown: string): Map<string, LlmBrdOutput> {
@@ -95,26 +98,43 @@ function parseLlmBrdOutputs(markdown: string): Map<string, LlmBrdOutput> {
 
   while ((match = linePattern.exec(source)) !== null) {
     const id = match[1].toUpperCase();
-    const statusAction = normalizeStatusAction(match[3]);
+    const rawStatus = match[3].trim().toLowerCase();
     const seOutputText = match[4].trim();
-    if (statusAction && seOutputText) {
-      outputs.set(id, { statusAction, seOutputText });
+
+    if (rawStatus === 'done') {
+      outputs.set(id, { statusAction: 'done', phaseAction: 'in_scope', seOutputText });
+      continue;
     }
+
+    // Legacy Canceled lines: do not transition Jira status; set Phase Out Of Scope instead.
+    outputs.set(id, {
+      phaseAction: 'out_of_scope',
+      seOutputText: isNoEvidenceSeOutput(seOutputText) ? undefined : seOutputText,
+    });
   }
 
   return outputs;
 }
 
+function isNoEvidenceSeOutput(text: string): boolean {
+  return /^no wa evidence found\.?$/i.test(text.trim());
+}
+
+function inferPhaseFromScope(
+  scopeValue: BrdScopeValue,
+  statusAction?: BrdStatusAction
+): BrdPhaseAction | undefined {
+  // Explicit Done from WA BRD Output wins over keyword-based "No signal found".
+  if (statusAction === 'done') return 'in_scope';
+  if (scopeValue === 'Future') return 'future';
+  if (scopeValue === 'Out Of Scope' || scopeValue === 'No signal found') return 'out_of_scope';
+  if (scopeValue === 'In Scope') return 'in_scope';
+  return undefined;
+}
+
 function extractBrdOutputSection(markdown: string): string | undefined {
   const sectionMatch = markdown.match(/(?:^|\n)##\s+BRD Output for Sweep\s*\n([\s\S]*?)(?=\n##\s+|\s*$)/i);
   return sectionMatch?.[1];
-}
-
-function normalizeStatusAction(value: string): BrdStatusAction | undefined {
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'done') return 'done';
-  if (normalized === 'canceled' || normalized === 'cancelled') return 'canceled';
-  return undefined;
 }
 
 function parseAssessment(raw: unknown): WebsiteAssessment | undefined {

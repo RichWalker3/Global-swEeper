@@ -2,6 +2,31 @@
 
 Global-sweep uses `major.minor.patch` style versioning during the internal pilot.
 
+## v0.3.1 - 2026-07-28
+
+BRD Workspace quality release for hosted PROD: Phase field, Out Of Scope instead of Canceled, detector fixes, and golden regression tests — merged onto the v0.2.5 production hardening baseline.
+
+### Added
+
+- **BRD Workspace — Phase dropdown (Jira `customfield_21069`)** — Leave unchanged / in Scope / Out Of Scope / Future; writes on Send to Jira.
+- **Canceled → Out Of Scope workflow** — no-signal BRDs keep status unchanged and set Phase Out Of Scope.
+- **Local regression suite** — `npm run ci` / `npm run ci:full` (unit + Playwright smoke). See `docs/TESTING.md`.
+- **Golden BRD Output regression** — OAK+FORT reviewed WA BRD lines in `src/brd/goldenRegression.test.ts`.
+- **Crawl fixture regression** — `src/scraper/__fixtures__/shopify-store/` + `integration.test.ts`.
+- **Playwright install helper** — `scripts/install-playwright.ts` + project-local browser path resolution.
+
+### Changed
+
+- Pre-order detector no longer treats “Notify me when available” as pre-order.
+- Returns provider detection scans portal hrefs (Loop / ReturnGO / etc.).
+- WA prompt uses a trimmed crawl summary and evidence-only BRD Output lines.
+- `.gitignore` excludes worktrees, decks, and presales scratch files.
+
+### Preserved from v0.2.5
+
+- Hosted browser manager, assessment queue, crash-storm salvage, Docker/Product Forge runtime.
+
+
 ## v0.2.5 - 2026-06-15
 
 Production hardening for hosted Playwright scraping: browser lifecycle control, assessment queuing, crash recovery, container resource tuning, and smarter degraded capture when Chromium keeps crashing.

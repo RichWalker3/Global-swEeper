@@ -1,5 +1,12 @@
 import { buildBrdRows } from './mapper.js';
-import type { BrdDraftInput, BrdMatrixRow, BrdParentContext, BrdReviewResult } from './types.js';
+import type {
+  BrdDraftInput,
+  BrdMatrixRow,
+  BrdParentContext,
+  BrdPhaseAction,
+  BrdReviewResult,
+  BrdStatusAction,
+} from './types.js';
 
 export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentContext }): BrdReviewResult {
   const manualMode = isManualBrdMode(input);
@@ -12,9 +19,13 @@ export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentConte
       const existingText = subtask?.seOutputText || '';
       const jiraDescriptionText = subtask?.descriptionText || '';
       const currentStatus = subtask?.status || '';
+      const currentPhase = subtask?.phaseText || '';
       const conflictNote = manualMode ? undefined : buildConflictNote(existingText, row);
       const finalText = manualMode ? existingText : buildFinalText(existingText, row, conflictNote);
       const statusAction = manualMode ? undefined : row.recommendedStatusAction;
+      const phaseAction = manualMode
+        ? undefined
+        : row.recommendedPhaseAction ?? recommendedPhaseAction(row, statusAction) ?? phaseActionFromJiraPhase(currentPhase);
 
       return {
         ...row,
@@ -22,7 +33,9 @@ export function composeBrdReview(input: BrdDraftInput & { parent: BrdParentConte
         existingText,
         jiraDescriptionText,
         currentStatus,
+        currentPhase,
         statusAction,
+        phaseAction,
         conflictNote,
         finalText,
       };
@@ -115,4 +128,27 @@ function summarizeExistingText(existingText: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 500);
+}
+
+function recommendedPhaseAction(
+  row: BrdMatrixRow,
+  statusAction?: BrdStatusAction
+): BrdPhaseAction | undefined {
+  if (row.scopeValue === 'Future') return 'future';
+  if (row.scopeValue === 'Out Of Scope' || row.scopeValue === 'No signal found') return 'out_of_scope';
+  if (statusAction === 'done' || row.scopeValue === 'In Scope') return 'in_scope';
+  return undefined;
+}
+
+function phaseActionFromJiraPhase(phaseText: string | undefined): BrdPhaseAction | undefined {
+  switch ((phaseText || '').trim()) {
+    case 'in Scope':
+      return 'in_scope';
+    case 'Out Of Scope':
+      return 'out_of_scope';
+    case 'Future':
+      return 'future';
+    default:
+      return undefined;
+  }
 }

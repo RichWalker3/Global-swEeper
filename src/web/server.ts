@@ -4,6 +4,14 @@
  */
 
 import 'dotenv/config';
+import { ensurePlaywrightBrowsersPath, validateChromiumInstall } from '../playwright/paths.js';
+
+ensurePlaywrightBrowsersPath();
+const chromiumStatus = validateChromiumInstall();
+if (!chromiumStatus.ok) {
+  console.warn(`[sweep] ${chromiumStatus.error}`);
+  console.warn('[sweep] Website assessments will fail until Chromium is installed. Run: npm run playwright:install');
+}
 import { createServer } from 'http';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname, extname, join } from 'path';

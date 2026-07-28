@@ -2,7 +2,7 @@
  * Prompt builder for Claude extraction
  */
 
-import type { ScrapeResult, PageData } from '../scraper/types.js';
+import type { ScrapeResult, PageData, CrawlSummary } from '../scraper/types.js';
 import { BRD_REQUIREMENTS } from '../brd/requirements.js';
 
 export type PromptResponseFormat = 'markdown' | 'json';
@@ -218,16 +218,19 @@ At the end of the Website Assessment, add a section named exactly:
 
 ## BRD Output for Sweep
 
-This section is machine-read by Sweep. Include exactly one bullet for each BRD from BRD-001 through BRD-030 using this one-line format:
+This section is machine-read by Sweep. Include a bullet **only for BRDs where the WA has evidence, a useful finding, or a scoping note**.
 
-- BRD-001 | Hub locations and entities | Status: Done | SE Output: [concise SE scoping note based only on WA evidence, or "No WA evidence found."]
+Use this one-line format for included BRDs:
+
+- BRD-001 | Hub locations and entities | Status: Done | SE Output: [concise SE scoping note based only on WA evidence]
 
 Use these rules:
-- Use **Status: Done** when the WA includes evidence, a useful finding, or a scoping note for that BRD.
-- Use **Status: Canceled** when the WA has no evidence for that BRD feature or the feature appears absent.
+- Use **Status: Done** only when the WA includes evidence, a useful finding, or a scoping note for that BRD.
+- **Omit BRDs with no evidence** — do not list absent features. Sweep will default those rows to Phase Out Of Scope without changing Jira status.
 - Keep each SE Output note concise but useful for a Jira field.
-- Do not invent merchant capabilities. If there is no evidence, say "No WA evidence found." and use Status: Canceled.
-- Keep the BRD output one line per BRD so Sweep can parse it.`;
+- Do not invent merchant capabilities.
+- Never write "No WA evidence found." or use Status: Canceled.
+- Keep each included BRD on one line so Sweep can parse it.`;
 
 const HIGH_SIGNAL_CATEGORIES = new Set([
   'shipping',
@@ -301,8 +304,10 @@ Respond with ONLY the Markdown Website Assessment. No preamble, no explanation a
 
 ## Crawl Summary
 \`\`\`json
-${JSON.stringify(summary, null, 2)}
+${JSON.stringify(summarizeCrawlForPrompt(summary), null, 2)}
 \`\`\`
+
+- **Focus guidance:** This summary is intentionally trimmed to scoping-relevant signals. Do not expand the WA with a full technology inventory or list every detected app unless it affects a BRD, red flag, merchant question, or implementation risk.
 
 ## Evidence by Category
 
@@ -334,9 +339,9 @@ Generate a complete Website Assessment following the EXACT template structure fr
 11. **Open Questions** - What needs merchant clarification
 12. **Next Steps** - Recommended actions
 13. **Legend** - Status indicator definitions
-14. **BRD Output for Sweep** - exactly one machine-readable line for each BRD below
+14. **BRD Output for Sweep** — one machine-readable line per BRD **with WA evidence only** (omit BRDs with no signal)
 
-Use this BRD list and exact one-line format:
+Use this BRD list. Include a line only when you have evidence for that BRD:
 ${formatBrdPromptList()}
 
 **CRITICAL FORMAT RULES:**
@@ -348,7 +353,8 @@ ${formatBrdPromptList()}
 - Mark deductions with **[Inference]**
 - Make the scope note explicit about whether checkout was reached, skipped for speed, login-gated, or blocked
 - Prefer at least one concrete PDP example and one concrete shipping/returns proof URL when the evidence bundle supports them
-- For BRD Output for Sweep, use **Status: Done** if there is relevant information and **Status: Canceled** if there is no evidence or the feature is absent`;
+- Keep findings focused on BRD/scoping relevance. Do not list every detected site feature unless it affects a BRD, red flag, merchant question, or implementation risk
+- For BRD Output for Sweep, include **only** BRDs with evidence using **Status: Done**. Omit BRDs with no WA signal entirely.`;
 
   return {
     system: SYSTEM_PROMPT,
@@ -358,8 +364,37 @@ ${formatBrdPromptList()}
 
 function formatBrdPromptList(): string {
   return BRD_REQUIREMENTS
-    .map((requirement) => `- ${requirement.id} | ${requirement.requirement} | Status: Done or Canceled | SE Output: [one-line note]`)
+    .map((requirement) => `- ${requirement.id} | ${requirement.requirement} | Status: Done (include only if evidence) | SE Output: [one-line note]`)
     .join('\n');
+}
+
+export function summarizeCrawlForPrompt(summary: CrawlSummary): Record<string, unknown> {
+  return {
+    seedUrl: summary.seedUrl,
+    domain: summary.domain,
+    pagesVisited: summary.pagesVisited,
+    productPagesScraped: summary.productPagesScraped,
+    platformDetected: summary.platformDetected,
+    headlessDetected: summary.headlessDetected,
+    globalEDetected: summary.globalEDetected,
+    checkoutReached: summary.checkoutReached,
+    checkoutSkipped: summary.checkoutSkipped,
+    checkoutStoppedAt: summary.checkoutStoppedAt,
+    redFlags: summary.redFlags,
+    thirdPartiesDetected: (summary.thirdPartiesDetected || []).slice(0, 20),
+    returnProvider: summary.policyInfo?.returnProvider,
+    returnPortal: summary.policyInfo?.returnPortal,
+    catalogFeatures: summary.catalogFeatures,
+    loyaltyProgram: summary.loyaltyProgram,
+    marketplacePresence: summary.marketplacePresence,
+    policyInfo: summary.policyInfo,
+    checkoutInfo: summary.checkoutInfo,
+    dangerousGoods: (summary.dangerousGoods || []).slice(0, 5),
+    b2bIndicators: summary.b2bIndicators,
+    dropshipIndicators: summary.dropshipIndicators,
+    errors: (summary.errors || []).slice(0, 5),
+    scrapingCompletionWarning: summary.scrapingCompletionWarning,
+  };
 }
 
 interface TieredPages {

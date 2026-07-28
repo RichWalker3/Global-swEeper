@@ -1,72 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import { buildPrompt } from './prompt.js';
-import type { ScrapeResult } from '../scraper/types.js';
+import { buildPrompt, summarizeCrawlForPrompt } from './prompt.js';
+import { buildMinimalScrapeResult } from '../test/fixtures/scrapeResult.js';
 
-function makeScrapeResult(): ScrapeResult {
-  return {
-    summary: {
-      seedUrl: 'https://example.com',
-      domain: 'example.com',
-      startedAt: '2026-04-08T00:00:00.000Z',
-      completedAt: '2026-04-08T00:05:00.000Z',
-      pagesVisited: 2,
-      pagesBlocked: 0,
-      checkoutReached: false,
-      checkoutSkipped: true,
-      errors: [],
-      thirdPartiesDetected: ['Shop Pay'],
-      technologies: [],
-      redFlags: [],
-      dangerousGoods: [],
-      b2bIndicators: [],
-      dropshipIndicators: [],
-      productPagesScraped: 1,
-    },
-    pages: [
-      {
-        url: 'https://example.com/pages/payments',
-        title: 'Payments',
-        cleanedText: 'Pay with Shop Pay, PayPal, Klarna, and major cards.',
-        excerpt: 'Pay with Shop Pay, PayPal, Klarna, and major cards.',
-        evidenceText: 'Pay with Shop Pay, PayPal, Klarna, and major cards.',
-        matchedCategories: ['payments'],
-        keyPhrases: ['Shop Pay', 'PayPal', 'Klarna'],
-        networkRequests: [],
-        timestamp: '2026-04-08T00:01:00.000Z',
-      },
-      {
-        url: 'https://example.com/blog/story',
-        title: 'Story',
-        cleanedText: 'Brand story only.',
-        excerpt: 'Brand story only.',
-        evidenceText: 'Brand story only.',
-        matchedCategories: [],
-        keyPhrases: ['brand story'],
-        networkRequests: [],
-        timestamp: '2026-04-08T00:02:00.000Z',
-      },
-    ],
-  };
-}
+describe('summarizeCrawlForPrompt', () => {
+  it('trims Wappalyzer technologies from the prompt payload', () => {
+    const summary = buildMinimalScrapeResult().summary;
+    const trimmed = summarizeCrawlForPrompt(summary);
+
+    expect(trimmed.technologies).toBeUndefined();
+    expect(trimmed.returnProvider).toBe('Loop Returns');
+    expect(trimmed.thirdPartiesDetected).toEqual(['Loop Returns', 'Klaviyo']);
+  });
+});
 
 describe('buildPrompt', () => {
-  it('promotes payments pages into the high-signal tier', () => {
-    const prompt = buildPrompt(makeScrapeResult());
-    expect(prompt.user).toContain('### High-Signal Pages (Full Content)');
-    expect(prompt.user).toContain('https://example.com/pages/payments');
+  it('does not instruct agents to use Status: Canceled', () => {
+    const scrapeResult = buildMinimalScrapeResult();
+    const { system, user } = buildPrompt(scrapeResult);
+
+    expect(system).not.toMatch(/Use \*\*Status: Canceled\*\*/);
+    expect(user).not.toMatch(/Use \*\*Status: Canceled\*\*/);
+    expect(system).toContain('Never write "No WA evidence found." or use Status: Canceled');
   });
 
-  it('can request JSON output for the extractor path', () => {
-    const prompt = buildPrompt(makeScrapeResult(), { responseFormat: 'json' });
-    expect(prompt.user).toContain('Return a single valid JSON object');
-    expect(prompt.user).toContain('- meta');
-    expect(prompt.user).not.toContain('Respond with ONLY the Markdown');
-  });
+  it('includes trimmed crawl summary instead of the full summary object', () => {
+    const scrapeResult = buildMinimalScrapeResult();
+    const { user } = buildPrompt(scrapeResult);
 
-  it('adds a machine-readable BRD output request to the WA prompt', () => {
-    const prompt = buildPrompt(makeScrapeResult());
-    expect(prompt.system).toContain('## BRD Output for Sweep');
-    expect(prompt.user).toContain('- BRD-001 | Hub locations and entities | Status: Done or Canceled | SE Output: [one-line note]');
-    expect(prompt.user).toContain('- BRD-030 | Returns Platform | Status: Done or Canceled | SE Output: [one-line note]');
+    expect(user).toContain('"returnProvider": "Loop Returns"');
+    expect(user).not.toContain('"technologies"');
+    expect(user).toContain('Focus guidance');
   });
 });

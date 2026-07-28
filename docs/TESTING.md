@@ -58,6 +58,8 @@ Writes an HTML report under `coverage/`. Informational only — no fail threshol
 | Returns portals | `policyExtractor.test.ts` | Loop href detection |
 | BRD WA parsing | `mapper.test.ts` | Done vs legacy Canceled vs no-signal |
 | BRD review grid | `composer.test.ts` | Phase Out Of Scope defaults |
+| Golden BRD Output | `goldenRegression.test.ts` | OAK+FORT reviewed WA BRD lines → Done / Out Of Scope |
+| Crawl fixtures | `integration.test.ts` + `__fixtures__/shopify-store/` | Detectors vs expected.json (Loop, Smile, DG, etc.) |
 | WA prompt | `prompt.test.ts` | Trimmed summary, no Canceled instructions |
 | Jira writer | `jira.test.ts` | Phase writes, no Canceled transitions |
 | Playwright | `src/smoke/playwright.smoke.test.ts` | Chromium launch + fixture scrape |

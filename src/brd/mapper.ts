@@ -102,7 +102,7 @@ function parseLlmBrdOutputs(markdown: string): Map<string, LlmBrdOutput> {
     const seOutputText = match[4].trim();
 
     if (rawStatus === 'done') {
-      outputs.set(id, { statusAction: 'done', seOutputText });
+      outputs.set(id, { statusAction: 'done', phaseAction: 'in_scope', seOutputText });
       continue;
     }
 
@@ -124,9 +124,11 @@ function inferPhaseFromScope(
   scopeValue: BrdScopeValue,
   statusAction?: BrdStatusAction
 ): BrdPhaseAction | undefined {
+  // Explicit Done from WA BRD Output wins over keyword-based "No signal found".
+  if (statusAction === 'done') return 'in_scope';
   if (scopeValue === 'Future') return 'future';
   if (scopeValue === 'Out Of Scope' || scopeValue === 'No signal found') return 'out_of_scope';
-  if (statusAction === 'done' || scopeValue === 'In Scope') return 'in_scope';
+  if (scopeValue === 'In Scope') return 'in_scope';
   return undefined;
 }
 

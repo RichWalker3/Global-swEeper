@@ -55,8 +55,9 @@ import {
   startRun,
   type LogQuery,
 } from './logStore.js';
-import type { ScrapeResult } from '../scraper/types.js';
+import type { ScrapeResult, KnownPlatform } from '../scraper/types.js';
 import type { BrdReviewResult } from '../brd/types.js';
+import { normalizePlatform } from '../scraper/platforms/index.js';
 
 function hostedMaxPages(env: NodeJS.ProcessEnv = process.env): number {
   const raw = env.SWEEP_HOSTED_MAX_PAGES;
@@ -150,6 +151,9 @@ const clients = new Map<string, (data: string) => void>();
 interface SweepRequestOptions {
   screenshots?: boolean;
   skipCheckout?: boolean;
+  platform?: KnownPlatform;
+  browserMode?: 'headless' | 'visible';
+  persistentProfile?: boolean;
 }
 
 function parseLogQuery(url: URL): LogQuery {
@@ -283,7 +287,12 @@ async function handleRequest(
       res.end(JSON.stringify({ status: 'started', clientId }));
 
       // Run the sweep in background
-      runSweep(targetUrl, clientId, options);
+      runSweep(targetUrl, clientId, {
+        ...options,
+        platform: normalizePlatform(options.platform),
+        browserMode: options.browserMode === 'visible' ? 'visible' : 'headless',
+        persistentProfile: options.persistentProfile === true,
+      });
 
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -764,7 +773,9 @@ async function runSweep(targetUrl: string, clientId: string, options: SweepReque
 
     const scrapeResult = await scrapeWithProgress(targetUrl, clientId, options, runId, log);
 
-    const { system, user } = buildPrompt(scrapeResult);
+    const { system, user } = buildPrompt(scrapeResult, {
+      selectedPlatform: options.platform,
+    });
     const partialNote = scrapeResult.summary.scrapingCompletionWarning;
     const status = partialNote ? 'partial' : 'completed';
 
@@ -820,6 +831,9 @@ async function scrapeWithProgress(
     maxPages: hostedMaxPages(),
     scrapeTimeout: options.skipCheckout === true ? 300000 : 420000,
     skipCheckout: options.skipCheckout === true,
+    platform: options.platform,
+    browserMode: options.browserMode,
+    persistentProfile: options.persistentProfile,
     onLog: (entry) => log(entry),
     onProgress: (progress) => {
       // Map scraper phases to UI progress

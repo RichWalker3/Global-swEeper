@@ -3,6 +3,9 @@
  * Focused on WA-critical apps only: red flags, loyalty, subscriptions, returns, payments
  */
 
+import type { KnownPlatform } from './types.js';
+import { getPlatformProfile } from './platforms/index.js';
+
 interface ThirdPartyPattern {
   name: string;
   patterns: RegExp[];
@@ -405,35 +408,31 @@ export function detectDropshipFulfillment(text: string, url: string): { detected
 /**
  * Extract product URLs from page content (for PDP discovery)
  */
-export function extractProductLinks(html: string, baseUrl: string): string[] {
+export function extractProductLinks(html: string, baseUrl: string, platform?: KnownPlatform): string[] {
   const productLinks: string[] = [];
   const domain = new URL(baseUrl).origin;
-  
-  // Common Shopify product URL patterns
-  const patterns = [
-    /href=["']([^"']*\/products\/[^"'#?]+)/gi,
-    /href=["']([^"']*\/p\/[^"'#?]+)/gi,
-  ];
-  
-  for (const pattern of patterns) {
+  const profile = getPlatformProfile(platform);
+
+  for (const pattern of profile.productUrlPatterns) {
+    pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(html)) !== null) {
       let url = match[1];
-      
+
       // Make absolute if relative
       if (url.startsWith('/')) {
         url = domain + url;
       } else if (!url.startsWith('http')) {
         url = domain + '/' + url;
       }
-      
+
       // Skip duplicates and variant URLs
       if (!productLinks.includes(url) && !url.includes('?variant=')) {
         productLinks.push(url);
       }
     }
   }
-  
+
   // Return a wider sample so the scraper can choose stronger PDP evidence later.
   return productLinks.slice(0, 12);
 }

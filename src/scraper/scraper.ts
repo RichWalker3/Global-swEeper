@@ -12,9 +12,10 @@ import { logAssessment, type DebugInfo } from '../logger/index.js';
 import { gotoWithRetry, classifyError, randomDelay, USER_AGENTS, isBrowserCrashError, shouldRestartBrowserOnNavigationFailure, shouldRetryFullBrowserNavigation } from './helpers.js';
 import { createStealthContext, dismissCookieConsent, slowScroll, type BrowserConfig, type ContextOptions } from './browser.js';
 import { StealthBrowserManager, attachPageCrashLogging } from './browserManager.js';
-import { discoverCrawlTargets, getFallbackTargets, dedupeCrawlTargets, normalizeCrawlUrl, type CrawlTarget } from './crawler.js';
+import { discoverCrawlTargets, discoverIndexedCrawlTargets, getFallbackTargets, dedupeCrawlTargets, mergeCrawlTargets, normalizeCrawlUrl, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
+import { getPlatformProfile } from './platforms/index.js';
 import type { Browser, BrowserContext, Page, Request, ConsoleMessage } from 'playwright';
 
 // ============ State Management (declared early for scrape snapshot typing) ============
@@ -332,6 +333,10 @@ const DEFAULT_OPTIONS: Required<ScrapeOptions> = {
   takeScreenshots: true,
   verbose: false,
   skipCheckout: false,
+  platform: 'unknown',
+  browserMode: 'headless',
+  persistentProfile: false,
+  profileName: 'default',
   onProgress: () => {},
   onLog: () => {},
 };
@@ -351,6 +356,7 @@ let lastScrapeSnapshot: {
   startedAt: string;
   state: ScrapeState;
   debugInfo: Partial<DebugInfo>;
+  platform: Required<ScrapeOptions>['platform'];
 } | null = null;
 
 function describeIncompletePhase(phase: string): string {
@@ -421,7 +427,10 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
     };
   }
 
-  const result = buildResult(snap.seedUrl, snap.startedAt, snap.state, snap.debugInfo, { skipLog: false });
+  const result = buildResult(snap.seedUrl, snap.startedAt, snap.state, snap.debugInfo, {
+    skipLog: false,
+    platform: snap.platform,
+  });
   const warning =
     `Timed out after ${opts.scrapeTimeout / 1000}s during "${scrapeProgress.phase}" phase. ` +
     `Collected ${result.pages.length} page(s) and ${result.summary.productPagesScraped} product page(s). ` +
@@ -618,7 +627,7 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
   // Initialize accumulators
   const state = createInitialState(seedUrl, session.config);
   const debugInfo = createDebugInfo(session.config);
-  lastScrapeSnapshot = { seedUrl, startedAt, state, debugInfo };
+  lastScrapeSnapshot = { seedUrl, startedAt, state, debugInfo, platform: opts.platform };
 
   try {
     // Phase 0: Discover pages
@@ -643,6 +652,7 @@ async function scrapeInternal(seedUrl: string, opts: Required<ScrapeOptions>): P
     // Build result before browser teardown so the UI always receives data even if Chromium hangs on close.
     return buildResult(seedUrl, startedAt, state, debugInfo, {
       skipLog: scrapeRaceResolvedWithTimeout,
+      platform: opts.platform,
     });
   } finally {
     scrapeProgress.phase = 'analyzing';
@@ -721,10 +731,10 @@ async function createRecoveryContext(
   }
 }
 
-function markFallbackDiscovery(seedUrl: string, state: ScrapeState): CrawlTarget[] {
+function markFallbackDiscovery(seedUrl: string, state: ScrapeState, opts: Required<ScrapeOptions>): CrawlTarget[] {
   state.discoveryUsedFallbackUrls = true;
   state.degradedReasons.add('discovery_fallback');
-  return getFallbackTargets(seedUrl);
+  return getFallbackTargets(seedUrl, opts.platform);
 }
 
 // ============ Discovery Phase ============
@@ -763,7 +773,7 @@ async function tryLightweightDiscovery(
     const statusCode = navResult.response?.status();
     if (statusCode && statusCode >= 400) return null;
 
-    const discoveryPromise = discoverCrawlTargets(page, seedUrl, opts.verbose);
+    const discoveryPromise = discoverCrawlTargets(page, seedUrl, opts.verbose, opts.platform);
     const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
       setTimeout(() => reject(new Error('Lightweight discovery timeout')), 10000)
     );
@@ -813,6 +823,15 @@ async function discoverPages(
   });
 
   await ensureLiveBrowserSession(session, state, opts, 'pre-discovery');
+
+  const indexedTargets = await discoverIndexedCrawlTargets(seedUrl, opts.verbose, opts.platform);
+  if (indexedTargets.length > 0) {
+    opts.onProgress({
+      phase: 'init',
+      message: `Found ${indexedTargets.length} sitemap/search-index URL(s).`,
+    });
+  }
+
   const discoveryPage = await session.context.newPage();
   attachPageCrashLogging(discoveryPage, (entry) => emitLog(opts, entry), seedUrl, () => noteRendererCrash(state, opts));
   let navResult = await gotoWithRetry(discoveryPage, seedUrl, {
@@ -840,17 +859,18 @@ async function discoverPages(
     if (!navResult.error && !navResult.blocked && (!navResult.response || navResult.response.status() < 400)) {
       await dismissCookieConsent(retryPage, opts.verbose);
       try {
-        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose);
+        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose, opts.platform);
         const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
           setTimeout(() => reject(new Error('Discovery timeout')), 10000)
         );
         const targets = await Promise.race([discoveryPromise, timeoutPromise]);
         await retryPage.close().catch(() => {});
         await activeContext.close().catch(() => {});
-        if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl`);
-        return targets;
+        const mergedTargets = mergeCrawlTargets(targets, indexedTargets);
+        if (opts.verbose) console.log(`  Found ${mergedTargets.length} pages to crawl`);
+        return mergedTargets;
       } catch (discoveryError) {
-        if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError}), using fallback targets`);
+        if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError})`);
       }
     }
     await retryPage.close().catch(() => {});
@@ -871,14 +891,15 @@ async function discoverPages(
     if (!navResult.error && !navResult.blocked && (!navResult.response || navResult.response.status() < 400)) {
       await dismissCookieConsent(retryPage, opts.verbose);
       try {
-        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose);
+        const discoveryPromise = discoverCrawlTargets(retryPage, seedUrl, opts.verbose, opts.platform);
         const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
           setTimeout(() => reject(new Error('Discovery timeout')), 10000)
         );
         const targets = await Promise.race([discoveryPromise, timeoutPromise]);
         await retryPage.close().catch(() => {});
-        if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl after browser restart`);
-        return targets;
+        const mergedTargets = mergeCrawlTargets(targets, indexedTargets);
+        if (opts.verbose) console.log(`  Found ${mergedTargets.length} pages to crawl after browser restart`);
+        return mergedTargets;
       } catch {
         // fall through to lightweight / fallback
       }
@@ -892,8 +913,9 @@ async function discoverPages(
       await activeContext?.close().catch(() => {});
       await discoveryPage.close().catch(() => {});
       state.degradedReasons.add('lightweight_capture');
-      if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl via lightweight discovery`);
-      return targets;
+      const mergedTargets = mergeCrawlTargets(targets, indexedTargets);
+      if (opts.verbose) console.log(`  Found ${mergedTargets.length} pages to crawl via lightweight discovery`);
+      return mergedTargets;
     }
   }
 
@@ -901,17 +923,25 @@ async function discoverPages(
     handleNavigationError({ url: seedUrl, type: 'home' }, navResult, state, opts);
     await activeContext?.close().catch(() => {});
     await discoveryPage.close().catch(() => {});
+    if (indexedTargets.length > 0) {
+      if (opts.verbose) console.log('  ⚠ Discovery seed failed, using sitemap/search-index targets');
+      return indexedTargets;
+    }
     if (opts.verbose) console.log('  ⚠ Discovery seed failed, using fallback targets');
-    return markFallbackDiscovery(seedUrl, state);
+    return markFallbackDiscovery(seedUrl, state, opts);
   }
 
   const seedStatus = navResult.response?.status();
   if (seedStatus && seedStatus >= 400) {
     state.errors.push({ url: seedUrl, error: `HTTP ${seedStatus}`, type: classifyError('', seedStatus) });
-    if (opts.verbose) console.log(`  ⚠ Seed URL HTTP ${seedStatus}, using fallback targets`);
     await activeContext?.close().catch(() => {});
     await discoveryPage.close().catch(() => {});
-    return markFallbackDiscovery(seedUrl, state);
+    if (indexedTargets.length > 0) {
+      if (opts.verbose) console.log(`  ⚠ Seed URL HTTP ${seedStatus}, using sitemap/search-index targets`);
+      return indexedTargets;
+    }
+    if (opts.verbose) console.log(`  ⚠ Seed URL HTTP ${seedStatus}, using fallback targets`);
+    return markFallbackDiscovery(seedUrl, state, opts);
   }
 
   // Dismiss cookie consent banner if present
@@ -919,28 +949,29 @@ async function discoverPages(
 
   let targets: CrawlTarget[];
   try {
-    const discoveryPromise = discoverCrawlTargets(discoveryPage, seedUrl, opts.verbose);
+    const discoveryPromise = discoverCrawlTargets(discoveryPage, seedUrl, opts.verbose, opts.platform);
     const timeoutPromise = new Promise<CrawlTarget[]>((_, reject) =>
       setTimeout(() => reject(new Error('Discovery timeout')), 10000)
     );
     targets = await Promise.race([discoveryPromise, timeoutPromise]);
   } catch (discoveryError) {
-    if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError}), using fallback targets`);
-    targets = markFallbackDiscovery(seedUrl, state);
+    if (opts.verbose) console.log(`  ⚠ Discovery failed (${discoveryError})`);
+    targets = indexedTargets.length > 0 ? indexedTargets : markFallbackDiscovery(seedUrl, state, opts);
   }
 
   await activeContext?.close().catch(() => {});
   await discoveryPage.close().catch(() => {});
-  if (opts.verbose) console.log(`  Found ${targets.length} pages to crawl`);
+  const mergedTargets = mergeCrawlTargets(targets, indexedTargets);
+  if (opts.verbose) console.log(`  Found ${mergedTargets.length} pages to crawl`);
   emitLog(opts, {
     level: 'info',
     scope: 'scraper',
     event: 'discovery.complete',
     phase: 'discovery',
-    message: `Found ${targets.length} pages to crawl`,
-    details: { targetCount: targets.length },
+    message: `Found ${mergedTargets.length} pages to crawl`,
+    details: { targetCount: mergedTargets.length, indexedCount: indexedTargets.length },
   });
-  return targets;
+  return mergedTargets;
 }
 
 async function scrapeTargetAttempt(
@@ -1490,7 +1521,7 @@ async function processPageContent(
 
   // Product link extraction
   if (target.type === 'collection' && pageData.rawHtml) {
-    const productUrls = extractProductLinks(pageData.rawHtml, pageData.url);
+    const productUrls = extractProductLinks(pageData.rawHtml, pageData.url, opts.platform);
     for (const url of productUrls) {
       if (!state.discoveredProductUrls.includes(url)) {
         state.discoveredProductUrls.push(url);
@@ -1788,7 +1819,7 @@ async function testCheckout(
   startedAt: string
 ): Promise<void> {
   const checkoutUrl = new URL('/checkout', seedUrl).toString();
-  const checkoutProductCandidates = collectCheckoutProductCandidates(state);
+  const checkoutProductCandidates = collectCheckoutProductCandidates(state, opts);
   const checkoutDebug: {
     stage?: string;
     stoppedAt?: string;
@@ -1839,6 +1870,7 @@ async function testCheckout(
       timeout: opts.timeout,
       verbose: opts.verbose,
       preferredProductUrls: checkoutProductCandidates,
+      platform: opts.platform,
       abortSignal: abortController.signal,
       onDebugUpdate: (update) => Object.assign(checkoutDebug, update),
     });
@@ -1862,6 +1894,7 @@ async function testCheckout(
           timeout: opts.timeout,
           verbose: opts.verbose,
           preferredProductUrls: checkoutProductCandidates,
+          platform: opts.platform,
         });
       } finally {
         await rotated.context.close().catch(() => {});
@@ -1969,11 +2002,15 @@ function formatCheckoutDebugStop(debug: {
   return parts.length > 0 ? parts.join(' | ') : undefined;
 }
 
-function collectCheckoutProductCandidates(state: ScrapeState): string[] {
+function collectCheckoutProductCandidates(state: ScrapeState, opts: Required<ScrapeOptions>): string[] {
+  const profile = getPlatformProfile(opts.platform);
   return Array.from(
     new Set([
       ...state.pages
-        .filter((page) => page.matchedCategories.includes('pdp') || /\/products\/[^/?#]+/i.test(page.url))
+        .filter((page) =>
+          page.matchedCategories.includes('pdp') ||
+          profile.productUrlScorePatterns.some(({ pattern }) => pattern.test(page.url))
+        )
         .map((page) => page.url),
       ...state.discoveredProductUrls,
     ])
@@ -1994,14 +2031,34 @@ function mergeDerivedThirdParties(state: ScrapeState): void {
   }
 }
 
+function buildBotDetectionWarning(state: ScrapeState): string | undefined {
+  const blocked = state.errors.filter((error) => error.type === 'blocked');
+  if (blocked.length === 0) return undefined;
+
+  const blockers = Array.from(new Set(blocked.map((error) => error.blockType || 'bot protection')));
+  const blockerText = blockers.join(', ');
+  if (state.pages.length === 0) {
+    return `Automated crawl was blocked by ${blockerText}. Sweep could not collect page evidence; use sitemap/search-index results, manual WA inputs, or a proxy-supported run.`;
+  }
+
+  return `Some crawl targets were blocked by ${blockerText}. Treat the assessment as partial and manually verify blocked areas.`;
+}
+
 function buildResult(
   seedUrl: string,
   startedAt: string,
   state: ScrapeState,
   debugInfo: Partial<DebugInfo>,
-  options?: { skipLog?: boolean }
+  options?: { skipLog?: boolean; platform?: Required<ScrapeOptions>['platform'] }
 ): ScrapeResult {
   const completedAt = new Date().toISOString();
+  const profile = getPlatformProfile(options?.platform);
+  const selectedLabel = profile.label.toLowerCase();
+  const detectedLabel = state.platformDetected?.toLowerCase();
+  const platformConflict =
+    detectedLabel && profile.id !== 'unknown' && detectedLabel !== selectedLabel
+      ? `User selected ${profile.label}, but crawler evidence detected ${state.platformDetected}.`
+      : undefined;
 
   mergeDerivedThirdParties(state);
 
@@ -2047,7 +2104,10 @@ function buildResult(
       checkoutReached: state.checkoutReached,
       checkoutSkipped: state.checkoutSkipped,
       checkoutStoppedAt: state.checkoutStoppedAt,
+      selectedPlatform: { id: profile.id, label: profile.label },
       platformDetected: state.platformDetected,
+      platformConflict,
+      botDetectionWarning: buildBotDetectionWarning(state),
       headlessDetected: detectHeadless(state.pages),
       globalEDetected: state.globalEDetected,
       returngoDetected: state.returngoDetected,

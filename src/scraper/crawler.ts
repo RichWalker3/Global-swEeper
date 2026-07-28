@@ -13,6 +13,32 @@ export type { CrawlTarget };
 
 const MAX_DISCOVERY_TARGETS = 24;
 
+/** Canonical crawl URL key — treats `/` and bare origin as the same page. */
+export function normalizeCrawlUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname === '/' || parsed.pathname === '') {
+      return parsed.origin;
+    }
+    const path = parsed.pathname.replace(/\/$/, '') || '/';
+    return parsed.origin + path + parsed.search;
+  } catch {
+    return url.replace(/\/$/, '');
+  }
+}
+
+export function dedupeCrawlTargets(targets: CrawlTarget[]): CrawlTarget[] {
+  const seen = new Set<string>();
+  const deduped: CrawlTarget[] = [];
+  for (const target of targets) {
+    const key = normalizeCrawlUrl(target.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push({ ...target, url: key });
+  }
+  return deduped;
+}
+
 /**
  * Discover crawl targets by extracting links from the homepage
  */
@@ -173,7 +199,7 @@ export async function discoverIndexedCrawlTargets(seedUrl: string, verbose: bool
 }
 
 export function mergeCrawlTargets(...targetGroups: CrawlTarget[][]): CrawlTarget[] {
-  return sortAndLimitTargets(targetGroups.flat(), MAX_DISCOVERY_TARGETS);
+  return sortAndLimitTargets(dedupeCrawlTargets(targetGroups.flat()), MAX_DISCOVERY_TARGETS);
 }
 
 /**

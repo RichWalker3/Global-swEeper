@@ -34,6 +34,21 @@ export interface CrawlError {
   blockType?: string;
 }
 
+export type KnownPlatform = 'shopify' | 'sfcc' | 'gem' | 'unknown';
+
+export interface SelectedPlatformContext {
+  id: KnownPlatform;
+  label: string;
+}
+
+export type CrawlTargetType = 'home' | 'pdp' | 'collection' | 'cart' | 'checkout' | 'policy' | 'rewards' | 'other';
+
+export interface CrawlTarget {
+  url: string;
+  type: CrawlTargetType;
+  source?: string;
+}
+
 export interface DGFinding {
   keyword: string;
   category: string;
@@ -152,7 +167,9 @@ export interface CrawlSummary {
   /** True when checkout was intentionally skipped to keep the run fast. */
   checkoutSkipped?: boolean;
   checkoutStoppedAt?: string;
+  selectedPlatform?: SelectedPlatformContext;
   platformDetected?: string;
+  platformConflict?: string;
   headlessDetected?: boolean;
   globalEDetected?: boolean;
   returngoDetected?: boolean;
@@ -178,6 +195,8 @@ export interface CrawlSummary {
   marketplacePresence?: MarketplacePresence;
   /** Set when the run stopped early (timeout) but partial scrape data is still valid. */
   scrapingCompletionWarning?: string;
+  /** Set when Akamai, Cloudflare, DataDome, or similar bot protection blocks crawl evidence collection. */
+  botDetectionWarning?: string;
   /** Assessment capture fidelity — full vs degraded evidence. */
   scrapeQuality?: ScrapeQualitySummary;
 }
@@ -218,6 +237,14 @@ export interface ScrapeOptions {
   verbose?: boolean;
   /** When true, skip add-to-cart / checkout navigation (faster; avoids stalls on some stores). Default false for CLI. */
   skipCheckout?: boolean;
+  /** User-selected ecommerce platform. Steers platform-specific crawl and checkout heuristics. */
+  platform?: KnownPlatform;
+  /** Browser visibility. Use visible mode for human-assisted challenge handling. */
+  browserMode?: 'headless' | 'visible';
+  /** Reuse a local Playwright browser profile so manually cleared challenges can persist between runs. */
+  persistentProfile?: boolean;
+  /** Optional profile name for persistent browser storage. */
+  profileName?: string;
   onProgress?: (progress: ScrapeProgress) => void;
   /** Structured log sink for in-app observability */
   onLog?: (entry: StructuredLogInput) => void;

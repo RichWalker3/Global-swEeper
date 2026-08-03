@@ -1,6 +1,6 @@
 import type { CrawlTarget, CrawlTargetType, KnownPlatform } from './types.js';
 import { getPlatformProfile } from './platforms/index.js';
-import { isPhysicalStoreLocationPath, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
+import { isLowValueCommerceCloudActionUrl, isPhysicalStoreLocationPath, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
 import { gunzipSync } from 'node:zlib';
 
 type FetchLike = typeof fetch;
@@ -104,6 +104,7 @@ export function sortAndLimitTargets(targets: CrawlTarget[], maxTargets: number):
   return targets
     .filter((target) => {
       if (seen.has(target.url)) return false;
+      if (isLowValueCommerceCloudActionUrl(target.url)) return false;
       seen.add(target.url);
       return true;
     })

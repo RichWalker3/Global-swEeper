@@ -1636,7 +1636,7 @@
       <span class="logo-icon">🧹</span>
       <div>
         <div class="logo-text">Global-sw<span>E</span>ep</div>
-        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.3.1</span></div>
+        <div class="logo-sub">Website Assessment Tool <span class="version-label">v0.4.0</span></div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 1rem;">
@@ -1867,6 +1867,9 @@
                 <p style="font-size: 0.75rem; color: var(--gray-400); margin-top: 0.35rem;">
                   Use Unknown only when the platform has not been confirmed.
                 </p>
+                <p id="sfccPlatformNote" class="hidden" style="font-size: 0.75rem; color: var(--yellow); margin-top: 0.5rem; line-height: 1.45;">
+                  SFCC note: Sweep will gather pages, policies, and apps for your WA. <strong>Checkout is best-effort</strong> — some SFCC sites block or rate-limit automation. A missing checkout does not mean the assessment failed.
+                </p>
               </div>
             </div>
 
@@ -1892,13 +1895,13 @@
                   <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 400; cursor: pointer; margin: 0;">
                     <input type="checkbox" id="watchBrowser" name="watchBrowser" style="margin-top: 0.2rem;">
                     <span style="font-size: 0.8125rem; color: var(--gray-400); line-height: 1.4;">
-                      Watch browser: opens a visible Chromium window so you can complete a challenge if the site blocks automation.
+                      Watch browser (local Sweep only): opens a visible Chromium window on this machine so you can complete a challenge. On hosted Sweep this does not open a browser on your laptop.
                     </span>
                   </label>
                   <label style="display: flex; align-items: flex-start; gap: 0.5rem; font-weight: 400; cursor: pointer; margin: 0;">
                     <input type="checkbox" id="reuseBrowserProfile" name="reuseBrowserProfile" style="margin-top: 0.2rem;">
                     <span style="font-size: 0.8125rem; color: var(--gray-400); line-height: 1.4;">
-                      Reuse local Sweep browser profile: keeps cookies/session state in <code>tmp/browser-profiles</code> for future assisted runs. This turns on automatically with Watch browser, but you can uncheck it for a clean session.
+                      Reuse local Sweep browser profile: keeps cookies/session state in <code>tmp/browser-profiles</code> for future assisted runs. Local installs only.
                     </span>
                   </label>
                   <p style="font-size: 0.75rem; color: var(--gray-400); margin: 0;">
@@ -1951,8 +1954,8 @@
           <div id="scrapingWarningBanner" class="hidden" style="margin-bottom: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; line-height: 1.45; background: rgba(245, 158, 11, 0.15); color: var(--yellow); border: 1px solid rgba(245, 158, 11, 0.35);"></div>
           <div id="assistedModeCard" class="guided-action-card hidden">
             <strong>Blocked-site next step</strong>
-            <p style="margin: 0.35rem 0 0.75rem 0;">Sweep was blocked while collecting page evidence. Rerun with a visible browser and persistent profile so you can complete any challenge manually.</p>
-            <button type="button" class="btn btn-secondary" id="rerunAssistedBtn" style="width: auto;">Rerun with assisted browser</button>
+            <p style="margin: 0.35rem 0 0.75rem 0;">Sweep was blocked while collecting page evidence. On <strong>local</strong> Sweep you can rerun with a visible browser to complete the challenge. On <strong>hosted</strong> Sweep, continue with whatever evidence was collected or retry later — Watch browser cannot open on your laptop.</p>
+            <button type="button" class="btn btn-secondary" id="rerunAssistedBtn" style="width: auto;">Rerun with assisted browser (local)</button>
           </div>
           <div class="summary-stats">
             <div class="stat-box">
@@ -1973,6 +1976,26 @@
           <div class="scrape-health hidden" id="scrapeHealth" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
             <span id="scrapeHealthIcon"></span>
             <span id="scrapeHealthText"></span>
+          </div>
+
+          <div id="evidenceCoverageSection" class="hidden" style="margin-top: 1rem; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--gray-200); background: var(--gray-100);">
+            <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.35rem;">Evidence coverage</h4>
+            <p id="evidenceCoverageHeadline" style="font-size: 0.8125rem; font-weight: 600; margin: 0 0 0.5rem 0; line-height: 1.45;"></p>
+            <p id="evidenceCoverageWhat" style="font-size: 0.8125rem; margin: 0 0 0.5rem 0; line-height: 1.45; color: var(--gray-400);"></p>
+            <div id="evidenceCoverageAdvice" style="font-size: 0.8125rem; margin: 0 0 0.75rem 0; padding: 0.6rem 0.7rem; border-radius: 6px; background: rgba(232, 90, 44, 0.08); border: 1px solid rgba(232, 90, 44, 0.25); line-height: 1.45;">
+              <strong>How to proceed:</strong> <span id="evidenceCoverageNext"></span>
+            </div>
+            <div style="display: grid; gap: 0.65rem; grid-template-columns: 1fr 1fr;">
+              <div>
+                <div style="font-size: 0.75rem; font-weight: 600; color: var(--green); margin-bottom: 0.25rem;">Gathered</div>
+                <ul id="evidenceGatheredList" style="margin: 0; padding-left: 1.1rem; font-size: 0.75rem; color: var(--gray-400); line-height: 1.45;"></ul>
+              </div>
+              <div>
+                <div style="font-size: 0.75rem; font-weight: 600; color: var(--yellow); margin-bottom: 0.25rem;">Still need to fill in</div>
+                <ul id="evidenceMissingList" style="margin: 0; padding-left: 1.1rem; font-size: 0.75rem; color: var(--gray-400); line-height: 1.45;"></ul>
+              </div>
+            </div>
+            <ul id="evidenceNotesList" style="margin: 0.65rem 0 0 0; padding-left: 1.1rem; font-size: 0.75rem; color: var(--gray-400); line-height: 1.45;"></ul>
           </div>
 
           <div style="font-size: 0.75rem; color: var(--gray-400); margin-top: 1rem;">
@@ -2451,6 +2474,16 @@
 
       checkUnseenReleaseNotes();
 
+      const platformSelect = document.getElementById('merchantPlatform');
+      const sfccNote = document.getElementById('sfccPlatformNote');
+      const syncSfccNote = () => {
+        if (!sfccNote) return;
+        if (platformSelect?.value === 'sfcc') sfccNote.classList.remove('hidden');
+        else sfccNote.classList.add('hidden');
+      };
+      platformSelect?.addEventListener('change', syncSfccNote);
+      syncSfccNote();
+
       // Handle feedback form submission
       document.getElementById('feedbackForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -2900,6 +2933,30 @@
         ? ` / detected ${summary.platformDetected}`
         : '';
       document.getElementById('statPlatform').textContent = `${selectedPlatform}${detectedPlatform}`;
+
+      const coverage = summary.evidenceCoverage;
+      const coverageSection = document.getElementById('evidenceCoverageSection');
+      if (coverageSection) {
+        if (coverage) {
+          coverageSection.classList.remove('hidden');
+          document.getElementById('evidenceCoverageHeadline').textContent = coverage.headline || '';
+          document.getElementById('evidenceCoverageWhat').textContent = coverage.whatHappened || '';
+          document.getElementById('evidenceCoverageNext').textContent = coverage.howToProceed || '';
+          const adviceBox = document.getElementById('evidenceCoverageAdvice');
+          if (adviceBox) adviceBox.style.display = coverage.howToProceed ? 'block' : 'none';
+          const gatheredList = document.getElementById('evidenceGatheredList');
+          const missingList = document.getElementById('evidenceMissingList');
+          const notesList = document.getElementById('evidenceNotesList');
+          gatheredList.innerHTML = (coverage.gathered || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')
+            || '<li>None listed</li>';
+          missingList.innerHTML = (coverage.missing || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')
+            || '<li>None listed</li>';
+          notesList.innerHTML = (coverage.notes || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+          notesList.style.display = (coverage.notes || []).length ? 'block' : 'none';
+        } else {
+          coverageSection.classList.add('hidden');
+        }
+      }
       
       // Show scrape health indicator
       const scrapeErrors = summary.errors || [];
@@ -3204,6 +3261,23 @@
 - **Shop Pay:** ${summary.shopPayDetected ? '✅ Detected' : '❌ Not detected'}
 - **Third-parties:** ${summary.thirdPartiesDetected.join(', ') || 'None detected'}
 `;
+
+      if (summary.evidenceCoverage) {
+        const coverage = summary.evidenceCoverage;
+        summaryText += `\n## Evidence coverage\n\n`;
+        summaryText += `**${coverage.headline}**\n\n`;
+        if (coverage.whatHappened) summaryText += `**What happened:** ${coverage.whatHappened}\n\n`;
+        if (coverage.howToProceed) summaryText += `**How to proceed:** ${coverage.howToProceed}\n\n`;
+        if (coverage.gathered?.length) {
+          summaryText += `### Gathered\n${coverage.gathered.map((item) => `- ${item}`).join('\n')}\n\n`;
+        }
+        if (coverage.missing?.length) {
+          summaryText += `### Still need to fill in\n${coverage.missing.map((item) => `- ${item}`).join('\n')}\n\n`;
+        }
+        if (coverage.notes?.length) {
+          summaryText += `### Notes\n${coverage.notes.map((item) => `- ${item}`).join('\n')}\n`;
+        }
+      }
 
       if (flags.length > 0) {
         summaryText += `\n## ⚠️ Flags\n\n${flags.map(f => `- ${f}`).join('\n')}`;

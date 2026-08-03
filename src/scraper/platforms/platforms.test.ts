@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { buildCheckoutProductCandidatesForPlatform, evaluateCheckoutDestination } from '../checkoutTester.js';
 import { getFallbackTargets } from '../crawler.js';
 import { extractProductLinks } from '../detectors.js';
-import { discoverSearchIndexTargets, discoverSitemapTargets } from '../indexedDiscovery.js';
+import { discoverSearchIndexTargets, discoverSitemapTargets, sortAndLimitTargets } from '../indexedDiscovery.js';
 import { buildPrompt } from '../../extractor/prompt.js';
-import type { ScrapeResult } from '../types.js';
+import type { CrawlTarget, ScrapeResult } from '../types.js';
 import { getPlatformProfile, normalizePlatform } from './index.js';
+import { isLowValueCommerceCloudActionUrl } from './shared.js';
 
 describe('platform profiles', () => {
   it('normalizes platform names from UI and internal labels', () => {
@@ -86,6 +87,19 @@ describe('platform profiles', () => {
 
     expect(filtered).toEqual([
       'https://merchant.test/on/demandware.store/Sites-brand-Site/default/Product-Show?pid=SKU999',
+    ]);
+  });
+
+  it('excludes Wishlist / Compare / Account Demandware actions from SFCC product links', () => {
+    const html = [
+      '<a href="/US/en/jungle-moc/16256W.html">PDP</a>',
+      '<a href="/on/demandware.store/Sites-brand-Site/default/Wishlist-Add?pid=16256W">Wishlist</a>',
+      '<a href="/on/demandware.store/Sites-brand-Site/default/Compare-AddProduct?pid=16256W">Compare</a>',
+      '<a href="/on/demandware.store/Sites-brand-Site/default/Wishlist-Show">Wishlist page</a>',
+    ].join('');
+
+    expect(extractProductLinks(html, 'https://merchant.test', 'sfcc')).toEqual([
+      'https://merchant.test/US/en/jungle-moc/16256W.html',
     ]);
   });
 
@@ -209,5 +223,26 @@ describe('platform profiles', () => {
     ]));
     expect(targets.map((target) => target.url)).not.toContain('https://merchant.test/stores/augusta-me-412');
     expect(targets.find((target) => target.url.endsWith('/customer-service/shipping'))?.type).toBe('policy');
+  });
+
+  it('flags low-value SFCC Demandware action URLs', () => {
+    expect(isLowValueCommerceCloudActionUrl('/on/demandware.store/Sites-x/default/Wishlist-Show')).toBe(true);
+    expect(isLowValueCommerceCloudActionUrl('/on/demandware.store/Sites-x/default/Order-Track')).toBe(true);
+    expect(isLowValueCommerceCloudActionUrl('/on/demandware.store/Sites-x/default/Cart-Show')).toBe(false);
+    expect(isLowValueCommerceCloudActionUrl('/US/en/checkout')).toBe(false);
+  });
+
+  it('drops Wishlist / Order-Track targets from indexed discovery results', () => {
+    const targets: CrawlTarget[] = [
+      { url: 'https://merchant.test/US/en/home', type: 'home', source: 'sitemap' },
+      { url: 'https://merchant.test/on/demandware.store/Sites-x/default/Wishlist-Show', type: 'other', source: 'sitemap' },
+      { url: 'https://merchant.test/on/demandware.store/Sites-x/default/Order-Track', type: 'other', source: 'sitemap' },
+      { url: 'https://merchant.test/US/en/returns', type: 'policy', source: 'sitemap' },
+    ];
+
+    expect(sortAndLimitTargets(targets, 10).map((target) => target.url)).toEqual([
+      'https://merchant.test/US/en/home',
+      'https://merchant.test/US/en/returns',
+    ]);
   });
 });

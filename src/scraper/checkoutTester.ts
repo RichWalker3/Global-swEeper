@@ -528,17 +528,22 @@ async function selectPurchasableOptions(page: Page): Promise<void> {
     }
 
     // SFCC/custom swatch fallback: ensure each swatch group has one available selection.
+    // Includes Genesco-style a.variation-block (Johnston & Murphy size/width).
     const swatchAnchors = Array.from(
-      document.querySelectorAll<HTMLElement>('.swatchanchor, [role="radio"], [aria-label*="size" i], [aria-label*="width" i]')
+      document.querySelectorAll<HTMLElement>(
+        'a.variation-block, .swatchanchor, [role="radio"], [aria-label*="size" i], [aria-label*="width" i]'
+      )
     );
     const swatchGroups = new Map<string, Array<{ anchor: HTMLElement; text: string; unavailable: boolean; selected: boolean }>>();
     for (const anchor of swatchAnchors) {
       const text = (anchor.textContent || anchor.getAttribute('aria-label') || '').trim();
       if (!text) continue;
       const classes = `${anchor.className || ''} ${anchor.parentElement?.className || ''}`.toLowerCase();
+      const href = (anchor.getAttribute('href') || '').trim().toLowerCase();
       const unavailable =
         anchor.getAttribute('aria-disabled') === 'true' ||
         anchor.getAttribute('disabled') !== null ||
+        href === 'null' ||
         classes.includes('disabled') ||
         classes.includes('unavailable') ||
         classes.includes('unselectable') ||
@@ -549,10 +554,13 @@ async function selectPurchasableOptions(page: Page): Promise<void> {
         classes.includes('active') ||
         classes.includes('current') ||
         anchor.getAttribute('aria-checked') === 'true';
-      const groupRoot = anchor.closest('[data-attribute-id], [data-attribute-code], [id*="size"], [id*="width"], [class*="size"], [class*="width"], ul, ol, fieldset');
+      const groupRoot = anchor.closest(
+        '.variation-select, [data-attr], [data-attribute-id], [data-attribute-code], [id*="size"], [id*="width"], [class*="size"], [class*="width"], ul, ol, fieldset'
+      );
       const groupKey =
         groupRoot?.getAttribute('data-attribute-id') ||
         groupRoot?.getAttribute('data-attribute-code') ||
+        groupRoot?.getAttribute('data-attr') ||
         groupRoot?.getAttribute('id') ||
         groupRoot?.className?.toString().slice(0, 120) ||
         `group-${swatchGroups.size}`;
@@ -583,6 +591,11 @@ async function selectPurchasableOptionsWithTrustedClicks(page: Page, verbose = f
     'ul[class*="width" i]',
     '[data-attribute-id*="size" i], [data-attribute-code*="size" i]',
     '[data-attribute-id*="width" i], [data-attribute-code*="width" i]',
+    // Genesco / Johnston & Murphy SFCC variation blocks
+    '.variation-select.select-size',
+    '.variation-select.select-width',
+    '[data-attr="size"] .variation-select',
+    '[data-attr="width"] .variation-select',
   ];
 
   for (const groupSelector of groupSelectors) {
@@ -590,7 +603,7 @@ async function selectPurchasableOptionsWithTrustedClicks(page: Page, verbose = f
     const groupCount = Math.min(await groups.count().catch(() => 0), 4);
     for (let groupIndex = 0; groupIndex < groupCount; groupIndex++) {
       const group = groups.nth(groupIndex);
-      const options = group.locator('.swatchanchor, [role="radio"], button, a, label');
+      const options = group.locator('a.variation-block, .swatchanchor, [role="radio"], button, a, label');
       const optionCount = Math.min(await options.count().catch(() => 0), 18);
       if (optionCount <= 1) continue;
 
@@ -602,6 +615,7 @@ async function selectPurchasableOptionsWithTrustedClicks(page: Page, verbose = f
         const details = await option.evaluate((node) => {
           const text = (node.textContent || node.getAttribute('aria-label') || '').trim();
           const classes = `${node.className || ''} ${node.parentElement?.className || ''}`.toLowerCase();
+          const href = (node.getAttribute('href') || '').trim().toLowerCase();
           const selected =
             classes.includes('selected') ||
             classes.includes('active') ||
@@ -610,6 +624,7 @@ async function selectPurchasableOptionsWithTrustedClicks(page: Page, verbose = f
           const unavailable =
             node.getAttribute('aria-disabled') === 'true' ||
             node.getAttribute('disabled') !== null ||
+            href === 'null' ||
             classes.includes('disabled') ||
             classes.includes('unavailable') ||
             classes.includes('unselectable') ||
@@ -683,6 +698,46 @@ async function hasVariantId(page: Page): Promise<boolean> {
         return classes.includes('selected') || classes.includes('active') || classes.includes('current') || anchor.getAttribute('aria-checked') === 'true';
       });
       if (!hasSelectedNumericSwatch) return false;
+    }
+
+    // Genesco SFCC: size/width variation blocks must be selected before ATC is ready.
+    const sizeBlocks = Array.from(
+      document.querySelectorAll('a.variation-block.variation-size')
+    ).filter((el) => {
+      const href = ((el.getAttribute('href') || '').trim().toLowerCase());
+      return !el.classList.contains('disabled') && href !== 'null';
+    });
+    if (sizeBlocks.length > 0) {
+      const sizeSelected =
+        sizeBlocks.some((el) => {
+          const classes = `${el.className || ''}`.toLowerCase();
+          return (
+            classes.includes('selected') ||
+            classes.includes('active') ||
+            classes.includes('current') ||
+            el.getAttribute('aria-checked') === 'true'
+          );
+        }) ||
+        Boolean(document.querySelector('label.size .selected-label')?.textContent?.trim());
+      if (!sizeSelected) return false;
+    }
+
+    const widthBlocks = Array.from(
+      document.querySelectorAll('a.variation-block.variation-width')
+    ).filter((el) => !el.classList.contains('disabled'));
+    if (widthBlocks.length > 0) {
+      const widthSelected =
+        widthBlocks.some((el) => {
+          const classes = `${el.className || ''}`.toLowerCase();
+          return (
+            classes.includes('selected') ||
+            classes.includes('active') ||
+            classes.includes('current') ||
+            el.getAttribute('aria-checked') === 'true'
+          );
+        }) ||
+        Boolean(document.querySelector('label.width .selected-label')?.textContent?.trim());
+      if (!widthSelected) return false;
     }
 
     return true;
@@ -1684,20 +1739,28 @@ async function navigateToCheckout(
     // Cart navigation failed
   }
 
-  // Try direct checkout navigation
+  // Try direct checkout navigation — prefer locale-prefixed paths first to avoid
+  // burning retries on root /Checkout-Begin 404s (common on SFCC locale sites).
   if (!checkoutState.reachedCheckout) {
-    const rawCheckoutPaths = new Set<string>(profile.checkoutPaths);
+    const orderedCheckoutPaths: string[] = [];
+    const pushPath = (path: string) => {
+      const normalized = path.startsWith('/') ? path : `/${path}`;
+      if (!orderedCheckoutPaths.includes(normalized)) orderedCheckoutPaths.push(normalized);
+    };
+
     if (localePrefix) {
       for (const checkoutPath of profile.checkoutPaths) {
-        const normalized = checkoutPath.startsWith('/') ? checkoutPath : `/${checkoutPath}`;
-        rawCheckoutPaths.add(`${localePrefix}${normalized}`);
+        pushPath(`${localePrefix}${checkoutPath.startsWith('/') ? checkoutPath : `/${checkoutPath}`}`);
       }
-      rawCheckoutPaths.add(`${localePrefix}/checkout`);
-      rawCheckoutPaths.add(`${localePrefix}/Checkout-Begin`);
-      rawCheckoutPaths.add(`${localePrefix}/COShipping-Start`);
+      pushPath(`${localePrefix}/checkout`);
+      pushPath(`${localePrefix}/Checkout-Begin`);
+      pushPath(`${localePrefix}/COShipping-Start`);
+    }
+    for (const checkoutPath of profile.checkoutPaths) {
+      pushPath(checkoutPath);
     }
 
-    for (const path of Array.from(rawCheckoutPaths).map((checkoutPath) => buildSiteUrl(base, checkoutPath))) {
+    for (const path of orderedCheckoutPaths.map((checkoutPath) => buildSiteUrl(base, checkoutPath))) {
       try {
         const navResult = await gotoWithRetry(page, path, {
           timeout: opts.timeout,

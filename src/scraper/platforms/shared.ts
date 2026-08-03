@@ -64,6 +64,22 @@ export function isPhysicalStoreLocationPath(path: string): boolean {
   return STORE_LOCATION_PATH_PATTERNS.some((pattern) => pattern.test(path));
 }
 
+/** SFCC Demandware action endpoints that are not useful crawl/WA targets. */
+const LOW_VALUE_COMMERCE_CLOUD_ACTION_PATTERNS = [
+  /Wishlist-(?:Add|Show|Remove)/i,
+  /Compare-(?:AddProduct|Show)/i,
+  /Product-ShowQuickView/i,
+  /Search-ShowAjax/i,
+  /Account-(?:Show|Login|Start|EditProfile)/i,
+  /Login-Show/i,
+  /Order-(?:Track|History)/i,
+  /COCustomer-(?:Add|Edit)/i,
+];
+
+export function isLowValueCommerceCloudActionUrl(urlOrPath: string): boolean {
+  return LOW_VALUE_COMMERCE_CLOUD_ACTION_PATTERNS.some((pattern) => pattern.test(urlOrPath));
+}
+
 export const SHARED_ADD_TO_CART_SELECTORS = [
   'button:has-text("Add to cart")',
   'button:has-text("Add to Cart")',

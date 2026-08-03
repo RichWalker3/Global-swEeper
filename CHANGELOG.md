@@ -2,6 +2,29 @@
 
 Global-sweep uses `major.minor.patch` style versioning during the internal pilot.
 
+## v0.4.0 - 2026-08-03
+
+SFCC (Salesforce Commerce Cloud) support for hosted Website Assessments — best-effort checkout, clearer evidence coverage, and known limits called out in the UI.
+
+### Added
+
+- **SFCC platform profile** — crawl/checkout patterns for Demandware/SFCC storefronts (locale PDPs, Cart-Show / Checkout-Begin paths, variant selection including Genesco size/width blocks).
+- **Evidence coverage panel** — Summary shows what happened, how to proceed, gathered vs still-need-to-fill-in, so SEs know what they can trust and what to complete manually.
+- **SFCC run guidance** — platform note before start + WA prompt guidance that checkout is best-effort and missing checkout ≠ failed assessment.
+- **Rate-limit safeguards** — crawl/PDP circuit breakers; skip checkout when already rate-limited; filter Wishlist/Order-Track noise URLs.
+- **SFCC baseline harness** — `scripts/sfcc-baseline.ts` for merchant regression runs.
+
+### Changed
+
+- Checkout on SFCC is **best-effort**, not guaranteed (bot walls and 429s are common).
+- Watch browser / assisted copy clarified: useful on **local** Sweep only; hosted Sweep cannot open a browser on the user’s laptop.
+- Baseline classifier treats checkout miss / rate-limit as soft when crawl evidence is usable.
+
+### Known limitations
+
+- Hard bot blocks (e.g. PerimeterX) may still return little or no page evidence.
+- Aggressive rate limits may skip checkout after a usable policy/apps crawl — write the WA from what was gathered.
+
 ## v0.3.1 - 2026-07-28
 
 BRD Workspace quality release for hosted PROD: Phase field, Out Of Scope instead of Canceled, detector fixes, and golden regression tests — merged onto the v0.2.5 production hardening baseline.

@@ -412,6 +412,14 @@ export function extractProductLinks(html: string, baseUrl: string, platform?: Kn
   const productLinks: string[] = [];
   const domain = new URL(baseUrl).origin;
   const profile = getPlatformProfile(platform);
+  const nonProductPatterns = [
+    /Wishlist-Add/i,
+    /Compare-AddProduct/i,
+    /Product-ShowQuickView/i,
+    /QuickView/i,
+    /Search-ShowAjax/i,
+    /\/on\/demandware\.store\/.*(?:Wishlist|Compare|Account)-/i,
+  ];
 
   for (const pattern of profile.productUrlPatterns) {
     pattern.lastIndex = 0;
@@ -426,10 +434,16 @@ export function extractProductLinks(html: string, baseUrl: string, platform?: Kn
         url = domain + '/' + url;
       }
 
-      // Skip duplicates and variant URLs
-      if (!productLinks.includes(url) && !url.includes('?variant=')) {
-        productLinks.push(url);
+      // Skip duplicates, variant URLs, and non-purchasable SFCC action endpoints
+      if (
+        productLinks.includes(url) ||
+        url.includes('?variant=') ||
+        nonProductPatterns.some((skip) => skip.test(url))
+      ) {
+        continue;
       }
+
+      productLinks.push(url);
     }
   }
 

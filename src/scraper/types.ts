@@ -197,6 +197,16 @@ export interface CrawlSummary {
   scrapingCompletionWarning?: string;
   /** Set when Akamai, Cloudflare, DataDome, or similar bot protection blocks crawl evidence collection. */
   botDetectionWarning?: string;
+  /** Human-readable gathered vs missing evidence for Summary UI / prompts. */
+  evidenceCoverage?: {
+    level?: string;
+    headline: string;
+    whatHappened?: string;
+    howToProceed?: string;
+    gathered: string[];
+    missing: string[];
+    notes: string[];
+  };
   /** Assessment capture fidelity — full vs degraded evidence. */
   scrapeQuality?: ScrapeQualitySummary;
 }

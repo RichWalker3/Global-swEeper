@@ -15,6 +15,7 @@ import { StealthBrowserManager, attachPageCrashLogging } from './browserManager.
 import { discoverCrawlTargets, discoverIndexedCrawlTargets, getFallbackTargets, dedupeCrawlTargets, mergeCrawlTargets, normalizeCrawlUrl, type CrawlTarget } from './crawler.js';
 import { extractPageData, detectPlatform, detectHeadless } from './pageExtractor.js';
 import { testCheckoutFlow } from './checkoutTester.js';
+import { buildEvidenceCoverageReport } from './coverageReport.js';
 import { getPlatformProfile } from './platforms/index.js';
 import type { Browser, BrowserContext, Page, Request, ConsoleMessage } from 'playwright';
 
@@ -423,6 +424,28 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
         b2bIndicators: [],
         dropshipIndicators: [],
         productPagesScraped: 0,
+        evidenceCoverage: buildEvidenceCoverageReport({
+          seedUrl,
+          domain,
+          startedAt: completedAt,
+          completedAt,
+          pagesVisited: 0,
+          pagesBlocked: 1,
+          checkoutReached: false,
+          checkoutSkipped: opts.skipCheckout,
+          errors: [{ url: seedUrl, error: warning, type: 'timeout' }],
+          scrapingCompletionWarning: warning,
+          thirdPartiesDetected: [],
+          technologies: [],
+          redFlags: [],
+          dangerousGoods: [],
+          b2bIndicators: [],
+          dropshipIndicators: [],
+          productPagesScraped: 0,
+          selectedPlatform: opts.platform
+            ? { id: opts.platform, label: getPlatformProfile(opts.platform).label }
+            : undefined,
+        }),
       },
     };
   }
@@ -446,6 +469,7 @@ function buildPartialTimeoutResult(seedUrl: string, opts: Required<ScrapeOptions
     degradedReasons: Array.from(snap.state.degradedReasons),
     scrapingCompletionWarning: warning,
   });
+  result.summary.evidenceCoverage = buildEvidenceCoverageReport(result.summary);
   emitLog(opts, {
     level: 'warn',
     scope: 'scraper',
@@ -986,6 +1010,7 @@ async function scrapeTargetAttempt(
 ): Promise<{
   success: boolean;
   finalUrl?: string;
+  httpStatus?: number;
   navigationFailure?: { error?: string | null; blocked?: boolean; blockType?: string | null };
 }> {
   const page = await context.newPage();
@@ -1037,7 +1062,7 @@ async function scrapeTargetAttempt(
         message: `HTTP ${statusCode} for ${target.url}`,
         details: { url: target.url, statusCode, targetType: target.type },
       });
-      return { success: false };
+      return { success: false, httpStatus: statusCode };
     }
 
     if (!validateRedirect(page, target, state, debugInfo)) {
@@ -1159,10 +1184,24 @@ async function scrapeDiscoveredPages(
   const totalTargets = Math.min(targets.length, opts.maxPages);
   let pageIndex = 0;
   let lastVisitedUrl: string | undefined;
+  let consecutiveRateLimits = 0;
 
   for (const target of targets) {
     if (state.visited.size >= opts.maxPages) break;
     if (isTargetVisited(state, target.url)) continue;
+    // Cart is exercised in the checkout phase; crawling it early often triggers SFCC 429s.
+    if (!opts.skipCheckout && target.type === 'cart') {
+      if (opts.verbose) {
+        console.log(`  ↪ Skipping cart crawl target (deferred to checkout): ${new URL(target.url).pathname}`);
+      }
+      continue;
+    }
+    if (state.degradedReasons.has('rate_limited') && consecutiveRateLimits >= 3) {
+      if (opts.verbose) {
+        console.log('  ⚠️ Stopping page crawl early after repeated rate limits (429/503)');
+      }
+      break;
+    }
 
     pageIndex++;
     scrapeProgress.phase = 'page-scraping';
@@ -1183,7 +1222,14 @@ async function scrapeDiscoveredPages(
     }
 
     try {
-      if (pageIndex > 1) await randomDelay(500, 1500);
+      if (pageIndex > 1) {
+        const slowPlatform = opts.platform === 'sfcc' || opts.platform === 'gem';
+        const rateLimited = state.degradedReasons.has('rate_limited');
+        await randomDelay(
+          slowPlatform ? (rateLimited ? 4000 : 2000) : 500,
+          slowPlatform ? (rateLimited ? 8000 : 4500) : 1500
+        );
+      }
 
       if (shouldSkipFullBrowserTarget(state, target.type)) {
         emitLog(opts, {
@@ -1215,6 +1261,7 @@ async function scrapeDiscoveredPages(
         );
         if (lightweightAttempt.success) {
           lastVisitedUrl = lightweightAttempt.finalUrl;
+          consecutiveRateLimits = 0;
         } else if (lightweightAttempt.navigationFailure) {
           handleNavigationError(target, lightweightAttempt.navigationFailure, state, opts);
         }
@@ -1233,9 +1280,23 @@ async function scrapeDiscoveredPages(
       );
       if (primaryAttempt.success) {
         lastVisitedUrl = primaryAttempt.finalUrl;
+        consecutiveRateLimits = 0;
         continue;
       }
 
+      if (primaryAttempt.httpStatus === 429 || primaryAttempt.httpStatus === 503) {
+        consecutiveRateLimits += 1;
+        state.degradedReasons.add('rate_limited');
+        if (consecutiveRateLimits >= 3) {
+          if (opts.verbose) {
+            console.log('  ⚠️ Stopping page crawl early after repeated rate limits (429/503)');
+          }
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 8000));
+        continue;
+      }
+      consecutiveRateLimits = 0;
       const failure = primaryAttempt.navigationFailure;
       recordCrashFromFailure(state, opts, failure);
 
@@ -1661,13 +1722,17 @@ async function scrapeProductPages(
     /\/shop\b/i.test(page.url)
   );
   let lastProductUrl = collectionPage?.url;
+  let consecutiveRateLimits = 0;
 
   for (let i = 0; i < Math.min(state.discoveredProductUrls.length, maxProducts); i++) {
     const productUrl = state.discoveredProductUrls[i];
     if (state.visited.has(productUrl)) continue;
 
     try {
-      await randomDelay(500, 1200);
+      await randomDelay(
+        opts.platform === 'sfcc' || opts.platform === 'gem' ? 2500 : 500,
+        opts.platform === 'sfcc' || opts.platform === 'gem' ? 5000 : 1200
+      );
       const page = await context.newPage();
       const networkRequests: NetworkRequest[] = [];
 
@@ -1711,9 +1776,24 @@ async function scrapeProductPages(
         });
         if (opts.verbose) console.log(`  ✗ PDP: ${productUrl} - HTTP ${productStatus}`);
         await page.close();
+
+        if (productStatus === 429 || productStatus === 503) {
+          consecutiveRateLimits += 1;
+          if (consecutiveRateLimits >= 2) {
+            if (opts.verbose) {
+              console.log('  ⚠️ Stopping product scraping after repeated rate limits (429/503)');
+            }
+            state.degradedReasons.add('rate_limited');
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 8000));
+        } else {
+          consecutiveRateLimits = 0;
+        }
         continue;
       }
 
+      consecutiveRateLimits = 0;
       state.visited.add(productUrl);
       state.productPagesScraped++;
       lastProductUrl = page.url();
@@ -1842,6 +1922,23 @@ async function testCheckout(
     return;
   }
 
+  if (state.degradedReasons.has('rate_limited')) {
+    state.checkoutSkipped = true;
+    state.checkoutStoppedAt = 'skipped: rate limited during crawl (best-effort checkout)';
+    if (opts.verbose) {
+      console.log('  ↪ Skipping checkout after crawl rate limits (429/503)');
+    }
+    emitLog(opts, {
+      level: 'warn',
+      scope: 'checkout',
+      event: 'checkout.skipped_rate_limited',
+      phase: 'checkout',
+      message: 'Skipping checkout because the crawl hit repeated rate limits',
+      details: { checkoutUrl },
+    });
+    return;
+  }
+
   opts.onProgress({ phase: 'checkout', message: 'Testing checkout flow...' });
 
   emitLog(opts, {
@@ -1875,11 +1972,13 @@ async function testCheckout(
       onDebugUpdate: (update) => Object.assign(checkoutDebug, update),
     });
     let checkoutTimer: ReturnType<typeof setTimeout> | undefined;
+    const checkoutBudgetMs =
+      opts.platform === 'sfcc' || opts.platform === 'gem' ? 90000 : 45000;
     const checkoutTimeoutPromise = new Promise<null>((resolve) => {
       checkoutTimer = setTimeout(() => {
         abortController.abort();
         resolve(null);
-      }, 45000);
+      }, checkoutBudgetMs);
     });
     let checkoutResult = await Promise.race([checkoutPromise, checkoutTimeoutPromise]);
     if (checkoutTimer !== undefined) clearTimeout(checkoutTimer);
@@ -2136,6 +2235,8 @@ function buildResult(
     },
     pages: state.pages,
   };
+
+  result.summary.evidenceCoverage = buildEvidenceCoverageReport(result.summary);
 
   // Log for debugging (skip when a timeout already emitted a partial log)
   if (!options?.skipLog) {

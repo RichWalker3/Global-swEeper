@@ -32,9 +32,12 @@ A milestone is "done" only when all conditions below are met:
    - Variant or option selection works on common SFCC PDP patterns (radios, swatches, selects, ARIA-driven options).
    - Add-to-cart no longer fails systematically due to unselected options.
 
-3. Checkout attempt quality
-   - Checkout status reports meaningful progression with clear stop reasons.
+3. Checkout attempt quality (best-effort — not guaranteed)
+   - Sweep **attempts** checkout on SFCC but does **not** guarantee reaching a checkout page.
+   - Bot walls, rate limits, and highly custom PDP/cart UIs may stop the flow; that must not block a usable WA.
+   - Checkout status reports meaningful progression with clear stop reasons (`stage=…`, bot, 429, timeout).
    - Redirect/tracking shells are reported as staged outcomes, not generic failures.
+   - A run can still **Pass** for WA usability when crawl/policy/PDP evidence is strong even if checkout was not reached.
 
 4. Prompt/report quality
    - Prompt distinguishes partial limitations from full crawl failures.
@@ -55,9 +58,9 @@ For each merchant:
 1. Run full WA with SFCC platform selected.
 2. Review crawl targets, product scraping, checkout progression, and prompt quality.
 3. Record outcomes:
-   - `Pass`: usable assessment output without major manual patching.
-   - `Partial`: usable but with clear known limitations.
-   - `Fail`: blocked by recurring crawler/checkout defects.
+   - `Pass`: usable assessment output without major manual patching (checkout reached is a plus, not required).
+   - `Partial`: usable but with clear known limitations (including best-effort checkout stop).
+   - `Fail`: blocked by recurring crawler defects that prevent a usable WA (e.g. hard bot block, 0 pages).
 4. Log failure class and owner fix:
    - discovery
    - variant selection

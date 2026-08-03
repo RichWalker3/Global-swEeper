@@ -4,6 +4,7 @@
 
 import type { ScrapeResult, PageData, CrawlSummary, KnownPlatform } from '../scraper/types.js';
 import { BRD_REQUIREMENTS } from '../brd/requirements.js';
+import { buildEvidenceCoverageReport } from '../scraper/coverageReport.js';
 import { getPlatformProfile } from '../scraper/platforms/index.js';
 
 export type PromptResponseFormat = 'markdown' | 'json';
@@ -304,10 +305,25 @@ Keep crawlSummary aligned to the provided summary.`
 Respond with ONLY the Markdown Website Assessment. No preamble, no explanation after.`;
 
   const scrapeErrorCount = summary.errors?.length || 0;
+  const coverage = buildEvidenceCoverageReport(summary);
   const scrapeHealthLine =
     scrapeErrorCount === 0 && !summary.scrapingCompletionWarning && !summary.botDetectionWarning
       ? '- **Scrape health guidance:** Evidence collection completed cleanly (no blocked pages/errors). Do not describe this run as a failed sweep; treat checkout gaps as isolated checkout limitations only.'
       : '- **Scrape health guidance:** Treat scraping warnings/errors as scoped limitations. Distinguish partial coverage from total crawl failure.';
+  const coverageBlock = [
+    `- **Evidence coverage:** ${coverage.headline}`,
+    coverage.whatHappened ? `- **What happened:** ${coverage.whatHappened}` : null,
+    coverage.howToProceed ? `- **How to proceed:** ${coverage.howToProceed}` : null,
+    coverage.gathered.length ? `- **Gathered:** ${coverage.gathered.join('; ')}` : null,
+    coverage.missing.length ? `- **Not gathered / incomplete:** ${coverage.missing.join('; ')}` : null,
+    ...coverage.notes.map((note) => `- **Note:** ${note}`),
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const sfccGuidance =
+    selectedPlatform.id === 'sfcc'
+      ? '- **SFCC guidance:** Checkout is best-effort on Salesforce Commerce Cloud. Do not frame a missing checkout as a failed assessment when pages/policies/apps were collected. Mark checkout fields Unconfirmed when not reached, and tell the SE which gaps to fill manually.'
+      : '';
 
   // Build the user prompt with evidence
   const userPrompt = `# Website Assessment Request
@@ -323,6 +339,8 @@ ${JSON.stringify(summarizeCrawlForPrompt(summary), null, 2)}
 - Treat the selected platform as the expected implementation path for this run. Reconcile it with crawl evidence; if site evidence conflicts with the selected platform, call out the conflict as ❔ Unconfirmed or [Inference] instead of silently overriding it.
 - For GEM / Custom, assume a manual Global-e Module style implementation path unless direct evidence proves a packaged platform/plugin path.
 ${scrapeHealthLine}
+${coverageBlock}
+${sfccGuidance}
 - **Focus guidance:** This summary is intentionally trimmed to scoping-relevant signals. Do not expand the WA with a full technology inventory or list every detected app unless it affects a BRD, red flag, merchant question, or implementation risk.
 
 ## Evidence by Category
@@ -385,6 +403,7 @@ function formatBrdPromptList(): string {
 }
 
 export function summarizeCrawlForPrompt(summary: CrawlSummary): Record<string, unknown> {
+  const coverage = buildEvidenceCoverageReport(summary);
   return {
     seedUrl: summary.seedUrl,
     domain: summary.domain,
@@ -398,6 +417,7 @@ export function summarizeCrawlForPrompt(summary: CrawlSummary): Record<string, u
     checkoutReached: summary.checkoutReached,
     checkoutSkipped: summary.checkoutSkipped,
     checkoutStoppedAt: summary.checkoutStoppedAt,
+    evidenceCoverage: coverage,
     redFlags: summary.redFlags,
     thirdPartiesDetected: (summary.thirdPartiesDetected || []).slice(0, 20),
     returnProvider: summary.policyInfo?.returnProvider,

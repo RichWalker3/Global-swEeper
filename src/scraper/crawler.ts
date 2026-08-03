@@ -6,7 +6,7 @@
 import { Page } from 'playwright';
 import type { CrawlTarget, CrawlTargetType, KnownPlatform } from './types.js';
 import { getPlatformProfile } from './platforms/index.js';
-import { buildFallbackTargets, isPhysicalStoreLocationPath, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
+import { buildFallbackTargets, isLowValueCommerceCloudActionUrl, isPhysicalStoreLocationPath, SHARED_TEXT_CLASSIFIERS } from './platforms/shared.js';
 import { discoverIndexedTargets, sortAndLimitTargets } from './indexedDiscovery.js';
 
 export type { CrawlTarget };
@@ -97,6 +97,7 @@ export async function discoverCrawlTargets(page: Page, seedUrl: string, verbose:
       if (/\/(cdn|assets|static|media)\//i.test(url.pathname)) continue;
       if (/\/(account|login|register|cart\/add|checkout)/i.test(url.pathname)) continue;
       if (isPhysicalStoreLocationPath(url.pathname)) continue;
+      if (isLowValueCommerceCloudActionUrl(url.pathname + url.search)) continue;
 
       const normalizedUrl = url.origin + url.pathname.replace(/\/$/, '');
       if (discovered.has(normalizedUrl)) continue;

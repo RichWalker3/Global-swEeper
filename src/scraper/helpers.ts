@@ -197,9 +197,24 @@ export async function gotoWithRetry(
 
       // First wait for DOM content
       const response = await page.goto(url, { timeout: options.timeout, waitUntil: 'domcontentloaded' });
+      const statusCode = response?.status();
 
-      // 4xx/5xx (400, 402, 404, 503, …) often never reach network idle — avoid long waits that look like timeouts.
-      if (response && response.status() >= 400) {
+      // Rate limits / soft outages: back off and retry instead of treating as a finished page.
+      if (statusCode === 429 || statusCode === 503) {
+        lastError = `HTTP ${statusCode}`;
+        if (attempt < maxRetries) {
+          const delay = statusCode === 429 ? 4000 * Math.pow(2, attempt) : 2000 * Math.pow(2, attempt);
+          if (options.verbose) {
+            console.log(`  ⚠️ HTTP ${statusCode} for ${url}, backing off ${delay}ms before retry...`);
+          }
+          await page.waitForTimeout(delay);
+          continue;
+        }
+        return { response, blocked: false, blockType: null, error: null };
+      }
+
+      // Other 4xx/5xx often never reach network idle — avoid long waits that look like timeouts.
+      if (statusCode && statusCode >= 400) {
         return { response, blocked: false, blockType: null, error: null };
       }
 

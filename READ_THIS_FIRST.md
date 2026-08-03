@@ -22,7 +22,7 @@ Do **not** treat `pilot/team-handoff` as production. GitLab **`main`** is produc
 
 ## Mission (one sentence)
 
-Make full Website Assessments on **non-Shopify, non-Global-e SFCC** storefronts as reliable as today’s Shopify flow — discovery, policy/catalog evidence, checkout attempt, and AI prompt quality.
+Make full Website Assessments on **non-Shopify, non-Global-e SFCC** storefronts as reliable as today’s Shopify flow for **discovery, policy/catalog evidence, and WA prompt quality**. Checkout is **best-effort** on SFCC (bot walls / 429 / custom carts) — useful when it works, not a guarantee and not required for a usable assessment.
 
 ---
 
@@ -102,4 +102,37 @@ src/extractor/prompt.ts        → AI prompt; includes platform + scrape-health 
 
 ## Latest validation
 
-- **2026-07-28:** Rebased onto handoff/BRD tip (`feat/sfcc-wa-parity-rebased`). Platform unit tests expected green via `npm run ci`. Live 10-merchant baseline **not** run yet — **parked**.
+- **2026-07-28:** Full 10-merchant SFCC baseline via `scripts/sfcc-baseline.ts` on `feat/sfcc-wa-parity-rebased`.
+
+### Product bar (SFCC checkout)
+- **Must:** enough crawl/policy/PDP evidence for a usable WA; clear checkout stop reason when it doesn’t complete.
+- **Nice:** ATC + checkout when the site allows it.
+- **Don’t:** fail an otherwise-usable SFCC run solely because checkout wasn’t reached.
+- Soft classifier buckets: `checkout`, `timeout`, `rate_limit` (and `pdp` when checkout reached/skipped). Hard fail stays for bot walls with 0 pages.
+
+### Scoreboard
+| Merchant | Verdict | Notes |
+|----------|---------|--------|
+| Merrell | **PASS** | 18 pages, checkout reached |
+| Saucony | **PASS** | 18 pages, checkout reached |
+| Columbia | **FAIL** | PerimeterX hard block (0 pages) — needs **Watch browser** assisted path |
+| Skechers | **PARTIAL** | Usable crawl; ATC not confirmed under 429 pressure |
+| Bath & Body Works | **PARTIAL** | PerimeterX + timeout — assisted browser |
+| Tommy Hilfiger | **PASS*** | Checkout reached; dedicated PDP scrape 0 (soft) |
+| Chaco | **PARTIAL** | Rate-limited PDPs; checkout now skipped when crawl already rate-limited |
+| Johnston & Murphy | **PASS** | Genesco size/width + 360s budget |
+| Wolverine | **FAIL*** | Heavy 429 / thin crawl; Demandware noise filtered |
+| CAT Footwear | **PASS*** | Checkout reached; dedicated PDP scrape 0 (soft) |
+
+**Totals:** 5 PASS / 3 PARTIAL / 2 FAIL
+
+### Loop status (2026-07-29 / updated 2026-08-03)
+Code mitigations landed for SFCC: Genesco variants, locale checkout paths, Wishlist/Order noise filters, 429 crawl+PDP circuit breakers, cart deferred to checkout, skip checkout when rate-limited, best-effort classifier, **evidence coverage panel** + WA prompt guidance.
+**Useful evidence:** Merrell/Saucony/J&M/Tommy/CAT produce strong WA inputs (policies, apps, often checkout). Chaco-class still useful for returns/apps when checkout is skipped. Columbia-class bot walls remain empty.
+**Remaining hard gaps are environmental:** PerimeterX (Columbia/BBW) and aggressive 429 walls. Hosted Watch browser cannot help end users.
+**Headless retests parked.** CHANGELOG **Unreleased** holds the SFCC launch What's New copy — bump to a dated version on ship so the popup auto-opens.
+
+### Top fix buckets (next loop work)
+1. **Assisted browser validation** for Columbia / BBW (`browserMode: visible` + persistent profile) — already in UI; needs a manual assisted run, not more headless loops
+2. **Accept 429 merchants as best-effort PARTIAL/soft-Pass** once crawl evidence is strong and checkout is skipped cleanly
+3. Optional: Skechers ATC deep-dive only if product still wants checkout on that site

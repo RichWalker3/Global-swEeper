@@ -31,7 +31,7 @@ export const sfccProfile: PlatformProfile = {
     { pattern: /\/(Checkout-Begin|COShipping|COBilling|checkout)\b/i, type: 'checkout', priority: 8 },
     { pattern: /\/(Product-Show|p|product)\b/i, type: 'pdp', priority: 5 },
     { pattern: /\/[a-z0-9-]+\/[a-z0-9-]*\d[a-z0-9-]*\.html(?:\?|$)/i, type: 'pdp', priority: 5 },
-    { pattern: /\/on\/demandware\.store\//i, type: 'other', priority: 4 },
+    // Keep Cart/Checkout Demandware controllers; skip Wishlist/Account/etc via isLowValueCommerceCloudActionUrl.
   ],
   productUrlPatterns: [
     /href=["']([^"']*(?:Product-Show|\/p\/|\/product\/)[^"'#]+)/gi,
@@ -47,14 +47,21 @@ export const sfccProfile: PlatformProfile = {
   ],
   productDiscoveryPaths: ['/', '/Search-Show', '/search', '/shop', '/category'],
   addToCartSelectors: [
-    'button:has-text("Add to Cart")',
-    'button:has-text("Add to Bag")',
     'button.add-to-cart',
-    '.add-to-cart',
+    'button:has-text("Add to Bag")',
+    'button:has-text("Add to Cart")',
+    'button:has-text("ADD TO BAG")',
+    'button:has-text("ADD TO CART")',
     '[data-action*="AddToCart"]',
     '[data-url*="Cart-AddProduct"]',
     'form[action*="Cart-AddProduct"] button[type="submit"]',
-    ...SHARED_ADD_TO_CART_SELECTORS,
+    // Prefer exact controls; skip SHARED `[class*="add-to-cart"]` / bare "Add" (false hits on Genesco).
+    ...SHARED_ADD_TO_CART_SELECTORS.filter(
+      (selector) =>
+        selector !== 'button:has-text("Add")' &&
+        !selector.includes('[class*="add-to-cart"]') &&
+        !selector.includes('[class*="addToCart"]')
+    ),
   ],
   checkoutButtonSelectors: [
     'a[href*="Checkout-Begin"]',

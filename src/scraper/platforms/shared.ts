@@ -142,7 +142,3 @@ export function buildFallbackTargets(seedUrl: string, profile: PlatformProfile):
     })),
   ];
 }
-
-export function uniqueStrings(values: string[]): string[] {
-  return Array.from(new Set(values));
-}

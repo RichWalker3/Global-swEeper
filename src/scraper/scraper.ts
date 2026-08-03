@@ -1196,12 +1196,6 @@ async function scrapeDiscoveredPages(
       }
       continue;
     }
-    if (state.degradedReasons.has('rate_limited') && consecutiveRateLimits >= 3) {
-      if (opts.verbose) {
-        console.log('  ⚠️ Stopping page crawl early after repeated rate limits (429/503)');
-      }
-      break;
-    }
 
     pageIndex++;
     scrapeProgress.phase = 'page-scraping';

@@ -1,8 +1,8 @@
 import type { CrawlSummary } from './types.js';
 
-export type EvidenceCoverageLevel = 'strong' | 'usable' | 'partial' | 'blocked' | 'empty';
+type EvidenceCoverageLevel = 'strong' | 'usable' | 'partial' | 'blocked' | 'empty';
 
-export interface EvidenceCoverageReport {
+interface EvidenceCoverageReport {
   level: EvidenceCoverageLevel;
   headline: string;
   /** Short “what happened” line for the Summary card. */

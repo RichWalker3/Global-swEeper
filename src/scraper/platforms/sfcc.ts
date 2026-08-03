@@ -31,7 +31,6 @@ export const sfccProfile: PlatformProfile = {
     { pattern: /\/(Checkout-Begin|COShipping|COBilling|checkout)\b/i, type: 'checkout', priority: 8 },
     { pattern: /\/(Product-Show|p|product)\b/i, type: 'pdp', priority: 5 },
     { pattern: /\/[a-z0-9-]+\/[a-z0-9-]*\d[a-z0-9-]*\.html(?:\?|$)/i, type: 'pdp', priority: 5 },
-    // Keep Cart/Checkout Demandware controllers; skip Wishlist/Account/etc via isLowValueCommerceCloudActionUrl.
   ],
   productUrlPatterns: [
     /href=["']([^"']*(?:Product-Show|\/p\/|\/product\/)[^"'#]+)/gi,
@@ -48,10 +47,6 @@ export const sfccProfile: PlatformProfile = {
   productDiscoveryPaths: ['/', '/Search-Show', '/search', '/shop', '/category'],
   addToCartSelectors: [
     'button.add-to-cart',
-    'button:has-text("Add to Bag")',
-    'button:has-text("Add to Cart")',
-    'button:has-text("ADD TO BAG")',
-    'button:has-text("ADD TO CART")',
     '[data-action*="AddToCart"]',
     '[data-url*="Cart-AddProduct"]',
     'form[action*="Cart-AddProduct"] button[type="submit"]',
@@ -71,8 +66,6 @@ export const sfccProfile: PlatformProfile = {
     'input[name*="checkout" i]',
     'button[id*="checkout" i]',
     'input[id*="checkout" i]',
-    'button:has-text("Checkout")',
-    'button:has-text("Proceed to Checkout")',
     ...SHARED_CHECKOUT_BUTTON_SELECTORS,
   ],
   cartPaths: ['/Cart-Show', '/cart'],

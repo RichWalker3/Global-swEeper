@@ -32,6 +32,16 @@ test-results/
 
 # Screenshots from crawls
 screenshots/
+# Local merchant WA captures dropped in the repo root (not docs/assets)
+/*.png
+/*-snapshot.md
+/faq-snap.md
+
+# Finder duplicate copies ("foo 2.ts")
+* 2.md
+* 2.ts
+* 2.sh
+* 2.py
 
 # Temporary files
 tmp/
